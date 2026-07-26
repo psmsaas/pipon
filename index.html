@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Control Pipón</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        'pipon-brown': '#5C260E',
+                        'pipon-orange': '#D45115',
+                        'pipon-yellow': '#FCC873',
+                        'pipon-cream': '#FFF2D4'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FFF2D4; 
+            color: #5C260E; 
+            -webkit-tap-highlight-color: transparent; 
+        }
+        ::-webkit-scrollbar { display: none; }
+        
+        .modal-enter { animation: slideUp 0.3s ease-out forwards; }
+        .modal-exit { animation: slideDown 0.3s ease-in forwards; }
+        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideDown { from { transform: translateY(0); opacity: 1; } to { transform: translateY(100%); opacity: 0; } }
+        
+        .fab-menu {
+            transition: all 0.3s ease;
+            transform-origin: bottom right;
+            transform: scale(0);
+            opacity: 0;
+        }
+        .fab-menu.active {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        #toast-container { z-index: 9999; }
+        .toast { animation: slideInDown 0.3s ease-out forwards; }
+        @keyframes slideInDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    </style>
+</head>
+<body class="pb-24">
+
+    <div id="toast-container" class="fixed top-4 left-0 right-0 px-4 flex flex-col gap-2 items-center pointer-events-none"></div>
+
+    <header class="bg-pipon-brown text-white p-4 sticky top-0 z-10 shadow-md">
+        <div class="max-w-md mx-auto flex items-center justify-center gap-3">
+            <div class="bg-white rounded-full w-10 h-10 flex items-center justify-center overflow-hidden border-2 border-white">
+                <img src="pipon.jpeg" alt="Logo Pipón" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='https://placehold.co/100x100/FFF2D4/D45115?text=P';">
+            </div>
+            <h1 class="text-xl font-black tracking-wide uppercase">Pipón</h1>
+        </div>
+    </header>
+
+    <main class="p-4 max-w-md mx-auto">
+        
+        <div id="content-inicio" class="tab-content block">
+            <div class="bg-white rounded-3xl shadow-sm p-6 text-center border border-pipon-yellow/30 mb-4 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-2 bg-pipon-orange"></div>
+                <h2 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 mt-2">Balance del Día (Hoy)</h2>
+                <div class="text-5xl font-black text-pipon-brown mb-1" id="balance-total">$0</div>
+                <p id="balance-ayer" class="text-sm font-semibold text-gray-400">Ayer: Cargando...</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="bg-white rounded-2xl shadow-sm p-4 text-center border border-green-100">
+                    <div class="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto mb-2"><i class="fa-solid fa-arrow-down text-sm"></i></div>
+                    <p class="text-xs font-bold text-gray-500 uppercase">Ingresos</p>
+                    <p class="text-xl font-bold text-green-600" id="resumen-ingresos">$0</p>
+                </div>
+                <div class="bg-white rounded-2xl shadow-sm p-4 text-center border border-red-100">
+                    <div class="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-2"><i class="fa-solid fa-arrow-up text-sm"></i></div>
+                    <p class="text-xs font-bold text-gray-500 uppercase">Gastos</p>
+                    <p class="text-xl font-bold text-red-600" id="resumen-gastos">$0</p>
+                </div>
+            </div>
+
+            <h3 class="font-bold text-pipon-brown mb-3 px-1">Resumen rápido</h3>
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 text-center">
+                <i class="fa-solid fa-chart-pie text-4xl text-gray-200 mb-3 block"></i>
+                <p class="text-sm text-gray-500 font-medium">Usa el botón <span class="text-pipon-orange font-bold">+</span> para registrar los movimientos de hoy.</p>
+            </div>
+        </div>
+
+        <div id="content-ventas" class="tab-content hidden">
+            <div class="flex justify-between items-end mb-4 px-1">
+                <h2 class="text-xl font-bold text-pipon-brown">Ventas de Hoy</h2>
+                <span class="text-sm font-bold text-green-600 bg-green-100 px-3 py-1 rounded-full" id="total-ventas-hoy-badge">Total: $0</span>
+            </div>
+            <div id="lista-ventas" class="flex flex-col gap-3 pb-8">
+                <p class="text-center text-gray-500 mt-10">Cargando ventas...</p>
+            </div>
+        </div>
+
+        <div id="content-gastos" class="tab-content hidden">
+            <div class="flex justify-between items-end mb-4 px-1">
+                <h2 class="text-xl font-bold text-pipon-brown">Gastos de Hoy</h2>
+                <span class="text-sm font-bold text-red-600 bg-red-100 px-3 py-1 rounded-full" id="total-gastos-hoy-badge">Total: $0</span>
+            </div>
+            <div id="lista-gastos" class="flex flex-col gap-3 pb-8">
+                <p class="text-center text-gray-500 mt-10">Cargando gastos...</p>
+            </div>
+        </div>
+
+        <div id="content-historial" class="tab-content hidden">
+            <div class="flex justify-between items-end mb-4 px-1">
+                <h2 class="text-xl font-bold text-pipon-brown">Historial Mensual</h2>
+            </div>
+            
+            <div class="bg-white rounded-2xl shadow-sm p-4 border border-gray-100 mb-4">
+                <div class="flex justify-between items-center mb-4">
+                    <button onclick="cambiarMes(-1)" class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-600 active:bg-gray-200"><i class="fa-solid fa-chevron-left"></i></button>
+                    <h3 id="calendario-mes-anio" class="font-bold text-gray-800 uppercase tracking-wide text-sm">Mes Año</h3>
+                    <button onclick="cambiarMes(1)" class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-600 active:bg-gray-200"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+                <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-black text-gray-400 mb-2">
+                    <div>DOM</div><div>LUN</div><div>MAR</div><div>MIE</div><div>JUE</div><div>VIE</div><div>SAB</div>
+                </div>
+                <div id="calendario-grilla" class="grid grid-cols-7 gap-1 text-sm"></div>
+            </div>
+
+            <div id="detalle-dia-seleccionado" class="hidden bg-white rounded-2xl shadow-sm p-5 border border-pipon-yellow/50 relative overflow-hidden transition-all">
+                <div class="absolute top-0 left-0 w-full h-1 bg-pipon-orange"></div>
+                <div class="flex justify-between items-center mb-4 border-b border-gray-50 pb-3">
+                    <span id="detalle-fecha" class="font-bold text-gray-800 flex items-center gap-2"><i class="fa-regular fa-calendar text-pipon-orange"></i> Selecciona un día</span>
+                    <div class="text-right">
+                        <p class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-0.5">Balance</p>
+                        <span id="detalle-balance" class="text-xl font-black">$0</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-green-50 p-3 rounded-xl border border-green-100">
+                        <div class="flex items-center gap-1.5 mb-1 text-green-600"><i class="fa-solid fa-arrow-down text-[10px]"></i><p class="text-[10px] uppercase font-bold">Ingresos</p></div>
+                        <p id="detalle-ventas" class="font-bold text-green-700 text-lg">$0</p>
+                    </div>
+                    <div class="bg-red-50 p-3 rounded-xl border border-red-100">
+                        <div class="flex items-center gap-1.5 mb-1 text-red-600"><i class="fa-solid fa-arrow-up text-[10px]"></i><p class="text-[10px] uppercase font-bold">Gastos</p></div>
+                        <p id="detalle-gastos" class="font-bold text-red-700 text-lg">$0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <nav class="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 z-30 pb-safe">
+        <div class="max-w-md mx-auto flex justify-between px-6 py-2">
+            <button onclick="switchTab('inicio')" id="nav-inicio" class="nav-btn flex flex-col items-center p-2 text-pipon-orange w-16"><i class="fa-solid fa-house text-xl mb-1"></i><span class="text-[10px] font-bold">Inicio</span></button>
+            <button onclick="switchTab('ventas')" id="nav-ventas" class="nav-btn flex flex-col items-center p-2 text-gray-400 w-16"><i class="fa-solid fa-cash-register text-xl mb-1"></i><span class="text-[10px] font-bold">Ventas</span></button>
+            <div class="w-16"></div>
+            <button onclick="switchTab('gastos')" id="nav-gastos" class="nav-btn flex flex-col items-center p-2 text-gray-400 w-16"><i class="fa-solid fa-receipt text-xl mb-1"></i><span class="text-[10px] font-bold">Gastos</span></button>
+            <button onclick="switchTab('historial')" id="nav-historial" class="nav-btn flex flex-col items-center p-2 text-gray-400 w-16"><i class="fa-solid fa-calendar-days text-xl mb-1"></i><span class="text-[10px] font-bold">Historial</span></button>
+        </div>
+    </nav>
+
+    <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
+        <div id="fab-menu" class="fab-menu absolute bottom-16 left-1/2 -translate-x-1/2 flex flex-col gap-3 bg-white p-3 rounded-2xl shadow-xl border border-gray-100 w-48 pointer-events-none">
+            <button onclick="openModal('modalVenta'); toggleFabMenu();" class="flex items-center gap-3 w-full bg-green-50 text-green-700 p-3 rounded-xl font-bold active:bg-green-100"><i class="fa-solid fa-plus-circle"></i> Nueva Venta</button>
+            <button onclick="openModal('modalGasto'); toggleFabMenu();" class="flex items-center gap-3 w-full bg-red-50 text-red-700 p-3 rounded-xl font-bold active:bg-red-100"><i class="fa-solid fa-minus-circle"></i> Nuevo Gasto</button>
+        </div>
+        <button onclick="toggleFabMenu()" id="fab-btn" class="w-14 h-14 bg-pipon-orange text-white rounded-full flex items-center justify-center text-2xl shadow-lg border-4 border-[#FFF2D4] active:scale-95 transition-transform"><i class="fa-solid fa-plus transition-transform duration-300" id="fab-icon"></i></button>
+    </div>
+    <div id="fab-overlay" onclick="toggleFabMenu()" class="fixed inset-0 bg-black/20 z-30 hidden backdrop-blur-sm transition-opacity opacity-0"></div>
+
+    <!-- MODAL VENTA -->
+    <div id="modalVenta" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-green-600">Registrar Venta</h2>
+                <button onclick="closeModal('modalVenta')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <form id="form-venta" onsubmit="guardarVenta(event)">
+                <div class="mb-5 text-center">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Monto Total</label>
+                    <div class="flex justify-center items-center gap-1 text-5xl font-black text-gray-800">
+                        <span class="text-3xl text-gray-400">$</span>
+                        <input type="number" id="venta-monto" class="w-32 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-green-500 transition-colors" required min="1" step="0.01" inputmode="decimal" placeholder="0">
+                    </div>
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Descripción (Opcional)</label>
+                    <input type="text" id="venta-desc" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:bg-white transition-all font-medium" placeholder="Ej: 3 docenas mixtas...">
+                </div>
+
+                <div class="mb-8">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Método de Pago</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button type="button" onclick="seleccionarMetodo('venta', 'Efectivo', this)" class="metodo-btn-venta border-2 border-green-500 bg-green-50 text-green-700 font-bold py-3 rounded-xl transition-all"><i class="fa-solid fa-money-bill-wave mr-2"></i>Efectivo</button>
+                        <button type="button" onclick="seleccionarMetodo('venta', 'Transferencia', this)" class="metodo-btn-venta border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-xl transition-all"><i class="fa-solid fa-building-columns mr-2"></i>Transfer.</button>
+                    </div>
+                    <input type="hidden" id="venta-metodo" value="Efectivo">
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Comprobante (Opcional)</label>
+                    <div class="flex items-center gap-2">
+                        <label for="venta-comprobante" class="flex-1 bg-gray-50 hover:bg-gray-100 border border-dashed border-gray-300 rounded-xl px-4 py-3 text-center cursor-pointer transition-colors text-sm font-medium text-gray-600 flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-camera"></i> <span id="venta-comprobante-label">Adjuntar foto/captura</span>
+                        </label>
+                        <input type="file" id="venta-comprobante" accept="image/*" class="hidden" onchange="procesarImagen('venta', this)">
+                        <button type="button" id="venta-comprobante-clear" onclick="limpiarImagen('venta')" class="hidden w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    <input type="hidden" id="venta-comprobante-base64" value="">
+                </div>
+
+                <button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-green-200 active:scale-95 transition-all">Guardar Venta</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL GASTO -->
+    <div id="modalGasto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-red-600">Registrar Gasto</h2>
+                <button onclick="closeModal('modalGasto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <form id="form-gasto" onsubmit="guardarGasto(event)">
+                <div class="mb-5 text-center">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Monto del Gasto</label>
+                    <div class="flex justify-center items-center gap-1 text-5xl font-black text-gray-800">
+                        <span class="text-3xl text-gray-400">$</span>
+                        <input type="number" id="gasto-monto" class="w-32 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-red-500 transition-colors" required min="1" step="0.01" inputmode="decimal" placeholder="0">
+                    </div>
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿En qué se gastó?</label>
+                    <input type="text" id="gasto-desc" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-red-500 focus:bg-white transition-all font-medium" placeholder="Ej: Harina, Envases..." required>
+                </div>
+
+                <div class="mb-8">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Pagado con</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button type="button" onclick="seleccionarMetodo('gasto', 'Efectivo', this)" class="metodo-btn-gasto border-2 border-red-500 bg-red-50 text-red-700 font-bold py-3 rounded-xl transition-all"><i class="fa-solid fa-money-bill-wave mr-2"></i>Caja/Efectivo</button>
+                        <button type="button" onclick="seleccionarMetodo('gasto', 'Transferencia', this)" class="metodo-btn-gasto border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-xl transition-all"><i class="fa-solid fa-building-columns mr-2"></i>Cuenta/Transf.</button>
+                    </div>
+                    <input type="hidden" id="gasto-metodo" value="Efectivo">
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Comprobante (Opcional)</label>
+                    <div class="flex items-center gap-2">
+                        <label for="gasto-comprobante" class="flex-1 bg-gray-50 hover:bg-gray-100 border border-dashed border-gray-300 rounded-xl px-4 py-3 text-center cursor-pointer transition-colors text-sm font-medium text-gray-600 flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-camera"></i> <span id="gasto-comprobante-label">Adjuntar foto/captura</span>
+                        </label>
+                        <input type="file" id="gasto-comprobante" accept="image/*" class="hidden" onchange="procesarImagen('gasto', this)">
+                        <button type="button" id="gasto-comprobante-clear" onclick="limpiarImagen('gasto')" class="hidden w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    <input type="hidden" id="gasto-comprobante-base64" value="">
+                </div>
+
+                <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-red-200 active:scale-95 transition-all">Guardar Gasto</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalComprobante" class="fixed inset-0 z-[60] hidden flex-col justify-center items-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="w-full max-w-md bg-white rounded-2xl overflow-hidden shadow-2xl modal-enter relative">
+            <div class="flex justify-between items-center p-4 border-b border-gray-100 bg-gray-50">
+                <h3 class="font-bold text-gray-800">Comprobante Adjunto</h3>
+                <button onclick="cerrarComprobante()" class="w-8 h-8 bg-gray-200 rounded-full text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4 bg-gray-100 flex justify-center max-h-[70vh] overflow-auto">
+                <img id="imagen-comprobante-vista" src="" alt="Comprobante" class="max-w-full rounded shadow-sm">
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Importaciones de Firebase (Asegúrate de configurar esto en tu proyecto real)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // NOTA PARA GITHUB: Reemplaza __firebase_config con el objeto de configuración que te da Firebase
+        // Ejemplo: const firebaseConfig = { apiKey: "...", authDomain: "...", projectId: "...", ... };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'pipon-app';
+        let firebaseConfig = {};
+        try { firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {}; } catch(e){}
+
+        const firebaseConfig = {
+ 	apiKey: "AIzaSyBjzZmNyG_NmfNlEc3QusG55YLYIUwXIQY",
+  	authDomain: "sistema-pipon.firebaseapp.com",
+ 	projectId: "sistema-pipon",
+  	storageBucket: "sistema-pipon.firebasestorage.app",
+  	messagingSenderId: "726758496600",
+  	appId: "1:726758496600:web:4a83534bdc337f4535ed2d"
+	};
+	
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        let userId = null;
+        let ventasData = [];
+        let gastosData = [];
+
+        let fechaCalendario = new Date(); 
+        let diaSeleccionadoFormat = null; 
+
+        // UTILIDADES
+        const formatearDinero = (monto) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(monto);
+        const formatearHora = (timestamp) => {
+            if (!timestamp) return '';
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            return date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+        };
+        const esHoy = (timestamp) => {
+            if (!timestamp) return false;
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            const hoy = new Date();
+            return date.getDate() === hoy.getDate() && date.getMonth() === hoy.getMonth() && date.getFullYear() === hoy.getFullYear();
+        };
+        const esAyer = (timestamp) => {
+            if (!timestamp) return false;
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            const ayer = new Date();
+            ayer.setDate(ayer.getDate() - 1); 
+            return date.getDate() === ayer.getDate() && date.getMonth() === ayer.getMonth() && date.getFullYear() === ayer.getFullYear();
+        };
+
+        window.showToast = (mensaje, tipo = 'success') => {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colorClass = tipo === 'success' ? 'bg-green-600' : 'bg-red-600';
+            const icon = tipo === 'success' ? 'fa-check' : 'fa-info';
+            toast.className = `toast ${colorClass} text-white px-5 py-3 rounded-full shadow-lg font-bold text-sm flex items-center gap-2 pointer-events-auto`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i> ${mensaje}`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-100%)';
+                toast.style.transition = 'all 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        };
+
+        // FUNCIONES DE RENDERIZADO
+        function renderBalanceYResumen() {
+            const ventasHoy = ventasData.filter(v => esHoy(v.timestamp));
+            const gastosHoy = gastosData.filter(g => esHoy(g.timestamp));
+
+            const totalVentasHoy = ventasHoy.reduce((sum, v) => sum + Number(v.monto), 0);
+            const totalGastosHoy = gastosHoy.reduce((sum, g) => sum + Number(g.monto), 0);
+            const balanceTotalHoy = totalVentasHoy - totalGastosHoy;
+
+            document.getElementById('resumen-ingresos').innerText = formatearDinero(totalVentasHoy);
+            document.getElementById('resumen-gastos').innerText = formatearDinero(totalGastosHoy);
+            
+            const balEl = document.getElementById('balance-total');
+            balEl.innerText = formatearDinero(balanceTotalHoy);
+            if (balanceTotalHoy > 0) balEl.className = 'text-5xl font-black text-green-600 mb-1';
+            else if (balanceTotalHoy < 0) balEl.className = 'text-5xl font-black text-red-600 mb-1';
+            else balEl.className = 'text-5xl font-black text-pipon-brown mb-1';
+
+            const ventasAyer = ventasData.filter(v => esAyer(v.timestamp));
+            const gastosAyer = gastosData.filter(g => esAyer(g.timestamp));
+            const totalVentasAyer = ventasAyer.reduce((sum, v) => sum + Number(v.monto), 0);
+            const totalGastosAyer = gastosAyer.reduce((sum, g) => sum + Number(g.monto), 0);
+            const balanceTotalAyer = totalVentasAyer - totalGastosAyer;
+
+            const balAyerEl = document.getElementById('balance-ayer');
+            if (totalVentasAyer === 0 && totalGastosAyer === 0) {
+                balAyerEl.innerText = `Ayer: Sin movimientos`;
+                balAyerEl.className = 'text-sm font-semibold text-gray-400';
+            } else {
+                balAyerEl.innerText = `Ayer: ${formatearDinero(balanceTotalAyer)}`;
+                if (balanceTotalAyer > 0) balAyerEl.className = 'text-sm font-bold text-green-500';
+                else if (balanceTotalAyer < 0) balAyerEl.className = 'text-sm font-bold text-red-500';
+                else balAyerEl.className = 'text-sm font-bold text-gray-500';
+            }
+        }
+
+        function renderVentas() {
+            const ventasHoy = ventasData.filter(v => esHoy(v.timestamp)).sort((a,b) => (b.timestamp?.toMillis()||0) - (a.timestamp?.toMillis()||0));
+            const total = ventasHoy.reduce((sum, v) => sum + Number(v.monto), 0);
+            document.getElementById('total-ventas-hoy-badge').innerText = `Total: ${formatearDinero(total)}`;
+            const listEl = document.getElementById('lista-ventas');
+
+            if (ventasHoy.length === 0) {
+                listEl.innerHTML = `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm mt-4"><i class="fa-solid fa-cash-register text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium">Aún no hay ventas hoy.</p></div>`;
+                return;
+            }
+            
+            listEl.innerHTML = ventasHoy.map(v => `
+                <div class="bg-white rounded-xl p-4 flex justify-between items-center shadow-sm border-l-4 border-l-green-500">
+                    <div>
+                        <p class="font-bold text-gray-800">${v.descripcion || 'Venta general'}</p>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="text-xs text-gray-400"><i class="fa-regular fa-clock"></i> ${formatearHora(v.timestamp)}</span>
+                            <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">${v.metodo}</span>
+                            ${v.comprobante ? `<button onclick="verComprobante('${v.id}', 'ventas')" class="text-[10px] bg-blue-50 text-blue-500 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-blue-100"><i class="fa-solid fa-paperclip"></i> Ver</button>` : ''}
+                        </div>
+                    </div>
+                    <span class="font-black text-green-600 text-lg">+${formatearDinero(v.monto)}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderGastos() {
+            const gastosHoy = gastosData.filter(g => esHoy(g.timestamp)).sort((a,b) => (b.timestamp?.toMillis()||0) - (a.timestamp?.toMillis()||0));
+            const total = gastosHoy.reduce((sum, g) => sum + Number(g.monto), 0);
+            document.getElementById('total-gastos-hoy-badge').innerText = `Total: ${formatearDinero(total)}`;
+            const listEl = document.getElementById('lista-gastos');
+
+            if (gastosHoy.length === 0) {
+                listEl.innerHTML = `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm mt-4"><i class="fa-solid fa-receipt text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium">No hay gastos hoy.</p></div>`;
+                return;
+            }
+            
+            listEl.innerHTML = gastosHoy.map(g => `
+                <div class="bg-white rounded-xl p-4 flex justify-between items-center shadow-sm border-l-4 border-l-red-500">
+                    <div>
+                        <p class="font-bold text-gray-800">${g.descripcion}</p>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="text-xs text-gray-400"><i class="fa-regular fa-clock"></i> ${formatearHora(g.timestamp)}</span>
+                            <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">${g.metodo}</span>
+                            ${g.comprobante ? `<button onclick="verComprobante('${g.id}', 'gastos')" class="text-[10px] bg-blue-50 text-blue-500 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-blue-100"><i class="fa-solid fa-paperclip"></i> Ver</button>` : ''}
+                        </div>
+                    </div>
+                    <span class="font-black text-red-600 text-lg">-${formatearDinero(g.monto)}</span>
+                </div>
+            `).join('');
+        }
+
+        // HISTORIAL / CALENDARIO
+        function agruparDatosPorFecha() {
+            const dias = {}; 
+            const agrupar = (item, tipo) => {
+                if(!item.timestamp) return;
+                const dateObj = item.timestamp.toDate ? item.timestamp.toDate() : new Date(item.timestamp);
+                const fecha = dateObj.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }); 
+                if(!dias[fecha]) dias[fecha] = { ventas: 0, gastos: 0 };
+                dias[fecha][tipo] += Number(item.monto);
+            };
+            ventasData.forEach(v => agrupar(v, 'ventas'));
+            gastosData.forEach(g => agrupar(g, 'gastos'));
+            return dias;
+        }
+
+        function renderHistorial() {
+            const datosAgrupados = agruparDatosPorFecha();
+            const grillaEl = document.getElementById('calendario-grilla');
+            
+            const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            const mesActual = fechaCalendario.getMonth();
+            const anioActual = fechaCalendario.getFullYear();
+            document.getElementById('calendario-mes-anio').innerText = `${meses[mesActual]} ${anioActual}`;
+
+            const primerDiaDelMes = new Date(anioActual, mesActual, 1).getDay(); 
+            const diasEnElMes = new Date(anioActual, mesActual + 1, 0).getDate();
+            
+            let htmlCalendario = '';
+            for (let i = 0; i < primerDiaDelMes; i++) htmlCalendario += `<div class="aspect-square"></div>`;
+
+            const hoyStr = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+            for (let dia = 1; dia <= diasEnElMes; dia++) {
+                const fechaCiclo = new Date(anioActual, mesActual, dia);
+                const fechaStr = fechaCiclo.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                
+                const tieneDatos = datosAgrupados[fechaStr];
+                const esHoyCalendario = fechaStr === hoyStr;
+                const estaSeleccionado = fechaStr === diaSeleccionadoFormat;
+
+                let clasesBtn = "w-full aspect-square rounded-full flex flex-col items-center justify-center relative font-medium transition-colors ";
+                if (estaSeleccionado) clasesBtn += "bg-pipon-orange text-white shadow-md";
+                else if (esHoyCalendario) clasesBtn += "bg-pipon-cream text-pipon-brown font-bold border border-pipon-yellow";
+                else clasesBtn += "text-gray-600 hover:bg-gray-50 active:bg-gray-100";
+
+                let indicadorHtml = '';
+                if (tieneDatos && !estaSeleccionado) indicadorHtml = `<div class="absolute bottom-1 w-1 h-1 rounded-full bg-pipon-orange"></div>`;
+                else if (tieneDatos && estaSeleccionado) indicadorHtml = `<div class="absolute bottom-1 w-1 h-1 rounded-full bg-white"></div>`;
+
+                htmlCalendario += `<button onclick="seleccionarDiaHistorial('${fechaStr}')" class="${clasesBtn}"><span>${dia}</span>${indicadorHtml}</button>`;
+            }
+
+            grillaEl.innerHTML = htmlCalendario;
+            actualizarCuadroDetalle(datosAgrupados);
+        }
+
+        function actualizarCuadroDetalle(datosAgrupados) {
+            const cuadroEl = document.getElementById('detalle-dia-seleccionado');
+            if (!diaSeleccionadoFormat) {
+                cuadroEl.classList.add('hidden');
+                return;
+            }
+            cuadroEl.classList.remove('hidden');
+            const infoDia = datosAgrupados[diaSeleccionadoFormat] || { ventas: 0, gastos: 0 };
+            const balanceDia = infoDia.ventas - infoDia.gastos;
+
+            document.getElementById('detalle-fecha').innerHTML = `<i class="fa-regular fa-calendar-check text-pipon-orange"></i> ${diaSeleccionadoFormat}`;
+            document.getElementById('detalle-ventas').innerText = formatearDinero(infoDia.ventas);
+            document.getElementById('detalle-gastos').innerText = formatearDinero(infoDia.gastos);
+            
+            const balEl = document.getElementById('detalle-balance');
+            balEl.innerText = formatearDinero(balanceDia);
+            balEl.className = `text-xl font-black ${balanceDia > 0 ? 'text-green-600' : (balanceDia < 0 ? 'text-red-600' : 'text-gray-800')}`;
+        }
+
+        // CONTROLADORES DE UI 
+        window.cambiarMes = function(cambio) { fechaCalendario.setMonth(fechaCalendario.getMonth() + cambio); renderHistorial(); }
+        window.seleccionarDiaHistorial = function(fechaStr) { diaSeleccionadoFormat = fechaStr; renderHistorial(); }
+
+        window.switchTab = function(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`content-${tabName}`).classList.remove('hidden');
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-pipon-orange');
+                btn.classList.add('text-gray-400');
+            });
+            const activeBtn = document.getElementById(`nav-${tabName}`);
+            activeBtn.classList.remove('text-gray-400');
+            activeBtn.classList.add('text-pipon-orange');
+
+            if (tabName === 'historial' && !diaSeleccionadoFormat) {
+                const hoy = new Date();
+                fechaCalendario = new Date(hoy.getFullYear(), hoy.getMonth(), 1); 
+                diaSeleccionadoFormat = hoy.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                renderHistorial();
+            }
+        };
+
+        window.toggleFabMenu = function() {
+            const menu = document.getElementById('fab-menu');
+            const overlay = document.getElementById('fab-overlay');
+            const icon = document.getElementById('fab-icon');
+            
+            if(menu.classList.contains('active')) {
+                menu.classList.remove('active', 'pointer-events-auto');
+                menu.classList.add('pointer-events-none');
+                overlay.classList.add('hidden');
+                overlay.classList.remove('opacity-100');
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                menu.classList.add('active', 'pointer-events-auto');
+                menu.classList.remove('pointer-events-none');
+                overlay.classList.remove('hidden');
+                setTimeout(() => overlay.classList.add('opacity-100'), 10);
+                icon.style.transform = 'rotate(45deg)';
+            }
+        };
+
+        window.openModal = function(modalId) {
+            const modal = document.getElementById(modalId);
+            const modalContent = modal.querySelector('div');
+            modal.classList.remove('hidden');
+            modalContent.classList.remove('modal-exit');
+            modalContent.classList.add('modal-enter');
+            setTimeout(() => { document.getElementById(modalId === 'modalVenta' ? 'venta-monto' : 'gasto-monto').focus(); }, 300);
+        };
+
+        window.closeModal = function(modalId) {
+            const modal = document.getElementById(modalId);
+            const modalContent = modal.querySelector('div');
+            modalContent.classList.remove('modal-enter');
+            modalContent.classList.add('modal-exit');
+            
+            setTimeout(() => { 
+                modal.classList.add('hidden'); 
+            }, 300);
+            
+            if(modalId === 'modalVenta') {
+                document.getElementById('form-venta').reset();
+                limpiarImagen('venta');
+                document.getElementById('venta-metodo').value = "Efectivo";
+                document.querySelectorAll('.metodo-btn-venta')[0].className = "metodo-btn-venta border-2 border-green-500 bg-green-50 text-green-700 font-bold py-3 rounded-xl transition-all";
+                document.querySelectorAll('.metodo-btn-venta')[1].className = "metodo-btn-venta border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-xl transition-all";
+            }
+            if(modalId === 'modalGasto') {
+                document.getElementById('form-gasto').reset();
+                limpiarImagen('gasto');
+                document.getElementById('gasto-metodo').value = "Efectivo";
+                document.querySelectorAll('.metodo-btn-gasto')[0].className = "metodo-btn-gasto border-2 border-red-500 bg-red-50 text-red-700 font-bold py-3 rounded-xl transition-all";
+                document.querySelectorAll('.metodo-btn-gasto')[1].className = "metodo-btn-gasto border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-xl transition-all";
+            }
+        };
+
+        window.seleccionarMetodo = function(tipo, metodo, elementoBtn) {
+            document.getElementById(`${tipo}-metodo`).value = metodo;
+            const botones = document.querySelectorAll(`.metodo-btn-${tipo}`);
+            botones.forEach(btn => {
+                btn.className = `metodo-btn-${tipo} border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-xl transition-all`;
+            });
+            if (tipo === 'venta') {
+                elementoBtn.className = `metodo-btn-${tipo} border-2 border-green-500 bg-green-50 text-green-700 font-bold py-3 rounded-xl transition-all`;
+            } else {
+                elementoBtn.className = `metodo-btn-${tipo} border-2 border-red-500 bg-red-50 text-red-700 font-bold py-3 rounded-xl transition-all`;
+            }
+        };
+
+        window.guardarVenta = async function(e) {
+            e.preventDefault();
+            if (!userId) { alert("Conectando con base de datos, espere..."); return; }
+            const monto = document.getElementById('venta-monto').value;
+            const desc = document.getElementById('venta-desc').value;
+            const metodo = document.getElementById('venta-metodo').value;
+            const comprobante = document.getElementById('venta-comprobante-base64').value;
+            try {
+                const ventasRef = collection(db, 'artifacts', appId, 'users', userId, 'ventas');
+                const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: new Date() };
+                if(comprobante) data.comprobante = comprobante;
+                await addDoc(ventasRef, data);
+                closeModal('modalVenta');
+                showToast('¡Venta guardada con éxito!', 'success');
+            } catch (error) { console.error(error); showToast('Error al guardar.', 'error'); }
+        };
+
+        window.guardarGasto = async function(e) {
+            e.preventDefault();
+            if (!userId) { alert("Conectando con base de datos, espere..."); return; }
+            const monto = document.getElementById('gasto-monto').value;
+            const desc = document.getElementById('gasto-desc').value;
+            const metodo = document.getElementById('gasto-metodo').value;
+            const comprobante = document.getElementById('gasto-comprobante-base64').value;
+            try {
+                const gastosRef = collection(db, 'artifacts', appId, 'users', userId, 'gastos');
+                const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: new Date() };
+                if(comprobante) data.comprobante = comprobante;
+                await addDoc(gastosRef, data);
+                closeModal('modalGasto');
+                showToast('Gasto registrado correctamente.', 'success'); 
+            } catch (error) { console.error(error); showToast('Error al guardar.', 'error'); }
+        };
+
+        window.procesarImagen = function(tipo, inputElement) {
+            const file = inputElement.files[0];
+            if (!file) return;
+            if (file.size > 800 * 1024) { showToast("Imagen muy pesada.", "error"); inputElement.value = ""; return; }
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById(`${tipo}-comprobante-base64`).value = e.target.result;
+                document.getElementById(`${tipo}-comprobante-label`).innerText = "Imagen adjunta ✓";
+                document.getElementById(`${tipo}-comprobante-label`).parentElement.classList.add('border-green-500', 'bg-green-50', 'text-green-600');
+                document.getElementById(`${tipo}-comprobante-clear`).classList.remove('hidden');
+            };
+            reader.readAsDataURL(file); 
+        };
+
+        window.limpiarImagen = function(tipo) {
+            document.getElementById(`${tipo}-comprobante`).value = ""; 
+            document.getElementById(`${tipo}-comprobante-base64`).value = ""; 
+            document.getElementById(`${tipo}-comprobante-label`).innerText = "Adjuntar foto/captura";
+            document.getElementById(`${tipo}-comprobante-label`).parentElement.classList.remove('border-green-500', 'bg-green-50', 'text-green-600');
+            document.getElementById(`${tipo}-comprobante-clear`).classList.add('hidden');
+        };
+
+        window.verComprobante = function(id, coleccion) {
+            let dataArr = coleccion === 'ventas' ? ventasData : gastosData;
+            let item = dataArr.find(i => i.id === id);
+            if(item && item.comprobante) {
+                const modal = document.getElementById('modalComprobante');
+                document.getElementById('imagen-comprobante-vista').src = item.comprobante;
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        };
+
+        window.cerrarComprobante = function() {
+            const modal = document.getElementById('modalComprobante');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            setTimeout(() => { document.getElementById('imagen-comprobante-vista').src = ""; }, 300);
+        };
+
+        // INICIALIZACIÓN
+        async function inicializar() {
+            try {
+                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
+                else await signInAnonymously(auth);
+                
+                userId = auth.currentUser?.uid;
+                if(!userId) throw new Error("No UID");
+
+                const ventasRef = collection(db, 'artifacts', appId, 'users', userId, 'ventas');
+                const gastosRef = collection(db, 'artifacts', appId, 'users', userId, 'gastos');
+
+                onSnapshot(ventasRef, (snapshot) => {
+                    ventasData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    renderBalanceYResumen(); renderVentas(); renderHistorial();
+                });
+                onSnapshot(gastosRef, (snapshot) => {
+                    gastosData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    renderBalanceYResumen(); renderGastos(); renderHistorial();
+                });
+            } catch (error) { console.error("Error inicializando:", error); }
+        }
+        inicializar();
+    </script>
+</body>
+</html>
