@@ -7,9 +7,7 @@
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     
     <script>
@@ -47,10 +45,12 @@
             transform-origin: bottom right;
             transform: scale(0);
             opacity: 0;
+            pointer-events: none;
         }
         .fab-menu.active {
             transform: scale(1);
             opacity: 1;
+            pointer-events: auto;
         }
 
         #toast-container { z-index: 9999; }
@@ -58,8 +58,7 @@
         @keyframes slideInDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     </style>
 </head>
-<body class="pb-24">
-
+<body class="pb-28">
     <div id="toast-container" class="fixed top-4 left-0 right-0 px-4 flex flex-col gap-2 items-center pointer-events-none"></div>
 
     <header class="bg-pipon-brown text-white p-4 sticky top-0 z-10 shadow-md">
@@ -72,7 +71,6 @@
     </header>
 
     <main class="p-4 max-w-md mx-auto">
-        
         <div id="content-inicio" class="tab-content block">
             <div class="bg-white rounded-3xl shadow-sm p-6 text-center border border-pipon-yellow/30 mb-4 relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-2 bg-pipon-orange"></div>
@@ -121,9 +119,18 @@
             </div>
         </div>
 
+        <div id="content-catalogo" class="tab-content hidden">
+            <div class="flex justify-center items-end mb-4 px-1">
+                <h2 class="text-xl font-bold text-pipon-brown">Catálogo</h2>
+            </div>
+            <div id="lista-productos" class="grid grid-cols-2 gap-3 pb-8">
+                <p class="text-center text-gray-500 mt-10 col-span-2">Cargando catálogo...</p>
+            </div>
+        </div>
+
         <div id="content-historial" class="tab-content hidden">
             <div class="flex justify-between items-end mb-4 px-1">
-                <h2 class="text-xl font-bold text-pipon-brown">Historial Mensual</h2>
+                <h2 class="text-xl font-bold text-pipon-brown">Historial Diario</h2>
             </div>
             
             <div class="bg-white rounded-2xl shadow-sm p-4 border border-gray-100 mb-4">
@@ -159,28 +166,73 @@
                 </div>
             </div>
         </div>
+
+        <div id="content-balances" class="tab-content hidden">
+            <div class="flex justify-between items-end mb-4 px-1">
+                <h2 class="text-xl font-bold text-pipon-brown">Balance General</h2>
+            </div>
+            
+            <div class="bg-white rounded-2xl shadow-sm p-4 border border-gray-100 mb-4">
+                <div class="flex justify-between items-center mb-4">
+                    <button onclick="cambiarAnioBalances(-1)" class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-600 active:bg-gray-200"><i class="fa-solid fa-chevron-left"></i></button>
+                    <h3 id="balances-anio" class="font-bold text-gray-800 uppercase tracking-wide text-lg">2026</h3>
+                    <button onclick="cambiarAnioBalances(1)" class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-600 active:bg-gray-200"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+                <!-- Grilla de 12 meses -->
+                <div id="balances-meses-grilla" class="grid grid-cols-4 gap-2"></div>
+            </div>
+
+            <div id="detalle-balances" class="hidden bg-white rounded-2xl shadow-sm p-5 border border-pipon-yellow/50 relative overflow-hidden transition-all">
+                <div class="absolute top-0 left-0 w-full h-1 bg-pipon-orange"></div>
+                
+                <h3 class="font-bold text-gray-800 mb-4 text-center border-b border-gray-50 pb-2">Resumen del Mes</h3>
+                
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="bg-green-50 p-3 rounded-xl border border-green-100 text-center">
+                        <p class="text-[10px] uppercase font-bold text-green-600 mb-1"><i class="fa-solid fa-arrow-down"></i> Ingresos</p>
+                        <p id="bal-ingresos" class="font-black text-green-700 text-lg">$0</p>
+                    </div>
+                    <div class="bg-red-50 p-3 rounded-xl border border-red-100 text-center">
+                        <p class="text-[10px] uppercase font-bold text-red-600 mb-1"><i class="fa-solid fa-arrow-up"></i> Gastos</p>
+                        <p id="bal-gastos" class="font-black text-red-700 text-lg">$0</p>
+                    </div>
+                </div>
+                
+                <div class="text-center mb-6 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <p class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Ganancia Neta</p>
+                    <span id="bal-neto" class="text-2xl font-black">$0</span>
+                </div>
+
+                <h3 class="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2"><i class="fa-solid fa-ranking-star text-pipon-orange"></i> Ranking de Ventas</h3>
+                <div id="balances-ranking" class="flex flex-col gap-2">
+                    <!-- Javascript llenará el ranking -->
+                </div>
+            </div>
+        </div>
     </main>
 
     <nav class="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 z-30 pb-safe">
-        <div class="max-w-md mx-auto flex justify-between px-6 py-2">
-            <button onclick="switchTab('inicio')" id="nav-inicio" class="nav-btn flex flex-col items-center p-2 text-pipon-orange w-16"><i class="fa-solid fa-house text-xl mb-1"></i><span class="text-[10px] font-bold">Inicio</span></button>
-            <button onclick="switchTab('ventas')" id="nav-ventas" class="nav-btn flex flex-col items-center p-2 text-gray-400 w-16"><i class="fa-solid fa-cash-register text-xl mb-1"></i><span class="text-[10px] font-bold">Ventas</span></button>
-            <div class="w-16"></div>
-            <button onclick="switchTab('gastos')" id="nav-gastos" class="nav-btn flex flex-col items-center p-2 text-gray-400 w-16"><i class="fa-solid fa-receipt text-xl mb-1"></i><span class="text-[10px] font-bold">Gastos</span></button>
-            <button onclick="switchTab('historial')" id="nav-historial" class="nav-btn flex flex-col items-center p-2 text-gray-400 w-16"><i class="fa-solid fa-calendar-days text-xl mb-1"></i><span class="text-[10px] font-bold">Historial</span></button>
+        <div class="max-w-md mx-auto grid grid-cols-6 px-1 py-2 gap-0.5">
+            <button onclick="switchTab('inicio')" id="nav-inicio" class="nav-btn flex flex-col items-center justify-center py-2 text-pipon-orange transition-colors rounded-xl"><i class="fa-solid fa-house text-lg mb-1"></i><span class="text-[9px] font-bold">Inicio</span></button>
+            <button onclick="switchTab('ventas')" id="nav-ventas" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-cash-register text-lg mb-1"></i><span class="text-[9px] font-bold">Ventas</span></button>
+            <button onclick="switchTab('catalogo')" id="nav-catalogo" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-book-open text-lg mb-1"></i><span class="text-[9px] font-bold">Catálogo</span></button>
+            <button onclick="switchTab('gastos')" id="nav-gastos" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-receipt text-lg mb-1"></i><span class="text-[9px] font-bold">Gastos</span></button>
+            <button onclick="switchTab('historial')" id="nav-historial" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-calendar-days text-lg mb-1"></i><span class="text-[9px] font-bold">Historial</span></button>
+            <button onclick="switchTab('balances')" id="nav-balances" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-chart-line text-lg mb-1"></i><span class="text-[9px] font-bold">Balances</span></button>
         </div>
     </nav>
 
-    <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
-        <div id="fab-menu" class="fab-menu absolute bottom-16 left-1/2 -translate-x-1/2 flex flex-col gap-3 bg-white p-3 rounded-2xl shadow-xl border border-gray-100 w-48 pointer-events-none">
-            <button onclick="openModal('modalVenta'); toggleFabMenu();" class="flex items-center gap-3 w-full bg-green-50 text-green-700 p-3 rounded-xl font-bold active:bg-green-100"><i class="fa-solid fa-plus-circle"></i> Nueva Venta</button>
-            <button onclick="openModal('modalGasto'); toggleFabMenu();" class="flex items-center gap-3 w-full bg-red-50 text-red-700 p-3 rounded-xl font-bold active:bg-red-100"><i class="fa-solid fa-minus-circle"></i> Nuevo Gasto</button>
+    <div class="fixed bottom-24 right-4 z-40">
+        <div id="fab-menu" class="fab-menu absolute bottom-16 right-0 flex flex-col gap-3 bg-white p-3 rounded-2xl shadow-xl border border-gray-100 w-56">
+            <button onclick="openModal('modalVenta'); toggleFabMenu();" class="flex items-center gap-3 w-full bg-green-50 text-green-700 p-3 rounded-xl font-bold active:bg-green-100 transition-colors"><i class="fa-solid fa-plus-circle text-lg"></i> Nueva Venta</button>
+            <button onclick="openModal('modalGasto'); toggleFabMenu();" class="flex items-center gap-3 w-full bg-red-50 text-red-700 p-3 rounded-xl font-bold active:bg-red-100 transition-colors"><i class="fa-solid fa-minus-circle text-lg"></i> Nuevo Gasto</button>
+            <div class="h-px bg-gray-100 w-full my-1"></div>
+            <button onclick="openModal('modalProducto'); toggleFabMenu();" class="flex items-center gap-3 w-full bg-pipon-cream text-pipon-brown p-3 rounded-xl font-bold active:bg-pipon-yellow transition-colors"><i class="fa-solid fa-box-open text-lg"></i> Nuevo Producto</button>
         </div>
-        <button onclick="toggleFabMenu()" id="fab-btn" class="w-14 h-14 bg-pipon-orange text-white rounded-full flex items-center justify-center text-2xl shadow-lg border-4 border-[#FFF2D4] active:scale-95 transition-transform"><i class="fa-solid fa-plus transition-transform duration-300" id="fab-icon"></i></button>
+        <button onclick="toggleFabMenu()" id="fab-btn" class="w-14 h-14 bg-pipon-orange text-white rounded-full flex items-center justify-center text-2xl shadow-lg shadow-orange-300 active:scale-95 transition-transform"><i class="fa-solid fa-plus transition-transform duration-300" id="fab-icon"></i></button>
     </div>
     <div id="fab-overlay" onclick="toggleFabMenu()" class="fixed inset-0 bg-black/20 z-30 hidden backdrop-blur-sm transition-opacity opacity-0"></div>
 
-    <!-- MODAL VENTA -->
     <div id="modalVenta" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
         <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative">
             <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
@@ -190,17 +242,20 @@
             </div>
             
             <form id="form-venta" onsubmit="guardarVenta(event)">
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Producto / Detalle</label>
+                    <select id="venta-producto" onchange="seleccionarProductoVenta()" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:bg-white transition-all font-bold text-gray-700 appearance-none">
+                        <option value="">Venta General / Varios</option>
+                        <!-- Se llena con JS -->
+                    </select>
+                </div>
+
                 <div class="mb-5 text-center">
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Monto Total</label>
                     <div class="flex justify-center items-center gap-1 text-5xl font-black text-gray-800">
                         <span class="text-3xl text-gray-400">$</span>
                         <input type="number" id="venta-monto" class="w-32 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-green-500 transition-colors" required min="1" step="0.01" inputmode="decimal" placeholder="0">
                     </div>
-                </div>
-
-                <div class="mb-5">
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Descripción (Opcional)</label>
-                    <input type="text" id="venta-desc" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:bg-white transition-all font-medium" placeholder="Ej: 3 docenas mixtas...">
                 </div>
 
                 <div class="mb-8">
@@ -229,7 +284,6 @@
         </div>
     </div>
 
-    <!-- MODAL GASTO -->
     <div id="modalGasto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
         <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative">
             <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
@@ -278,10 +332,91 @@
         </div>
     </div>
 
+    <!-- MODAL NUEVO PRODUCTO -->
+    <div id="modalProducto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-pipon-brown">Crear Producto</h2>
+                <button onclick="closeModal('modalProducto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <form id="form-producto" onsubmit="guardarProducto(event)">
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Nombre del Producto</label>
+                    <input type="text" id="producto-nombre" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-bold text-gray-800" placeholder="Ej: Docena de Churros..." required>
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Precio de Venta</label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-lg">$</span>
+                        <input type="number" id="producto-precio" class="w-full bg-gray-50 border border-gray-200 rounded-xl pl-8 pr-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-bold text-gray-800" required min="0" step="0.01" inputmode="decimal" placeholder="0">
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Foto del Producto (Opcional)</label>
+                    <div class="flex items-center gap-2">
+                        <label for="producto-comprobante" class="flex-1 bg-pipon-cream/50 hover:bg-pipon-cream border border-dashed border-pipon-yellow rounded-xl px-4 py-4 text-center cursor-pointer transition-colors text-sm font-bold text-pipon-brown flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-image text-lg"></i> <span id="producto-comprobante-label">Subir foto del producto</span>
+                        </label>
+                        <input type="file" id="producto-comprobante" accept="image/*" class="hidden" onchange="procesarImagen('producto', this)">
+                        <button type="button" id="producto-comprobante-clear" onclick="limpiarImagen('producto')" class="hidden w-12 h-12 bg-red-50 text-red-500 rounded-xl flex items-center justify-center"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    <input type="hidden" id="producto-comprobante-base64" value="">
+                </div>
+
+                <button type="submit" class="w-full bg-pipon-brown hover:bg-[#4a1e0b] text-white font-black py-4 rounded-2xl text-lg shadow-lg active:scale-95 transition-all">Guardar Producto</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalEditarProducto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-pipon-orange">Editar Producto</h2>
+                <button onclick="closeModal('modalEditarProducto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <form id="form-editar-producto" onsubmit="actualizarProducto(event)">
+                <input type="hidden" id="edit-producto-id">
+                
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Nombre del Producto</label>
+                    <input type="text" id="edit-producto-nombre" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-bold text-gray-800" required>
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Precio de Venta</label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-lg">$</span>
+                        <input type="number" id="edit-producto-precio" class="w-full bg-gray-50 border border-gray-200 rounded-xl pl-8 pr-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-bold text-gray-800" required min="0" step="0.01" inputmode="decimal">
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Foto del Producto</label>
+                    <div class="flex items-center gap-2">
+                        <label for="edit-producto-comprobante" class="flex-1 bg-pipon-cream/50 hover:bg-pipon-cream border border-dashed border-pipon-yellow rounded-xl px-4 py-4 text-center cursor-pointer transition-colors text-sm font-bold text-pipon-brown flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-image text-lg"></i> <span id="edit-producto-comprobante-label">Cambiar foto</span>
+                        </label>
+                        <input type="file" id="edit-producto-comprobante" accept="image/*" class="hidden" onchange="procesarImagen('edit-producto', this)">
+                        <button type="button" id="edit-producto-comprobante-clear" onclick="limpiarImagen('edit-producto')" class="hidden w-12 h-12 bg-red-50 text-red-500 rounded-xl flex items-center justify-center"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    <input type="hidden" id="edit-producto-comprobante-base64" value="">
+                </div>
+
+                <button type="submit" class="w-full bg-pipon-orange hover:bg-[#b84511] text-white font-black py-4 rounded-2xl text-lg shadow-lg active:scale-95 transition-all">Guardar Cambios</button>
+            </form>
+        </div>
+    </div>
+
     <div id="modalComprobante" class="fixed inset-0 z-[60] hidden flex-col justify-center items-center bg-black/80 backdrop-blur-sm p-4">
         <div class="w-full max-w-md bg-white rounded-2xl overflow-hidden shadow-2xl modal-enter relative">
             <div class="flex justify-between items-center p-4 border-b border-gray-100 bg-gray-50">
-                <h3 class="font-bold text-gray-800">Comprobante Adjunto</h3>
+                <h3 class="font-bold text-gray-800">Visualizador</h3>
                 <button onclick="cerrarComprobante()" class="w-8 h-8 bg-gray-200 rounded-full text-gray-600"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-4 bg-gray-100 flex justify-center max-h-[70vh] overflow-auto">
@@ -293,9 +428,9 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Configuración de Firebase - Reemplazar con la tuya si cambia
+        // CONFIGURACIÓN FIREBASE (REEMPLAZAR CON TU CONFIG SI ES NECESARIO)
         const firebaseConfig = {
             apiKey: "AIzaSyBjzZmNyG_NmfNlEc3QusG55YLYIUwXIQY",
             authDomain: "sistema-pipon.firebaseapp.com",
@@ -309,15 +444,19 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        // userId ya no es estrictamente necesario para la ruta, pero lo mantenemos para que auth no falle
-        let userId = null; 
         let ventasData = [];
         let gastosData = [];
+        let productosData = [];
 
+        // Variables para Historial Diario
         let fechaCalendario = new Date(); 
         let diaSeleccionadoFormat = null; 
 
-        // UTILIDADES
+        // Variables para Balances Mensuales
+        let anioBalances = new Date().getFullYear();
+        let mesBalancesSelec = new Date().getMonth(); // 0 a 11
+
+        // UTILIDADES BÁSICAS
         const formatearDinero = (monto) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(monto);
         const formatearHora = (timestamp) => {
             if (!timestamp) return '';
@@ -441,6 +580,44 @@
             `).join('');
         }
 
+        function renderProductos() {
+            const listEl = document.getElementById('lista-productos');
+            if (productosData.length === 0) {
+                listEl.innerHTML = `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm mt-4 col-span-2"><i class="fa-solid fa-box-open text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium">Aún no has creado productos.</p></div>`;
+            } else {
+                listEl.innerHTML = productosData.map(p => `
+                    <div class="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 flex flex-col items-center text-center relative overflow-hidden group">
+                        <button onclick="abrirEditarProducto('${p.id}')" class="absolute top-2 right-2 w-7 h-7 bg-gray-50 text-gray-400 rounded-full flex items-center justify-center hover:bg-gray-100 active:bg-gray-200 transition-colors shadow-sm border border-gray-100"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                        <div class="w-20 h-20 bg-gray-50 rounded-full mb-3 flex items-center justify-center overflow-hidden border border-gray-100">
+                            ${p.foto ? `<img src="${p.foto}" class="w-full h-full object-cover">` : `<i class="fa-solid fa-box text-2xl text-gray-300"></i>`}
+                        </div>
+                        <p class="font-bold text-gray-800 text-sm leading-tight mb-1 px-1">${p.nombre}</p>
+                        <span class="font-black text-pipon-orange text-lg">${formatearDinero(p.precio)}</span>
+                    </div>
+                `).join('');
+            }
+
+            const selectVenta = document.getElementById('venta-producto');
+            let opcionesHtml = `<option value="">Venta General / Otro</option>`;
+            productosData.forEach(p => {
+                opcionesHtml += `<option value="${p.id}">${p.nombre}</option>`;
+            });
+            selectVenta.innerHTML = opcionesHtml;
+        }
+
+        window.seleccionarProductoVenta = function() {
+            const select = document.getElementById('venta-producto');
+            const productId = select.value;
+            const inputMonto = document.getElementById('venta-monto');
+            
+            if(productId) {
+                const producto = productosData.find(p => p.id === productId);
+                if(producto) inputMonto.value = producto.precio;
+            } else {
+                inputMonto.value = '';
+            }
+        };
+
         function agruparDatosPorFecha() {
             const dias = {}; 
             const agrupar = (item, tipo) => {
@@ -518,9 +695,106 @@
         window.cambiarMes = function(cambio) { fechaCalendario.setMonth(fechaCalendario.getMonth() + cambio); renderHistorial(); }
         window.seleccionarDiaHistorial = function(fechaStr) { diaSeleccionadoFormat = fechaStr; renderHistorial(); }
 
+        window.renderGridBalances = function() {
+            const mesesAbrev = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+            const grilla = document.getElementById('balances-meses-grilla');
+            document.getElementById('balances-anio').innerText = anioBalances;
+            
+            let html = '';
+            mesesAbrev.forEach((mes, index) => {
+                let clases = "py-3 rounded-xl font-bold text-sm transition-all border outline-none active:scale-95 ";
+                if (index === mesBalancesSelec) {
+                    clases += "bg-pipon-orange text-white border-pipon-orange shadow-md";
+                } else {
+                    clases += "bg-white text-gray-600 border-gray-200 hover:bg-gray-50";
+                }
+                html += `<button onclick="seleccionarMesBalances(${index})" class="${clases}">${mes}</button>`;
+            });
+            grilla.innerHTML = html;
+            actualizarDetalleBalances();
+        };
+
+        window.cambiarAnioBalances = function(dir) { 
+            anioBalances += dir; 
+            renderGridBalances(); 
+        };
+        
+        window.seleccionarMesBalances = function(mesIndex) { 
+            mesBalancesSelec = mesIndex; 
+            renderGridBalances(); 
+        };
+
+        function actualizarDetalleBalances() {
+            const detalleEl = document.getElementById('detalle-balances');
+            detalleEl.classList.remove('hidden');
+            
+            // 1. Filtrar ventas y gastos del mes y año exacto
+            const ventasMes = ventasData.filter(v => {
+                if(!v.timestamp) return false;
+                const d = v.timestamp.toDate ? v.timestamp.toDate() : new Date(v.timestamp);
+                return d.getFullYear() === anioBalances && d.getMonth() === mesBalancesSelec;
+            });
+            
+            const gastosMes = gastosData.filter(g => {
+                if(!g.timestamp) return false;
+                const d = g.timestamp.toDate ? g.timestamp.toDate() : new Date(g.timestamp);
+                return d.getFullYear() === anioBalances && d.getMonth() === mesBalancesSelec;
+            });
+            
+            // 2. Calcular los totales del mes
+            const totalVentas = ventasMes.reduce((sum, v) => sum + Number(v.monto), 0);
+            const totalGastos = gastosMes.reduce((sum, g) => sum + Number(g.monto), 0);
+            const balanceNeta = totalVentas - totalGastos;
+            
+            // Renderizar Totales
+            document.getElementById('bal-ingresos').innerText = formatearDinero(totalVentas);
+            document.getElementById('bal-gastos').innerText = formatearDinero(totalGastos);
+            
+            const balNetoEl = document.getElementById('bal-neto');
+            balNetoEl.innerText = formatearDinero(balanceNeta);
+            balNetoEl.className = `text-2xl font-black ${balanceNeta > 0 ? 'text-green-600' : (balanceNeta < 0 ? 'text-red-600' : 'text-gray-800')}`;
+            
+            // 3. Crear el Ranking de Productos más vendidos
+            const estadisticasProd = {};
+            ventasMes.forEach(v => {
+                const nombreProd = v.descripcion || 'Venta General';
+                if(!estadisticasProd[nombreProd]) {
+                    estadisticasProd[nombreProd] = { cantidad: 0, recaudado: 0 };
+                }
+                estadisticasProd[nombreProd].cantidad += 1; // Cuenta 1 venta/transacción registrada
+                estadisticasProd[nombreProd].recaudado += Number(v.monto); // Suma el dinero total
+            });
+            
+            // Convertir objeto a arreglo y ordenarlo por mayor recaudación
+            const ranking = Object.keys(estadisticasProd)
+                .map(k => ({ nombre: k, ...estadisticasProd[k] }))
+                .sort((a, b) => b.recaudado - a.recaudado);
+                
+            // Renderizar la lista
+            const listEl = document.getElementById('balances-ranking');
+            if (ranking.length === 0) {
+                listEl.innerHTML = `<p class="text-center text-gray-400 py-4 text-sm font-medium border border-dashed border-gray-200 rounded-xl">No hay ventas registradas en este mes.</p>`;
+            } else {
+                listEl.innerHTML = ranking.map((prod, index) => `
+                    <div class="flex justify-between items-center bg-gray-50 rounded-xl p-3 border border-gray-100">
+                        <div class="flex items-center gap-3">
+                            <span class="w-6 h-6 rounded-full bg-pipon-cream text-pipon-orange flex items-center justify-center font-black text-xs shrink-0">${index + 1}</span>
+                            <div>
+                                <p class="font-bold text-gray-800 text-sm leading-tight">${prod.nombre}</p>
+                                <p class="text-[11px] text-gray-500 font-medium">${prod.cantidad} ${prod.cantidad === 1 ? 'venta registrada' : 'ventas registradas'}</p>
+                            </div>
+                        </div>
+                        <span class="font-black text-pipon-brown shrink-0">${formatearDinero(prod.recaudado)}</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+
         window.switchTab = function(tabName) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById(`content-${tabName}`).classList.remove('hidden');
+            
             document.querySelectorAll('.nav-btn').forEach(btn => {
                 btn.classList.remove('text-pipon-orange');
                 btn.classList.add('text-gray-400');
@@ -534,6 +808,9 @@
                 fechaCalendario = new Date(hoy.getFullYear(), hoy.getMonth(), 1); 
                 diaSeleccionadoFormat = hoy.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
                 renderHistorial();
+            }
+            if (tabName === 'balances') {
+                renderGridBalances();
             }
         };
 
@@ -563,7 +840,12 @@
             modal.classList.remove('hidden');
             modalContent.classList.remove('modal-exit');
             modalContent.classList.add('modal-enter');
-            setTimeout(() => { document.getElementById(modalId === 'modalVenta' ? 'venta-monto' : 'gasto-monto').focus(); }, 300);
+            
+            setTimeout(() => { 
+                if(modalId === 'modalVenta') document.getElementById('venta-monto').focus();
+                else if(modalId === 'modalGasto') document.getElementById('gasto-monto').focus();
+                else if(modalId === 'modalProducto') document.getElementById('producto-nombre').focus();
+            }, 300);
         };
 
         window.closeModal = function(modalId) {
@@ -572,9 +854,7 @@
             modalContent.classList.remove('modal-enter');
             modalContent.classList.add('modal-exit');
             
-            setTimeout(() => { 
-                modal.classList.add('hidden'); 
-            }, 300);
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
             
             if(modalId === 'modalVenta') {
                 document.getElementById('form-venta').reset();
@@ -589,6 +869,14 @@
                 document.getElementById('gasto-metodo').value = "Efectivo";
                 document.querySelectorAll('.metodo-btn-gasto')[0].className = "metodo-btn-gasto border-2 border-red-500 bg-red-50 text-red-700 font-bold py-3 rounded-xl transition-all";
                 document.querySelectorAll('.metodo-btn-gasto')[1].className = "metodo-btn-gasto border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-xl transition-all";
+            }
+            if(modalId === 'modalProducto') {
+                document.getElementById('form-producto').reset();
+                limpiarImagen('producto');
+            }
+            if(modalId === 'modalEditarProducto') {
+                document.getElementById('form-editar-producto').reset();
+                limpiarImagen('edit-producto');
             }
         };
 
@@ -608,11 +896,15 @@
         window.guardarVenta = async function(e) {
             e.preventDefault();
             const monto = document.getElementById('venta-monto').value;
-            const desc = document.getElementById('venta-desc').value;
+            const selectProd = document.getElementById('venta-producto');
+            let desc = "Venta General";
+            if (selectProd.value) {
+                desc = selectProd.options[selectProd.selectedIndex].text;
+            }
             const metodo = document.getElementById('venta-metodo').value;
             const comprobante = document.getElementById('venta-comprobante-base64').value;
+            
             try {
-                // RUTA GLOBAL PARA EL NEGOCIO (Sincroniza todos los dispositivos)
                 const ventasRef = collection(db, 'negocio', 'pipon', 'ventas');
                 const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: new Date() };
                 if(comprobante) data.comprobante = comprobante;
@@ -622,7 +914,7 @@
                 showToast('¡Venta guardada con éxito!', 'success');
             } catch (error) { 
                 console.error(error); 
-                showToast('Error al guardar. Revisa permisos de Firebase.', 'error'); 
+                showToast('Error al guardar. Revisa permisos.', 'error'); 
             }
         };
 
@@ -632,8 +924,8 @@
             const desc = document.getElementById('gasto-desc').value;
             const metodo = document.getElementById('gasto-metodo').value;
             const comprobante = document.getElementById('gasto-comprobante-base64').value;
+            
             try {
-                // RUTA GLOBAL PARA EL NEGOCIO (Sincroniza todos los dispositivos)
                 const gastosRef = collection(db, 'negocio', 'pipon', 'gastos');
                 const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: new Date() };
                 if(comprobante) data.comprobante = comprobante;
@@ -643,7 +935,71 @@
                 showToast('Gasto registrado correctamente.', 'success'); 
             } catch (error) { 
                 console.error(error); 
-                showToast('Error al guardar. Revisa permisos de Firebase.', 'error'); 
+                showToast('Error al guardar. Revisa permisos.', 'error'); 
+            }
+        };
+
+        window.guardarProducto = async function(e) {
+            e.preventDefault();
+            const nombre = document.getElementById('producto-nombre').value;
+            const precio = document.getElementById('producto-precio').value;
+            const foto = document.getElementById('producto-comprobante-base64').value;
+            
+            try {
+                const productosRef = collection(db, 'negocio', 'pipon', 'productos');
+                const data = { nombre: nombre, precio: Number(precio), timestamp: new Date() };
+                if(foto) data.foto = foto;
+                
+                await addDoc(productosRef, data);
+                closeModal('modalProducto');
+                showToast('Producto agregado al catálogo.', 'success'); 
+            } catch (error) { 
+                console.error(error); 
+                showToast('Error al guardar. Revisa permisos.', 'error'); 
+            }
+        };
+
+        window.abrirEditarProducto = function(id) {
+            const prod = productosData.find(p => p.id === id);
+            if(!prod) return;
+            
+            document.getElementById('edit-producto-id').value = id;
+            document.getElementById('edit-producto-nombre').value = prod.nombre;
+            document.getElementById('edit-producto-precio').value = prod.precio;
+            
+            if(prod.foto) {
+                document.getElementById('edit-producto-comprobante-base64').value = prod.foto;
+                document.getElementById('edit-producto-comprobante-label').innerText = "Foto guardada ✓";
+                const labelParent = document.getElementById('edit-producto-comprobante-label').parentElement;
+                labelParent.classList.add('border-pipon-orange', 'bg-pipon-yellow', 'text-pipon-brown');
+                document.getElementById('edit-producto-comprobante-clear').classList.remove('hidden');
+            } else {
+                limpiarImagen('edit-producto');
+            }
+            
+            openModal('modalEditarProducto');
+        };
+
+        window.actualizarProducto = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('edit-producto-id').value;
+            const nombre = document.getElementById('edit-producto-nombre').value;
+            const precio = document.getElementById('edit-producto-precio').value;
+            const foto = document.getElementById('edit-producto-comprobante-base64').value;
+            
+            try {
+                const prodRef = doc(db, 'negocio', 'pipon', 'productos', id);
+                const data = { nombre: nombre, precio: Number(precio) };
+                
+                if(foto) data.foto = foto;
+                else data.foto = ""; 
+                
+                await updateDoc(prodRef, data);
+                closeModal('modalEditarProducto');
+                showToast('Producto actualizado.', 'success'); 
+            } catch (error) { 
+                console.error(error); 
+                showToast('Error al actualizar. Revisa permisos.', 'error'); 
             }
         };
 
@@ -654,8 +1010,15 @@
             const reader = new FileReader();
             reader.onload = function(e) {
                 document.getElementById(`${tipo}-comprobante-base64`).value = e.target.result;
-                document.getElementById(`${tipo}-comprobante-label`).innerText = "Imagen adjunta ✓";
-                document.getElementById(`${tipo}-comprobante-label`).parentElement.classList.add('border-green-500', 'bg-green-50', 'text-green-600');
+                const labelStr = (tipo === 'producto' || tipo === 'edit-producto') ? 'Foto lista ✓' : 'Imagen adjunta ✓';
+                document.getElementById(`${tipo}-comprobante-label`).innerText = labelStr;
+                
+                const labelParent = document.getElementById(`${tipo}-comprobante-label`).parentElement;
+                if(tipo === 'producto' || tipo === 'edit-producto') {
+                    labelParent.classList.add('border-pipon-orange', 'bg-pipon-yellow', 'text-pipon-brown');
+                } else {
+                    labelParent.classList.add('border-green-500', 'bg-green-50', 'text-green-600');
+                }
                 document.getElementById(`${tipo}-comprobante-clear`).classList.remove('hidden');
             };
             reader.readAsDataURL(file); 
@@ -664,8 +1027,19 @@
         window.limpiarImagen = function(tipo) {
             document.getElementById(`${tipo}-comprobante`).value = ""; 
             document.getElementById(`${tipo}-comprobante-base64`).value = ""; 
-            document.getElementById(`${tipo}-comprobante-label`).innerText = "Adjuntar foto/captura";
-            document.getElementById(`${tipo}-comprobante-label`).parentElement.classList.remove('border-green-500', 'bg-green-50', 'text-green-600');
+            
+            let labelStr = 'Adjuntar foto/captura';
+            if (tipo === 'producto') labelStr = 'Subir foto del producto';
+            if (tipo === 'edit-producto') labelStr = 'Cambiar foto';
+            
+            document.getElementById(`${tipo}-comprobante-label`).innerText = labelStr;
+            const labelParent = document.getElementById(`${tipo}-comprobante-label`).parentElement;
+            
+            if(tipo === 'producto' || tipo === 'edit-producto') {
+                labelParent.classList.remove('border-pipon-orange', 'bg-pipon-yellow', 'text-pipon-brown');
+            } else {
+                labelParent.classList.remove('border-green-500', 'bg-green-50', 'text-green-600');
+            }
             document.getElementById(`${tipo}-comprobante-clear`).classList.add('hidden');
         };
 
@@ -689,25 +1063,35 @@
 
         async function inicializar() {
             try {
-                // Mantenemos el inicio anónimo para que Firebase sepa que hay un usuario activo navegando
                 await signInAnonymously(auth);
-                userId = auth.currentUser?.uid;
 
-                // Apuntamos la lectura a las RUTAS GLOBALES DEL NEGOCIO
                 const ventasRef = collection(db, 'negocio', 'pipon', 'ventas');
                 const gastosRef = collection(db, 'negocio', 'pipon', 'gastos');
+                const productosRef = collection(db, 'negocio', 'pipon', 'productos');
+
+                onSnapshot(productosRef, (snapshot) => {
+                    productosData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    productosData.sort((a, b) => a.nombre.localeCompare(b.nombre));
+                    renderProductos();
+                });
 
                 onSnapshot(ventasRef, (snapshot) => {
                     ventasData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    renderBalanceYResumen(); renderVentas(); renderHistorial();
+                    renderBalanceYResumen(); 
+                    renderVentas(); 
+                    renderHistorial();
+                    if(document.getElementById('content-balances').classList.contains('block')) renderGridBalances();
                 });
+
                 onSnapshot(gastosRef, (snapshot) => {
                     gastosData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    renderBalanceYResumen(); renderGastos(); renderHistorial();
+                    renderBalanceYResumen(); 
+                    renderGastos(); 
+                    renderHistorial();
+                    if(document.getElementById('content-balances').classList.contains('block')) renderGridBalances();
                 });
             } catch (error) { 
-                console.error("Error inicializando:", error); 
-                alert("Error al conectar con la base de datos.");
+                console.error("Error inicializando Firebase:", error); 
             }
         }
         
