@@ -23,7 +23,7 @@
                         'pipon-yellow': '#FCC873',
                         'pipon-cream': '#FFF2D4'
                     }
-                } 
+                }
             }
         }
     </script>
@@ -295,6 +295,7 @@
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // Configuración de Firebase - Reemplazar con la tuya si cambia
         const firebaseConfig = {
             apiKey: "AIzaSyBjzZmNyG_NmfNlEc3QusG55YLYIUwXIQY",
             authDomain: "sistema-pipon.firebaseapp.com",
@@ -308,7 +309,8 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        let userId = null;
+        // userId ya no es estrictamente necesario para la ruta, pero lo mantenemos para que auth no falle
+        let userId = null; 
         let ventasData = [];
         let gastosData = [];
 
@@ -605,38 +607,44 @@
 
         window.guardarVenta = async function(e) {
             e.preventDefault();
-            if (!userId) { alert("Conectando con base de datos, espere..."); return; }
             const monto = document.getElementById('venta-monto').value;
             const desc = document.getElementById('venta-desc').value;
             const metodo = document.getElementById('venta-metodo').value;
             const comprobante = document.getElementById('venta-comprobante-base64').value;
             try {
-                // RUTA CORREGIDA: Apunta a "usuarios/userId/ventas"
-                const ventasRef = collection(db, 'usuarios', userId, 'ventas');
+                // RUTA GLOBAL PARA EL NEGOCIO (Sincroniza todos los dispositivos)
+                const ventasRef = collection(db, 'negocio', 'pipon', 'ventas');
                 const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: new Date() };
                 if(comprobante) data.comprobante = comprobante;
+                
                 await addDoc(ventasRef, data);
                 closeModal('modalVenta');
                 showToast('¡Venta guardada con éxito!', 'success');
-            } catch (error) { console.error(error); showToast('Error al guardar.', 'error'); }
+            } catch (error) { 
+                console.error(error); 
+                showToast('Error al guardar. Revisa permisos de Firebase.', 'error'); 
+            }
         };
 
         window.guardarGasto = async function(e) {
             e.preventDefault();
-            if (!userId) { alert("Conectando con base de datos, espere..."); return; }
             const monto = document.getElementById('gasto-monto').value;
             const desc = document.getElementById('gasto-desc').value;
             const metodo = document.getElementById('gasto-metodo').value;
             const comprobante = document.getElementById('gasto-comprobante-base64').value;
             try {
-                // RUTA CORREGIDA: Apunta a "usuarios/userId/gastos"
-                const gastosRef = collection(db, 'usuarios', userId, 'gastos');
+                // RUTA GLOBAL PARA EL NEGOCIO (Sincroniza todos los dispositivos)
+                const gastosRef = collection(db, 'negocio', 'pipon', 'gastos');
                 const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: new Date() };
                 if(comprobante) data.comprobante = comprobante;
+                
                 await addDoc(gastosRef, data);
                 closeModal('modalGasto');
                 showToast('Gasto registrado correctamente.', 'success'); 
-            } catch (error) { console.error(error); showToast('Error al guardar.', 'error'); }
+            } catch (error) { 
+                console.error(error); 
+                showToast('Error al guardar. Revisa permisos de Firebase.', 'error'); 
+            }
         };
 
         window.procesarImagen = function(tipo, inputElement) {
@@ -681,14 +689,13 @@
 
         async function inicializar() {
             try {
-                // Iniciar sesión anónimamente siempre en producción
+                // Mantenemos el inicio anónimo para que Firebase sepa que hay un usuario activo navegando
                 await signInAnonymously(auth);
                 userId = auth.currentUser?.uid;
-                if(!userId) throw new Error("No UID");
 
-                // RUTAS CORREGIDAS
-                const ventasRef = collection(db, 'usuarios', userId, 'ventas');
-                const gastosRef = collection(db, 'usuarios', userId, 'gastos');
+                // Apuntamos la lectura a las RUTAS GLOBALES DEL NEGOCIO
+                const ventasRef = collection(db, 'negocio', 'pipon', 'ventas');
+                const gastosRef = collection(db, 'negocio', 'pipon', 'gastos');
 
                 onSnapshot(ventasRef, (snapshot) => {
                     ventasData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -700,8 +707,7 @@
                 });
             } catch (error) { 
                 console.error("Error inicializando:", error); 
-                // Añadimos una alerta visual para que sepas si Firebase falló
-                alert("Error al conectar con la base de datos. Revisa la consola o tus reglas de Firestore.");
+                alert("Error al conectar con la base de datos.");
             }
         }
         
