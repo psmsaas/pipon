@@ -291,26 +291,20 @@
     </div>
 
     <script type="module">
-        // Importaciones de Firebase (Asegúrate de configurar esto en tu proyecto real)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // NOTA PARA GITHUB: Reemplaza __firebase_config con el objeto de configuración que te da Firebase
-        // Ejemplo: const firebaseConfig = { apiKey: "...", authDomain: "...", projectId: "...", ... };
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'pipon-app';
-        let firebaseConfig = {};
-        try { firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {}; } catch(e){}
-
         const firebaseConfig = {
- 	apiKey: "AIzaSyBjzZmNyG_NmfNlEc3QusG55YLYIUwXIQY",
-  	authDomain: "sistema-pipon.firebaseapp.com",
- 	projectId: "sistema-pipon",
-  	storageBucket: "sistema-pipon.firebasestorage.app",
-  	messagingSenderId: "726758496600",
-  	appId: "1:726758496600:web:4a83534bdc337f4535ed2d"
-	};
-		
+            apiKey: "AIzaSyBjzZmNyG_NmfNlEc3QusG55YLYIUwXIQY",
+            authDomain: "sistema-pipon.firebaseapp.com",
+            projectId: "sistema-pipon",
+            storageBucket: "sistema-pipon.firebasestorage.app",
+            messagingSenderId: "726758496600",
+            appId: "1:726758496600:web:4a83534bdc337f4535ed2d"
+        };
+        
+        const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
         
@@ -358,7 +352,6 @@
             }, 3000);
         };
 
-        // FUNCIONES DE RENDERIZADO
         function renderBalanceYResumen() {
             const ventasHoy = ventasData.filter(v => esHoy(v.timestamp));
             const gastosHoy = gastosData.filter(g => esHoy(g.timestamp));
@@ -446,7 +439,6 @@
             `).join('');
         }
 
-        // HISTORIAL / CALENDARIO
         function agruparDatosPorFecha() {
             const dias = {}; 
             const agrupar = (item, tipo) => {
@@ -521,7 +513,6 @@
             balEl.className = `text-xl font-black ${balanceDia > 0 ? 'text-green-600' : (balanceDia < 0 ? 'text-red-600' : 'text-gray-800')}`;
         }
 
-        // CONTROLADORES DE UI 
         window.cambiarMes = function(cambio) { fechaCalendario.setMonth(fechaCalendario.getMonth() + cambio); renderHistorial(); }
         window.seleccionarDiaHistorial = function(fechaStr) { diaSeleccionadoFormat = fechaStr; renderHistorial(); }
 
@@ -620,7 +611,8 @@
             const metodo = document.getElementById('venta-metodo').value;
             const comprobante = document.getElementById('venta-comprobante-base64').value;
             try {
-                const ventasRef = collection(db, 'artifacts', appId, 'users', userId, 'ventas');
+                // RUTA CORREGIDA: Apunta a "usuarios/userId/ventas"
+                const ventasRef = collection(db, 'usuarios', userId, 'ventas');
                 const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: new Date() };
                 if(comprobante) data.comprobante = comprobante;
                 await addDoc(ventasRef, data);
@@ -637,7 +629,8 @@
             const metodo = document.getElementById('gasto-metodo').value;
             const comprobante = document.getElementById('gasto-comprobante-base64').value;
             try {
-                const gastosRef = collection(db, 'artifacts', appId, 'users', userId, 'gastos');
+                // RUTA CORREGIDA: Apunta a "usuarios/userId/gastos"
+                const gastosRef = collection(db, 'usuarios', userId, 'gastos');
                 const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: new Date() };
                 if(comprobante) data.comprobante = comprobante;
                 await addDoc(gastosRef, data);
@@ -686,18 +679,16 @@
             setTimeout(() => { document.getElementById('imagen-comprobante-vista').src = ""; }, 300);
         };
 
-        // INICIALIZACIÓN
         async function inicializar() {
             try {
-                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
-                else await signInAnonymously(auth);
-                
+                // Iniciar sesión anónimamente siempre en producción
+                await signInAnonymously(auth);
                 userId = auth.currentUser?.uid;
                 if(!userId) throw new Error("No UID");
 
-                const ventasRef = collection(db, 'artifacts', appId, 'users', userId, 'ventas');
-                const gastosRef = collection(db, 'artifacts', appId, 'users', userId, 'gastos');
+                // RUTAS CORREGIDAS
+                const ventasRef = collection(db, 'usuarios', userId, 'ventas');
+                const gastosRef = collection(db, 'usuarios', userId, 'gastos');
 
                 onSnapshot(ventasRef, (snapshot) => {
                     ventasData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -707,8 +698,13 @@
                     gastosData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     renderBalanceYResumen(); renderGastos(); renderHistorial();
                 });
-            } catch (error) { console.error("Error inicializando:", error); }
+            } catch (error) { 
+                console.error("Error inicializando:", error); 
+                // Añadimos una alerta visual para que sepas si Firebase falló
+                alert("Error al conectar con la base de datos. Revisa la consola o tus reglas de Firestore.");
+            }
         }
+        
         inicializar();
     </script>
 </body>
