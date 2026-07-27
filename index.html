@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Control Pipón</title>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -62,11 +61,16 @@
     <div id="toast-container" class="fixed top-4 left-0 right-0 px-4 flex flex-col gap-2 items-center pointer-events-none"></div>
 
     <header class="bg-pipon-brown text-white p-4 sticky top-0 z-10 shadow-md">
-        <div class="max-w-md mx-auto flex items-center justify-center gap-3">
+        <div class="max-w-md mx-auto flex items-center justify-center gap-3 relative">
             <div class="bg-white rounded-full w-10 h-10 flex items-center justify-center overflow-hidden border-2 border-white">
                 <img src="./pipon.jpeg" alt="Logo Pipón" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='https://placehold.co/100x100/FFF2D4/D45115?text=P';">
             </div>
             <h1 class="text-xl font-black tracking-wide uppercase">Pipón</h1>
+            
+            <!-- MARCA DE AGUA PSM -->
+            <a href="https://psmsaas.github.io/psm/" target="_blank" class="absolute right-0 top-1/2 -translate-y-1/2 text-[9px] font-bold text-white/30 hover:text-white/80 transition-colors tracking-widest no-underline">
+                BY: PSM
+            </a>
         </div>
     </header>
 
@@ -178,7 +182,6 @@
                     <h3 id="balances-anio" class="font-bold text-gray-800 uppercase tracking-wide text-lg">2026</h3>
                     <button onclick="cambiarAnioBalances(1)" class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-600 active:bg-gray-200"><i class="fa-solid fa-chevron-right"></i></button>
                 </div>
-                <!-- Grilla de 12 meses -->
                 <div id="balances-meses-grilla" class="grid grid-cols-4 gap-2"></div>
             </div>
 
@@ -332,7 +335,6 @@
         </div>
     </div>
 
-    <!-- MODAL NUEVO PRODUCTO -->
     <div id="modalProducto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
         <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative">
             <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
@@ -692,9 +694,6 @@
             balEl.className = `text-xl font-black ${balanceDia > 0 ? 'text-green-600' : (balanceDia < 0 ? 'text-red-600' : 'text-gray-800')}`;
         }
 
-        window.cambiarMes = function(cambio) { fechaCalendario.setMonth(fechaCalendario.getMonth() + cambio); renderHistorial(); }
-        window.seleccionarDiaHistorial = function(fechaStr) { diaSeleccionadoFormat = fechaStr; renderHistorial(); }
-
         window.renderGridBalances = function() {
             const mesesAbrev = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
             const grilla = document.getElementById('balances-meses-grilla');
@@ -728,7 +727,6 @@
             const detalleEl = document.getElementById('detalle-balances');
             detalleEl.classList.remove('hidden');
             
-            // 1. Filtrar ventas y gastos del mes y año exacto
             const ventasMes = ventasData.filter(v => {
                 if(!v.timestamp) return false;
                 const d = v.timestamp.toDate ? v.timestamp.toDate() : new Date(v.timestamp);
@@ -741,12 +739,10 @@
                 return d.getFullYear() === anioBalances && d.getMonth() === mesBalancesSelec;
             });
             
-            // 2. Calcular los totales del mes
             const totalVentas = ventasMes.reduce((sum, v) => sum + Number(v.monto), 0);
             const totalGastos = gastosMes.reduce((sum, g) => sum + Number(g.monto), 0);
             const balanceNeta = totalVentas - totalGastos;
             
-            // Renderizar Totales
             document.getElementById('bal-ingresos').innerText = formatearDinero(totalVentas);
             document.getElementById('bal-gastos').innerText = formatearDinero(totalGastos);
             
@@ -754,23 +750,20 @@
             balNetoEl.innerText = formatearDinero(balanceNeta);
             balNetoEl.className = `text-2xl font-black ${balanceNeta > 0 ? 'text-green-600' : (balanceNeta < 0 ? 'text-red-600' : 'text-gray-800')}`;
             
-            // 3. Crear el Ranking de Productos más vendidos
             const estadisticasProd = {};
             ventasMes.forEach(v => {
                 const nombreProd = v.descripcion || 'Venta General';
                 if(!estadisticasProd[nombreProd]) {
                     estadisticasProd[nombreProd] = { cantidad: 0, recaudado: 0 };
                 }
-                estadisticasProd[nombreProd].cantidad += 1; // Cuenta 1 venta/transacción registrada
-                estadisticasProd[nombreProd].recaudado += Number(v.monto); // Suma el dinero total
+                estadisticasProd[nombreProd].cantidad += 1; 
+                estadisticasProd[nombreProd].recaudado += Number(v.monto); 
             });
             
-            // Convertir objeto a arreglo y ordenarlo por mayor recaudación
             const ranking = Object.keys(estadisticasProd)
                 .map(k => ({ nombre: k, ...estadisticasProd[k] }))
                 .sort((a, b) => b.recaudado - a.recaudado);
                 
-            // Renderizar la lista
             const listEl = document.getElementById('balances-ranking');
             if (ranking.length === 0) {
                 listEl.innerHTML = `<p class="text-center text-gray-400 py-4 text-sm font-medium border border-dashed border-gray-200 rounded-xl">No hay ventas registradas en este mes.</p>`;
@@ -790,6 +783,8 @@
             }
         }
 
+        window.cambiarMes = function(cambio) { fechaCalendario.setMonth(fechaCalendario.getMonth() + cambio); renderHistorial(); }
+        window.seleccionarDiaHistorial = function(fechaStr) { diaSeleccionadoFormat = fechaStr; renderHistorial(); }
 
         window.switchTab = function(tabName) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
