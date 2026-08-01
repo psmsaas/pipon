@@ -5,8 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Control Pipón</title>
     
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     
     <script>
@@ -58,16 +61,18 @@
     </style>
 </head>
 <body class="pb-28">
+
     <div id="toast-container" class="fixed top-4 left-0 right-0 px-4 flex flex-col gap-2 items-center pointer-events-none"></div>
 
     <header class="bg-pipon-brown text-white p-4 sticky top-0 z-10 shadow-md">
         <div class="max-w-md mx-auto flex items-center justify-center gap-3 relative">
             <div class="bg-white rounded-full w-10 h-10 flex items-center justify-center overflow-hidden border-2 border-white">
+                <!-- Reemplaza el src con tu link del logo -->
                 <img src="./pipon.jpeg" alt="Logo Pipón" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='https://placehold.co/100x100/FFF2D4/D45115?text=P';">
             </div>
             <h1 class="text-xl font-black tracking-wide uppercase">Pipón</h1>
             
-            <!-- MARCA DE AGUA PSM -->
+            <!-- MARCA DE AGUA (Cambia el href por tu enlace) -->
             <a href="https://psmsaas.github.io/psm/" target="_blank" class="absolute right-0 top-1/2 -translate-y-1/2 text-[9px] font-bold text-white/30 hover:text-white/80 transition-colors tracking-widest no-underline">
                 BY: PSMsaas
             </a>
@@ -75,6 +80,8 @@
     </header>
 
     <main class="p-4 max-w-md mx-auto">
+        
+        <!-- PESTAÑA: INICIO -->
         <div id="content-inicio" class="tab-content block">
             <div class="bg-white rounded-3xl shadow-sm p-6 text-center border border-pipon-yellow/30 mb-4 relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-2 bg-pipon-orange"></div>
@@ -103,6 +110,7 @@
             </div>
         </div>
 
+        <!-- PESTAÑA: VENTAS -->
         <div id="content-ventas" class="tab-content hidden">
             <div class="flex justify-between items-end mb-4 px-1">
                 <h2 class="text-xl font-bold text-pipon-brown">Ventas de Hoy</h2>
@@ -113,16 +121,7 @@
             </div>
         </div>
 
-        <div id="content-gastos" class="tab-content hidden">
-            <div class="flex justify-between items-end mb-4 px-1">
-                <h2 class="text-xl font-bold text-pipon-brown">Gastos de Hoy</h2>
-                <span class="text-sm font-bold text-red-600 bg-red-100 px-3 py-1 rounded-full" id="total-gastos-hoy-badge">Total: $0</span>
-            </div>
-            <div id="lista-gastos" class="flex flex-col gap-3 pb-8">
-                <p class="text-center text-gray-500 mt-10">Cargando gastos...</p>
-            </div>
-        </div>
-
+        <!-- PESTAÑA: CATÁLOGO -->
         <div id="content-catalogo" class="tab-content hidden">
             <div class="flex justify-center items-end mb-4 px-1">
                 <h2 class="text-xl font-bold text-pipon-brown">Catálogo</h2>
@@ -132,6 +131,25 @@
             </div>
         </div>
 
+        <!-- PESTAÑA: PROVEEDORES -->
+        <div id="content-proveedores" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-4 px-1">
+                <h2 class="text-xl font-bold text-pipon-brown">Proveedores</h2>
+                <button onclick="openModal('modalProveedor')" class="text-sm font-bold text-blue-600 bg-blue-100 px-4 py-1.5 rounded-full flex items-center gap-1 active:bg-blue-200 transition-colors shadow-sm">
+                    <i class="fa-solid fa-plus"></i> Añadir
+                </button>
+            </div>
+            
+            <!-- Contenedor Gastos sin Especificar -->
+            <div id="gasto-sin-especificar-container" class="mb-4"></div>
+            
+            <!-- Lista Proveedores -->
+            <div id="lista-proveedores" class="flex flex-col gap-3 pb-8">
+                <p class="text-center text-gray-500 mt-10">Cargando proveedores...</p>
+            </div>
+        </div>
+
+        <!-- PESTAÑA: HISTORIAL -->
         <div id="content-historial" class="tab-content hidden">
             <div class="flex justify-between items-end mb-4 px-1">
                 <h2 class="text-xl font-bold text-pipon-brown">Historial Diario</h2>
@@ -158,7 +176,7 @@
                         <span id="detalle-balance" class="text-xl font-black">$0</span>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-2 gap-4 mb-4">
                     <div class="bg-green-50 p-3 rounded-xl border border-green-100">
                         <div class="flex items-center gap-1.5 mb-1 text-green-600"><i class="fa-solid fa-arrow-down text-[10px]"></i><p class="text-[10px] uppercase font-bold">Ingresos</p></div>
                         <p id="detalle-ventas" class="font-bold text-green-700 text-lg">$0</p>
@@ -168,9 +186,16 @@
                         <p id="detalle-gastos" class="font-bold text-red-700 text-lg">$0</p>
                     </div>
                 </div>
+                
+                <!-- LISTA DETALLADA DEL DÍA -->
+                <div class="border-t border-gray-100 pt-3">
+                    <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Movimientos del Día</h4>
+                    <div id="detalle-movimientos-lista" class="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1"></div>
+                </div>
             </div>
         </div>
 
+        <!-- PESTAÑA: BALANCES -->
         <div id="content-balances" class="tab-content hidden">
             <div class="flex justify-between items-end mb-4 px-1">
                 <h2 class="text-xl font-bold text-pipon-brown">Balance General</h2>
@@ -179,13 +204,13 @@
             <div class="bg-white rounded-2xl shadow-sm p-4 border border-gray-100 mb-4">
                 <div class="flex justify-between items-center mb-4">
                     <button onclick="cambiarAnioBalances(-1)" class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-600 active:bg-gray-200"><i class="fa-solid fa-chevron-left"></i></button>
-                    <h3 id="balances-anio" class="font-bold text-gray-800 uppercase tracking-wide text-lg">2026</h3>
+                    <h3 id="balances-anio" class="font-bold text-gray-800 uppercase tracking-wide text-lg">Año</h3>
                     <button onclick="cambiarAnioBalances(1)" class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-600 active:bg-gray-200"><i class="fa-solid fa-chevron-right"></i></button>
                 </div>
                 <div id="balances-meses-grilla" class="grid grid-cols-4 gap-2"></div>
             </div>
 
-            <div id="detalle-balances" class="hidden bg-white rounded-2xl shadow-sm p-5 border border-pipon-yellow/50 relative overflow-hidden transition-all">
+            <div id="detalle-balances" class="hidden bg-white rounded-2xl shadow-sm p-5 border border-pipon-yellow/50 relative overflow-hidden transition-all mb-8">
                 <div class="absolute top-0 left-0 w-full h-1 bg-pipon-orange"></div>
                 
                 <h3 class="font-bold text-gray-800 mb-4 text-center border-b border-gray-50 pb-2">Resumen del Mes</h3>
@@ -207,9 +232,10 @@
                 </div>
 
                 <h3 class="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2"><i class="fa-solid fa-ranking-star text-pipon-orange"></i> Ranking de Ventas</h3>
-                <div id="balances-ranking" class="flex flex-col gap-2">
-                    <!-- Javascript llenará el ranking -->
-                </div>
+                <div id="balances-ranking" class="flex flex-col gap-2 mb-6"></div>
+
+                <h3 class="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2"><i class="fa-solid fa-truck text-blue-500"></i> Gastos por Proveedor</h3>
+                <div id="balances-gastos-proveedores" class="flex flex-col gap-2"></div>
             </div>
         </div>
     </main>
@@ -219,9 +245,9 @@
             <button onclick="switchTab('inicio')" id="nav-inicio" class="nav-btn flex flex-col items-center justify-center py-2 text-pipon-orange transition-colors rounded-xl"><i class="fa-solid fa-house text-lg mb-1"></i><span class="text-[9px] font-bold">Inicio</span></button>
             <button onclick="switchTab('ventas')" id="nav-ventas" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-cash-register text-lg mb-1"></i><span class="text-[9px] font-bold">Ventas</span></button>
             <button onclick="switchTab('catalogo')" id="nav-catalogo" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-book-open text-lg mb-1"></i><span class="text-[9px] font-bold">Catálogo</span></button>
-            <button onclick="switchTab('gastos')" id="nav-gastos" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-receipt text-lg mb-1"></i><span class="text-[9px] font-bold">Gastos</span></button>
+            <button onclick="switchTab('proveedores')" id="nav-proveedores" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-address-book text-lg mb-1"></i><span class="text-[9px] font-bold">Agenda</span></button>
             <button onclick="switchTab('historial')" id="nav-historial" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-calendar-days text-lg mb-1"></i><span class="text-[9px] font-bold">Historial</span></button>
-            <button onclick="switchTab('balances')" id="nav-balances" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-chart-line text-lg mb-1"></i><span class="text-[9px] font-bold">Balances</span></button>
+            <button onclick="switchTab('balances')" id="nav-balances" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-chart-pie text-lg mb-1"></i><span class="text-[9px] font-bold">Balances</span></button>
         </div>
     </nav>
 
@@ -236,20 +262,21 @@
     </div>
     <div id="fab-overlay" onclick="toggleFabMenu()" class="fixed inset-0 bg-black/20 z-30 hidden backdrop-blur-sm transition-opacity opacity-0"></div>
 
+    <!-- MODAL VENTA -->
     <div id="modalVenta" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
-        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-black text-green-600">Registrar Venta</h2>
-                <button onclick="closeModal('modalVenta')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+                <button type="button" onclick="closeModal('modalVenta')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
             </div>
             
             <form id="form-venta" onsubmit="guardarVenta(event)">
                 <div class="mb-5">
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Producto / Detalle</label>
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Producto</label>
                     <select id="venta-producto" onchange="seleccionarProductoVenta()" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:bg-white transition-all font-bold text-gray-700 appearance-none">
                         <option value="">Venta General / Varios</option>
-                        <!-- Se llena con JS -->
+                        <!-- Opciones de Firebase -->
                     </select>
                 </div>
 
@@ -287,12 +314,13 @@
         </div>
     </div>
 
+    <!-- MODAL GASTO -->
     <div id="modalGasto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
-        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-black text-red-600">Registrar Gasto</h2>
-                <button onclick="closeModal('modalGasto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+                <button type="button" onclick="closeModal('modalGasto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
             </div>
             
             <form id="form-gasto" onsubmit="guardarGasto(event)">
@@ -307,6 +335,14 @@
                 <div class="mb-5">
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿En qué se gastó?</label>
                     <input type="text" id="gasto-desc" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-red-500 focus:bg-white transition-all font-medium" placeholder="Ej: Harina, Envases..." required>
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Proveedor (Opcional)</label>
+                    <select id="gasto-proveedor" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-red-500 focus:bg-white transition-all font-bold text-gray-700 appearance-none">
+                        <option value="">Sin Especificar / Otro</option>
+                        <!-- Rellenado por JS -->
+                    </select>
                 </div>
 
                 <div class="mb-8">
@@ -335,18 +371,19 @@
         </div>
     </div>
 
+    <!-- MODAL PRODUCTO -->
     <div id="modalProducto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
-        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-black text-pipon-brown">Crear Producto</h2>
-                <button onclick="closeModal('modalProducto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+                <button type="button" onclick="closeModal('modalProducto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
             </div>
             
             <form id="form-producto" onsubmit="guardarProducto(event)">
                 <div class="mb-5">
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Nombre del Producto</label>
-                    <input type="text" id="producto-nombre" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-bold text-gray-800" placeholder="Ej: Docena de Churros..." required>
+                    <input type="text" id="producto-nombre" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-bold text-gray-800" placeholder="Ej: Sanguche de Bondiola..." required>
                 </div>
 
                 <div class="mb-5">
@@ -374,12 +411,13 @@
         </div>
     </div>
 
+    <!-- MODAL EDITAR PRODUCTO -->
     <div id="modalEditarProducto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
-        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-black text-pipon-orange">Editar Producto</h2>
-                <button onclick="closeModal('modalEditarProducto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+                <button type="button" onclick="closeModal('modalEditarProducto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
             </div>
             
             <form id="form-editar-producto" onsubmit="actualizarProducto(event)">
@@ -415,11 +453,128 @@
         </div>
     </div>
 
+    <!-- MODAL NUEVO PROVEEDOR -->
+    <div id="modalProveedor" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-blue-600">Nuevo Proveedor</h2>
+                <button type="button" onclick="closeModal('modalProveedor')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <form id="form-proveedor" onsubmit="guardarProveedor(event)">
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Nombre o Empresa</label>
+                    <input type="text" id="prov-nombre" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-bold text-gray-800" placeholder="Ej: Panadería San José" required>
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Teléfono / WhatsApp (Opcional)</label>
+                    <input type="tel" id="prov-telefono" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-medium text-gray-800" placeholder="Ej: 3451234567">
+                </div>
+                
+                <div class="mb-8">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿Qué nos vende? (Opcional)</label>
+                    <input type="text" id="prov-detalle" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-medium text-gray-800" placeholder="Ej: Pan, fiambres, envases...">
+                </div>
+
+                <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-blue-200 active:scale-95 transition-all">Guardar Proveedor</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL EDITAR PROVEEDOR -->
+    <div id="modalEditarProveedor" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-blue-600">Editar Proveedor</h2>
+                <button type="button" onclick="closeModal('modalEditarProveedor')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <form id="form-editar-proveedor" onsubmit="actualizarProveedor(event)">
+                <input type="hidden" id="edit-prov-id">
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Nombre o Empresa</label>
+                    <input type="text" id="edit-prov-nombre" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-bold text-gray-800" required>
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Teléfono / WhatsApp (Opcional)</label>
+                    <input type="tel" id="edit-prov-telefono" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-medium text-gray-800">
+                </div>
+                
+                <div class="mb-8">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿Qué nos vende? (Opcional)</label>
+                    <input type="text" id="edit-prov-detalle" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-medium text-gray-800">
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="button" onclick="confirmarEliminarProveedor()" class="w-14 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center text-lg active:bg-red-100 transition-colors"><i class="fa-solid fa-trash"></i></button>
+                    <button type="submit" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-blue-200 active:scale-95 transition-all">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL CONFIRMAR ELIMINAR PROVEEDOR -->
+    <div id="modalConfirmDelete" class="fixed inset-0 z-[70] hidden flex-col justify-center items-center bg-black/60 backdrop-blur-sm p-4 opacity-0 transition-opacity">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform scale-95 transition-transform" id="modalConfirmDeleteContent">
+            <div class="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-3xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="text-xl font-black text-center text-gray-800 mb-2">¿Eliminar proveedor?</h3>
+            <p class="text-center text-sm text-gray-500 font-medium mb-6">Los gastos asociados a este proveedor pasarán a la lista de "Falta asignar proveedor". Esta acción no se puede deshacer.</p>
+            <div class="flex gap-3">
+                <button onclick="cerrarConfirmDelete()" class="flex-1 bg-gray-100 text-gray-600 font-bold py-3 rounded-xl active:bg-gray-200 transition-colors">Cancelar</button>
+                <button id="btn-confirm-delete" class="flex-1 bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-red-200 active:scale-95 transition-all">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL EDITAR GASTO -->
+    <div id="modalEditarGasto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-red-600">Editar Gasto</h2>
+                <button type="button" onclick="closeModal('modalEditarGasto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <form id="form-editar-gasto" onsubmit="actualizarGasto(event)">
+                <input type="hidden" id="edit-gasto-id">
+                
+                <div class="mb-5 text-center">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Monto del Gasto</label>
+                    <div class="flex justify-center items-center gap-1 text-5xl font-black text-gray-800">
+                        <span class="text-3xl text-gray-400">$</span>
+                        <input type="number" id="edit-gasto-monto" class="w-32 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-red-500 transition-colors" required min="1" step="0.01" inputmode="decimal">
+                    </div>
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿En qué se gastó?</label>
+                    <input type="text" id="edit-gasto-desc" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-red-500 focus:bg-white transition-all font-medium" required>
+                </div>
+
+                <div class="mb-8">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Asignar Proveedor</label>
+                    <select id="edit-gasto-proveedor" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-red-500 focus:bg-white transition-all font-bold text-gray-700 appearance-none">
+                        <!-- JS Llena esto -->
+                    </select>
+                </div>
+
+                <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-red-200 active:scale-95 transition-all">Guardar Cambios</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- VISUALIZADOR DE COMPROBANTES -->
     <div id="modalComprobante" class="fixed inset-0 z-[60] hidden flex-col justify-center items-center bg-black/80 backdrop-blur-sm p-4">
         <div class="w-full max-w-md bg-white rounded-2xl overflow-hidden shadow-2xl modal-enter relative">
             <div class="flex justify-between items-center p-4 border-b border-gray-100 bg-gray-50">
-                <h3 class="font-bold text-gray-800">Visualizador</h3>
-                <button onclick="cerrarComprobante()" class="w-8 h-8 bg-gray-200 rounded-full text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+                <h3 class="font-bold text-gray-800">Comprobante</h3>
+                <button type="button" onclick="cerrarComprobante()" class="w-8 h-8 bg-gray-200 rounded-full text-gray-600"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-4 bg-gray-100 flex justify-center max-h-[70vh] overflow-auto">
                 <img id="imagen-comprobante-vista" src="" alt="Comprobante" class="max-w-full rounded shadow-sm">
@@ -430,9 +585,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // CONFIGURACIÓN FIREBASE (REEMPLAZAR CON TU CONFIG SI ES NECESARIO)
         const firebaseConfig = {
             apiKey: "AIzaSyBjzZmNyG_NmfNlEc3QusG55YLYIUwXIQY",
             authDomain: "sistema-pipon.firebaseapp.com",
@@ -449,14 +603,13 @@
         let ventasData = [];
         let gastosData = [];
         let productosData = [];
+        let proveedoresData = [];
 
-        // Variables para Historial Diario
         let fechaCalendario = new Date(); 
         let diaSeleccionadoFormat = null; 
-
-        // Variables para Balances Mensuales
         let anioBalances = new Date().getFullYear();
-        let mesBalancesSelec = new Date().getMonth(); // 0 a 11
+        let mesBalancesSelec = new Date().getMonth();
+        let proveedorAEliminar = null;
 
         // UTILIDADES BÁSICAS
         const formatearDinero = (monto) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(monto);
@@ -478,12 +631,14 @@
             ayer.setDate(ayer.getDate() - 1); 
             return date.getDate() === ayer.getDate() && date.getMonth() === ayer.getMonth() && date.getFullYear() === ayer.getFullYear();
         };
+        // Para gestionar gastos huerfanos cuando se elimina un proveedor
+        const esHuerfano = (g) => !g.proveedor || g.proveedor === "" || !proveedoresData.some(p => p.nombre === g.proveedor);
 
         window.showToast = (mensaje, tipo = 'success') => {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
-            const colorClass = tipo === 'success' ? 'bg-green-600' : 'bg-red-600';
-            const icon = tipo === 'success' ? 'fa-check' : 'fa-info';
+            const colorClass = tipo === 'success' ? 'bg-green-600' : (tipo === 'info' ? 'bg-blue-600' : 'bg-red-600');
+            const icon = tipo === 'success' ? 'fa-check' : (tipo === 'info' ? 'fa-info-circle' : 'fa-circle-xmark');
             toast.className = `toast ${colorClass} text-white px-5 py-3 rounded-full shadow-lg font-bold text-sm flex items-center gap-2 pointer-events-auto`;
             toast.innerHTML = `<i class="fa-solid ${icon}"></i> ${mensaje}`;
             container.appendChild(toast);
@@ -556,32 +711,6 @@
             `).join('');
         }
 
-        function renderGastos() {
-            const gastosHoy = gastosData.filter(g => esHoy(g.timestamp)).sort((a,b) => (b.timestamp?.toMillis()||0) - (a.timestamp?.toMillis()||0));
-            const total = gastosHoy.reduce((sum, g) => sum + Number(g.monto), 0);
-            document.getElementById('total-gastos-hoy-badge').innerText = `Total: ${formatearDinero(total)}`;
-            const listEl = document.getElementById('lista-gastos');
-
-            if (gastosHoy.length === 0) {
-                listEl.innerHTML = `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm mt-4"><i class="fa-solid fa-receipt text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium">No hay gastos hoy.</p></div>`;
-                return;
-            }
-            
-            listEl.innerHTML = gastosHoy.map(g => `
-                <div class="bg-white rounded-xl p-4 flex justify-between items-center shadow-sm border-l-4 border-l-red-500">
-                    <div>
-                        <p class="font-bold text-gray-800">${g.descripcion}</p>
-                        <div class="flex items-center gap-2 mt-1">
-                            <span class="text-xs text-gray-400"><i class="fa-regular fa-clock"></i> ${formatearHora(g.timestamp)}</span>
-                            <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">${g.metodo}</span>
-                            ${g.comprobante ? `<button onclick="verComprobante('${g.id}', 'gastos')" class="text-[10px] bg-blue-50 text-blue-500 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-blue-100"><i class="fa-solid fa-paperclip"></i> Ver</button>` : ''}
-                        </div>
-                    </div>
-                    <span class="font-black text-red-600 text-lg">-${formatearDinero(g.monto)}</span>
-                </div>
-            `).join('');
-        }
-
         function renderProductos() {
             const listEl = document.getElementById('lista-productos');
             if (productosData.length === 0) {
@@ -601,24 +730,132 @@
 
             const selectVenta = document.getElementById('venta-producto');
             let opcionesHtml = `<option value="">Venta General / Otro</option>`;
-            productosData.forEach(p => {
-                opcionesHtml += `<option value="${p.id}">${p.nombre}</option>`;
-            });
+            productosData.forEach(p => { opcionesHtml += `<option value="${p.id}">${p.nombre}</option>`; });
             selectVenta.innerHTML = opcionesHtml;
         }
 
-        window.seleccionarProductoVenta = function() {
-            const select = document.getElementById('venta-producto');
-            const productId = select.value;
-            const inputMonto = document.getElementById('venta-monto');
+        function renderProveedores() {
+            const listEl = document.getElementById('lista-proveedores');
+            const gastoSinEspecContainer = document.getElementById('gasto-sin-especificar-container');
+            const anioActual = new Date().getFullYear();
+            const mesActual = new Date().getMonth();
             
-            if(productId) {
-                const producto = productosData.find(p => p.id === productId);
-                if(producto) inputMonto.value = producto.precio;
-            } else {
-                inputMonto.value = '';
+            // Calculo Gastos sin Especificar
+            let gastosMesSinEspec = 0;
+            let gastosAnioSinEspec = 0;
+
+            gastosData.forEach(g => {
+                if (esHuerfano(g) && g.timestamp) {
+                    const d = g.timestamp.toDate ? g.timestamp.toDate() : new Date(g.timestamp);
+                    if (d.getFullYear() === anioActual) {
+                        gastosAnioSinEspec += Number(g.monto);
+                        if (d.getMonth() === mesActual) { gastosMesSinEspec += Number(g.monto); }
+                    }
+                }
+            });
+
+            // Lista detallada de gastos sin asignar (o huérfanos por eliminación)
+            const gastosSinAsignar = gastosData.filter(esHuerfano).sort((a,b) => (b.timestamp?.toMillis()||0) - (a.timestamp?.toMillis()||0));
+            let listaSinAsignarHtml = '';
+            
+            if (gastosSinAsignar.length > 0) {
+                listaSinAsignarHtml = `
+                    <div class="mt-4 bg-white p-3 rounded-xl border border-red-100 shadow-sm">
+                        <h4 class="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center justify-between">
+                            <span class="flex items-center gap-1"><i class="fa-solid fa-circle-exclamation text-pipon-orange"></i> Falta asignar proveedor</span>
+                            <span class="bg-gray-100 text-gray-500 px-2 rounded-full">${gastosSinAsignar.length}</span>
+                        </h4>
+                        <div class="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+                            ${gastosSinAsignar.map(g => `
+                                <div class="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                    <div class="flex items-center gap-2 overflow-hidden">
+                                        <div class="w-6 h-6 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0"><i class="fa-solid fa-arrow-up text-[9px]"></i></div>
+                                        <div class="truncate">
+                                            <p class="text-xs font-bold text-gray-800 truncate leading-tight">${g.descripcion}</p>
+                                            <p class="text-[9px] text-gray-400 mt-0.5"><i class="fa-regular fa-clock"></i> ${new Date(g.timestamp?.toDate() || g.timestamp).toLocaleDateString('es-AR')} - ${formatearHora(g.timestamp)}</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <span class="font-black text-red-600 text-sm">-${formatearDinero(g.monto)}</span>
+                                        <button onclick="abrirEditarGasto('${g.id}')" class="w-7 h-7 rounded-lg bg-gray-200 text-gray-600 flex items-center justify-center active:bg-gray-300 transition-colors"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
             }
-        };
+
+            gastoSinEspecContainer.innerHTML = `
+                <div class="bg-gray-50 rounded-xl p-4 border border-gray-200 shadow-sm relative flex flex-col gap-3">
+                    <div class="pr-10">
+                        <p class="font-bold text-gray-700 text-lg leading-tight">Gastos sin Especificar</p>
+                        <p class="text-xs text-gray-500 font-medium mt-1"><i class="fa-solid fa-tag text-gray-400"></i> Gastos varios o proveedores eliminados</p>
+                    </div>
+                    <div class="flex gap-4 pt-3 border-t border-gray-200">
+                        <div>
+                            <p class="text-[9px] text-gray-500 uppercase font-bold tracking-wider">Gasto Mensual</p>
+                            <p class="font-black text-red-500 text-sm">${formatearDinero(gastosMesSinEspec)}</p>
+                        </div>
+                        <div>
+                            <p class="text-[9px] text-gray-500 uppercase font-bold tracking-wider">Gasto Anual</p>
+                            <p class="font-black text-red-500 text-sm">${formatearDinero(gastosAnioSinEspec)}</p>
+                        </div>
+                    </div>
+                </div>
+                ${listaSinAsignarHtml}
+            `;
+            
+            if (proveedoresData.length === 0) {
+                listEl.innerHTML = `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm mt-4"><i class="fa-solid fa-truck text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium">No hay proveedores registrados.</p></div>`;
+            } else {
+                listEl.innerHTML = proveedoresData.map(p => {
+                    let gastosMes = 0;
+                    let gastosAnio = 0;
+                    
+                    gastosData.forEach(g => {
+                        if (g.proveedor === p.nombre && g.timestamp) {
+                            const d = g.timestamp.toDate ? g.timestamp.toDate() : new Date(g.timestamp);
+                            if (d.getFullYear() === anioActual) {
+                                gastosAnio += Number(g.monto);
+                                if (d.getMonth() === mesActual) { gastosMes += Number(g.monto); }
+                            }
+                        }
+                    });
+
+                    return `
+                    <div class="bg-white rounded-xl p-4 shadow-sm border-l-4 border-l-blue-500 relative flex flex-col gap-3">
+                        <button onclick="abrirEditarProveedor('${p.id}')" class="absolute top-4 right-4 w-8 h-8 bg-gray-50 text-gray-400 rounded-full flex items-center justify-center hover:bg-gray-100 active:bg-gray-200 transition-colors shadow-sm"><i class="fa-solid fa-pen text-[11px]"></i></button>
+                        
+                        <div class="pr-10">
+                            <p class="font-bold text-gray-800 text-lg leading-tight">${p.nombre}</p>
+                            ${p.detalle ? `<p class="text-xs text-gray-500 font-medium mt-1"><i class="fa-solid fa-tag text-gray-300"></i> ${p.detalle}</p>` : ''}
+                        </div>
+                        
+                        <div class="flex gap-4 pt-3 border-t border-gray-50">
+                            <div>
+                                <p class="text-[9px] text-gray-400 uppercase font-bold tracking-wider">Gasto Mensual</p>
+                                <p class="font-black text-red-500 text-sm">${formatearDinero(gastosMes)}</p>
+                            </div>
+                            <div>
+                                <p class="text-[9px] text-gray-400 uppercase font-bold tracking-wider">Gasto Anual</p>
+                                <p class="font-black text-red-500 text-sm">${formatearDinero(gastosAnio)}</p>
+                            </div>
+                        </div>
+
+                        ${p.telefono ? `
+                        <div class="mt-1">
+                            <a href="https://wa.me/${p.telefono.replace(/\D/g,'')}" target="_blank" class="w-full bg-green-50 text-green-600 rounded-lg py-2 flex items-center justify-center gap-2 font-bold text-sm hover:bg-green-100 transition-colors"><i class="fa-brands fa-whatsapp text-lg"></i> Contactar</a>
+                        </div>` : ''}
+                    </div>
+                `}).join('');
+            }
+
+            const selectGasto = document.getElementById('gasto-proveedor');
+            let opcionesHtml = `<option value="">Sin Especificar / Otro</option>`;
+            proveedoresData.forEach(p => { opcionesHtml += `<option value="${p.nombre}">${p.nombre}</option>`; });
+            selectGasto.innerHTML = opcionesHtml;
+        }
 
         function agruparDatosPorFecha() {
             const dias = {}; 
@@ -626,8 +863,9 @@
                 if(!item.timestamp) return;
                 const dateObj = item.timestamp.toDate ? item.timestamp.toDate() : new Date(item.timestamp);
                 const fecha = dateObj.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }); 
-                if(!dias[fecha]) dias[fecha] = { ventas: 0, gastos: 0 };
+                if(!dias[fecha]) dias[fecha] = { ventas: 0, gastos: 0, items: [] };
                 dias[fecha][tipo] += Number(item.monto);
+                dias[fecha].items.push({...item, tipo: tipo}); 
             };
             ventasData.forEach(v => agrupar(v, 'ventas'));
             gastosData.forEach(g => agrupar(g, 'gastos'));
@@ -682,7 +920,7 @@
                 return;
             }
             cuadroEl.classList.remove('hidden');
-            const infoDia = datosAgrupados[diaSeleccionadoFormat] || { ventas: 0, gastos: 0 };
+            const infoDia = datosAgrupados[diaSeleccionadoFormat] || { ventas: 0, gastos: 0, items: [] };
             const balanceDia = infoDia.ventas - infoDia.gastos;
 
             document.getElementById('detalle-fecha').innerHTML = `<i class="fa-regular fa-calendar-check text-pipon-orange"></i> ${diaSeleccionadoFormat}`;
@@ -692,6 +930,44 @@
             const balEl = document.getElementById('detalle-balance');
             balEl.innerText = formatearDinero(balanceDia);
             balEl.className = `text-xl font-black ${balanceDia > 0 ? 'text-green-600' : (balanceDia < 0 ? 'text-red-600' : 'text-gray-800')}`;
+
+            const listaMovimientosEl = document.getElementById('detalle-movimientos-lista');
+            if (infoDia.items.length === 0) {
+                listaMovimientosEl.innerHTML = `<p class="text-center text-xs text-gray-400 py-2">No hubo movimientos este día.</p>`;
+            } else {
+                infoDia.items.sort((a,b) => (b.timestamp?.toMillis()||0) - (a.timestamp?.toMillis()||0));
+                listaMovimientosEl.innerHTML = infoDia.items.map(item => {
+                    const esVenta = item.tipo === 'ventas';
+                    const color = esVenta ? 'green' : 'red';
+                    const signo = esVenta ? '+' : '-';
+                    const icono = esVenta ? 'fa-arrow-down' : 'fa-arrow-up';
+                    
+                    let detalleExtra = '';
+                    if (!esVenta) {
+                        const huerfano = esHuerfano(item);
+                        const provName = huerfano ? 'Sin especificar' : item.proveedor;
+                        detalleExtra = `<span class="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold ml-2"><i class="fa-solid fa-truck"></i> ${provName}</span>`;
+                    }
+
+                    return `
+                    <div class="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                        <div class="flex items-center gap-2 overflow-hidden">
+                            <div class="w-6 h-6 rounded-full bg-${color}-100 text-${color}-600 flex items-center justify-center shrink-0"><i class="fa-solid ${icono} text-[9px]"></i></div>
+                            <div class="truncate">
+                                <p class="text-xs font-bold text-gray-800 truncate leading-tight">${item.descripcion || 'Venta General'}</p>
+                                <div class="flex items-center gap-1 mt-0.5">
+                                    <span class="text-[9px] text-gray-400"><i class="fa-regular fa-clock"></i> ${formatearHora(item.timestamp)}</span>
+                                    ${detalleExtra}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="font-black text-${color}-600 text-sm shrink-0">${signo}${formatearDinero(item.monto)}</span>
+                            ${!esVenta ? `<button onclick="abrirEditarGasto('${item.id}')" class="w-7 h-7 rounded-lg bg-gray-200 text-gray-600 flex items-center justify-center active:bg-gray-300 transition-colors"><i class="fa-solid fa-pen text-[10px]"></i></button>` : ''}
+                        </div>
+                    </div>`;
+                }).join('');
+            }
         }
 
         window.renderGridBalances = function() {
@@ -713,15 +989,8 @@
             actualizarDetalleBalances();
         };
 
-        window.cambiarAnioBalances = function(dir) { 
-            anioBalances += dir; 
-            renderGridBalances(); 
-        };
-        
-        window.seleccionarMesBalances = function(mesIndex) { 
-            mesBalancesSelec = mesIndex; 
-            renderGridBalances(); 
-        };
+        window.cambiarAnioBalances = function(dir) { anioBalances += dir; renderGridBalances(); };
+        window.seleccionarMesBalances = function(mesIndex) { mesBalancesSelec = mesIndex; renderGridBalances(); };
 
         function actualizarDetalleBalances() {
             const detalleEl = document.getElementById('detalle-balances');
@@ -750,36 +1019,67 @@
             balNetoEl.innerText = formatearDinero(balanceNeta);
             balNetoEl.className = `text-2xl font-black ${balanceNeta > 0 ? 'text-green-600' : (balanceNeta < 0 ? 'text-red-600' : 'text-gray-800')}`;
             
+            // Ranking Ventas
             const estadisticasProd = {};
             ventasMes.forEach(v => {
                 const nombreProd = v.descripcion || 'Venta General';
-                if(!estadisticasProd[nombreProd]) {
-                    estadisticasProd[nombreProd] = { cantidad: 0, recaudado: 0 };
-                }
+                if(!estadisticasProd[nombreProd]) { estadisticasProd[nombreProd] = { cantidad: 0, recaudado: 0 }; }
                 estadisticasProd[nombreProd].cantidad += 1; 
                 estadisticasProd[nombreProd].recaudado += Number(v.monto); 
             });
+            const rankingVentas = Object.keys(estadisticasProd).map(k => ({ nombre: k, ...estadisticasProd[k] })).sort((a, b) => b.recaudado - a.recaudado);
             
-            const ranking = Object.keys(estadisticasProd)
-                .map(k => ({ nombre: k, ...estadisticasProd[k] }))
-                .sort((a, b) => b.recaudado - a.recaudado);
-                
-            const listEl = document.getElementById('balances-ranking');
-            if (ranking.length === 0) {
-                listEl.innerHTML = `<p class="text-center text-gray-400 py-4 text-sm font-medium border border-dashed border-gray-200 rounded-xl">No hay ventas registradas en este mes.</p>`;
+            const listVentasEl = document.getElementById('balances-ranking');
+            if (rankingVentas.length === 0) {
+                listVentasEl.innerHTML = `<p class="text-center text-gray-400 py-4 text-sm font-medium border border-dashed border-gray-200 rounded-xl">No hay ventas este mes.</p>`;
             } else {
-                listEl.innerHTML = ranking.map((prod, index) => `
+                listVentasEl.innerHTML = rankingVentas.map((prod, index) => `
                     <div class="flex justify-between items-center bg-gray-50 rounded-xl p-3 border border-gray-100">
                         <div class="flex items-center gap-3">
                             <span class="w-6 h-6 rounded-full bg-pipon-cream text-pipon-orange flex items-center justify-center font-black text-xs shrink-0">${index + 1}</span>
                             <div>
                                 <p class="font-bold text-gray-800 text-sm leading-tight">${prod.nombre}</p>
-                                <p class="text-[11px] text-gray-500 font-medium">${prod.cantidad} ${prod.cantidad === 1 ? 'venta registrada' : 'ventas registradas'}</p>
+                                <p class="text-[11px] text-gray-500 font-medium">${prod.cantidad} ${prod.cantidad === 1 ? 'venta' : 'ventas'}</p>
                             </div>
                         </div>
                         <span class="font-black text-pipon-brown shrink-0">${formatearDinero(prod.recaudado)}</span>
                     </div>
                 `).join('');
+            }
+
+            // Gastos por Proveedor
+            const estadisticasProv = {};
+            gastosMes.forEach(g => {
+                let nombreProv = g.proveedor;
+                if(esHuerfano(g)) { nombreProv = 'Sin especificar'; }
+
+                if(!estadisticasProv[nombreProv]) { estadisticasProv[nombreProv] = { cantidad: 0, gastado: 0 }; }
+                estadisticasProv[nombreProv].cantidad += 1; 
+                estadisticasProv[nombreProv].gastado += Number(g.monto); 
+            });
+            const rankingGastos = Object.keys(estadisticasProv).map(k => ({ nombre: k, ...estadisticasProv[k] })).sort((a, b) => b.gastado - a.gastado);
+            
+            const listProvEl = document.getElementById('balances-gastos-proveedores');
+            if (rankingGastos.length === 0) {
+                listProvEl.innerHTML = `<p class="text-center text-gray-400 py-4 text-sm font-medium border border-dashed border-gray-200 rounded-xl">No hay gastos este mes.</p>`;
+            } else {
+                listProvEl.innerHTML = rankingGastos.map((prov, index) => {
+                    const esSinEspecificar = prov.nombre === 'Sin especificar';
+                    const iconBg = esSinEspecificar ? 'bg-gray-200' : 'bg-blue-50';
+                    const iconColor = esSinEspecificar ? 'text-gray-500' : 'text-blue-500';
+                    const icon = esSinEspecificar ? 'fa-tag' : 'fa-truck';
+                    return `
+                    <div class="flex justify-between items-center bg-gray-50 rounded-xl p-3 border border-gray-100">
+                        <div class="flex items-center gap-3">
+                            <span class="w-6 h-6 rounded-full ${iconBg} ${iconColor} flex items-center justify-center font-black text-xs shrink-0"><i class="fa-solid ${icon} text-[9px]"></i></span>
+                            <div>
+                                <p class="font-bold text-gray-800 text-sm leading-tight">${prov.nombre}</p>
+                                <p class="text-[11px] text-gray-500 font-medium">${prov.cantidad} ${prov.cantidad === 1 ? 'movimiento' : 'movimientos'}</p>
+                            </div>
+                        </div>
+                        <span class="font-black text-red-600 shrink-0">-${formatearDinero(prov.gastado)}</span>
+                    </div>
+                `}).join('');
             }
         }
 
@@ -789,7 +1089,6 @@
         window.switchTab = function(tabName) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById(`content-${tabName}`).classList.remove('hidden');
-            
             document.querySelectorAll('.nav-btn').forEach(btn => {
                 btn.classList.remove('text-pipon-orange');
                 btn.classList.add('text-gray-400');
@@ -835,11 +1134,11 @@
             modal.classList.remove('hidden');
             modalContent.classList.remove('modal-exit');
             modalContent.classList.add('modal-enter');
-            
             setTimeout(() => { 
                 if(modalId === 'modalVenta') document.getElementById('venta-monto').focus();
                 else if(modalId === 'modalGasto') document.getElementById('gasto-monto').focus();
                 else if(modalId === 'modalProducto') document.getElementById('producto-nombre').focus();
+                else if(modalId === 'modalProveedor') document.getElementById('prov-nombre').focus();
             }, 300);
         };
 
@@ -865,14 +1164,11 @@
                 document.querySelectorAll('.metodo-btn-gasto')[0].className = "metodo-btn-gasto border-2 border-red-500 bg-red-50 text-red-700 font-bold py-3 rounded-xl transition-all";
                 document.querySelectorAll('.metodo-btn-gasto')[1].className = "metodo-btn-gasto border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-xl transition-all";
             }
-            if(modalId === 'modalProducto') {
-                document.getElementById('form-producto').reset();
-                limpiarImagen('producto');
-            }
-            if(modalId === 'modalEditarProducto') {
-                document.getElementById('form-editar-producto').reset();
-                limpiarImagen('edit-producto');
-            }
+            if(modalId === 'modalProducto') { document.getElementById('form-producto').reset(); limpiarImagen('producto'); }
+            if(modalId === 'modalEditarProducto') { document.getElementById('form-editar-producto').reset(); limpiarImagen('edit-producto'); }
+            if(modalId === 'modalProveedor') { document.getElementById('form-proveedor').reset(); }
+            if(modalId === 'modalEditarProveedor') { document.getElementById('form-editar-proveedor').reset(); }
+            if(modalId === 'modalEditarGasto') { document.getElementById('form-editar-gasto').reset(); }
         };
 
         window.seleccionarMetodo = function(tipo, metodo, elementoBtn) {
@@ -888,14 +1184,24 @@
             }
         };
 
+        window.seleccionarProductoVenta = function() {
+            const select = document.getElementById('venta-producto');
+            const productId = select.value;
+            const inputMonto = document.getElementById('venta-monto');
+            
+            if(productId) {
+                const producto = productosData.find(p => p.id === productId);
+                if(producto) inputMonto.value = producto.precio;
+            } else { inputMonto.value = ''; }
+        };
+
         window.guardarVenta = async function(e) {
             e.preventDefault();
             const monto = document.getElementById('venta-monto').value;
             const selectProd = document.getElementById('venta-producto');
             let desc = "Venta General";
-            if (selectProd.value) {
-                desc = selectProd.options[selectProd.selectedIndex].text;
-            }
+            if (selectProd.value) { desc = selectProd.options[selectProd.selectedIndex].text; }
+            
             const metodo = document.getElementById('venta-metodo').value;
             const comprobante = document.getElementById('venta-comprobante-base64').value;
             
@@ -903,35 +1209,67 @@
                 const ventasRef = collection(db, 'negocio', 'pipon', 'ventas');
                 const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: new Date() };
                 if(comprobante) data.comprobante = comprobante;
-                
                 await addDoc(ventasRef, data);
                 closeModal('modalVenta');
                 showToast('¡Venta guardada con éxito!', 'success');
-            } catch (error) { 
-                console.error(error); 
-                showToast('Error al guardar. Revisa permisos.', 'error'); 
-            }
+            } catch (error) { console.error(error); showToast('Error al guardar.', 'error'); }
         };
 
         window.guardarGasto = async function(e) {
             e.preventDefault();
             const monto = document.getElementById('gasto-monto').value;
             const desc = document.getElementById('gasto-desc').value;
+            const proveedorSeleccionado = document.getElementById('gasto-proveedor').value;
             const metodo = document.getElementById('gasto-metodo').value;
             const comprobante = document.getElementById('gasto-comprobante-base64').value;
             
             try {
                 const gastosRef = collection(db, 'negocio', 'pipon', 'gastos');
                 const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: new Date() };
+                if(proveedorSeleccionado) data.proveedor = proveedorSeleccionado;
                 if(comprobante) data.comprobante = comprobante;
                 
                 await addDoc(gastosRef, data);
                 closeModal('modalGasto');
                 showToast('Gasto registrado correctamente.', 'success'); 
-            } catch (error) { 
-                console.error(error); 
-                showToast('Error al guardar. Revisa permisos.', 'error'); 
-            }
+            } catch (error) { console.error(error); showToast('Error al guardar.', 'error'); }
+        };
+
+        window.abrirEditarGasto = function(id) {
+            const gasto = gastosData.find(g => g.id === id);
+            if(!gasto) return;
+            
+            document.getElementById('edit-gasto-id').value = id;
+            document.getElementById('edit-gasto-monto').value = gasto.monto;
+            document.getElementById('edit-gasto-desc').value = gasto.descripcion;
+            
+            const selectProv = document.getElementById('edit-gasto-proveedor');
+            let opcionesHtml = `<option value="">Sin Especificar / Otro</option>`;
+            proveedoresData.forEach(p => { 
+                const isSelected = (gasto.proveedor === p.nombre) ? 'selected' : '';
+                opcionesHtml += `<option value="${p.nombre}" ${isSelected}>${p.nombre}</option>`; 
+            });
+            selectProv.innerHTML = opcionesHtml;
+            
+            openModal('modalEditarGasto');
+        };
+
+        window.actualizarGasto = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('edit-gasto-id').value;
+            const monto = document.getElementById('edit-gasto-monto').value;
+            const desc = document.getElementById('edit-gasto-desc').value;
+            const prov = document.getElementById('edit-gasto-proveedor').value;
+            
+            try {
+                const gastoRef = doc(db, 'negocio', 'pipon', 'gastos', id);
+                const data = { monto: Number(monto), descripcion: desc };
+                if(prov) data.proveedor = prov; else data.proveedor = ""; // limpia si es sin asignar
+                
+                await updateDoc(gastoRef, data);
+                closeModal('modalEditarGasto');
+                showToast('Gasto actualizado.', 'success'); 
+            } catch (error) { console.error(error); showToast('Error al actualizar.', 'error'); }
         };
 
         window.guardarProducto = async function(e) {
@@ -944,14 +1282,10 @@
                 const productosRef = collection(db, 'negocio', 'pipon', 'productos');
                 const data = { nombre: nombre, precio: Number(precio), timestamp: new Date() };
                 if(foto) data.foto = foto;
-                
                 await addDoc(productosRef, data);
                 closeModal('modalProducto');
                 showToast('Producto agregado al catálogo.', 'success'); 
-            } catch (error) { 
-                console.error(error); 
-                showToast('Error al guardar. Revisa permisos.', 'error'); 
-            }
+            } catch (error) { console.error(error); showToast('Error al guardar.', 'error'); }
         };
 
         window.abrirEditarProducto = function(id) {
@@ -965,12 +1299,9 @@
             if(prod.foto) {
                 document.getElementById('edit-producto-comprobante-base64').value = prod.foto;
                 document.getElementById('edit-producto-comprobante-label').innerText = "Foto guardada ✓";
-                const labelParent = document.getElementById('edit-producto-comprobante-label').parentElement;
-                labelParent.classList.add('border-pipon-orange', 'bg-pipon-yellow', 'text-pipon-brown');
+                document.getElementById('edit-producto-comprobante-label').parentElement.classList.add('border-pipon-orange', 'bg-pipon-yellow', 'text-pipon-brown');
                 document.getElementById('edit-producto-comprobante-clear').classList.remove('hidden');
-            } else {
-                limpiarImagen('edit-producto');
-            }
+            } else { limpiarImagen('edit-producto'); }
             
             openModal('modalEditarProducto');
         };
@@ -985,18 +1316,101 @@
             try {
                 const prodRef = doc(db, 'negocio', 'pipon', 'productos', id);
                 const data = { nombre: nombre, precio: Number(precio) };
-                
-                if(foto) data.foto = foto;
-                else data.foto = ""; 
+                if(foto) data.foto = foto; else data.foto = ""; 
                 
                 await updateDoc(prodRef, data);
                 closeModal('modalEditarProducto');
                 showToast('Producto actualizado.', 'success'); 
-            } catch (error) { 
-                console.error(error); 
-                showToast('Error al actualizar. Revisa permisos.', 'error'); 
-            }
+            } catch (error) { console.error(error); showToast('Error al actualizar.', 'error'); }
         };
+
+        window.guardarProveedor = async function(e) {
+            e.preventDefault();
+            const nombre = document.getElementById('prov-nombre').value;
+            const telefono = document.getElementById('prov-telefono').value;
+            const detalle = document.getElementById('prov-detalle').value;
+            
+            try {
+                const provRef = collection(db, 'negocio', 'pipon', 'proveedores');
+                const data = { nombre: nombre, timestamp: new Date() };
+                if(telefono) data.telefono = telefono;
+                if(detalle) data.detalle = detalle;
+                
+                await addDoc(provRef, data);
+                closeModal('modalProveedor');
+                showToast('Proveedor guardado.', 'info'); 
+            } catch (error) { console.error(error); showToast('Error al guardar.', 'error'); }
+        };
+
+        window.abrirEditarProveedor = function(id) {
+            const prov = proveedoresData.find(p => p.id === id);
+            if(!prov) return;
+            
+            document.getElementById('edit-prov-id').value = id;
+            document.getElementById('edit-prov-nombre').value = prov.nombre;
+            document.getElementById('edit-prov-telefono').value = prov.telefono || '';
+            document.getElementById('edit-prov-detalle').value = prov.detalle || '';
+            
+            openModal('modalEditarProveedor');
+        };
+
+        window.actualizarProveedor = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('edit-prov-id').value;
+            const nombre = document.getElementById('edit-prov-nombre').value;
+            const telefono = document.getElementById('edit-prov-telefono').value;
+            const detalle = document.getElementById('edit-prov-detalle').value;
+            
+            try {
+                const provRef = doc(db, 'negocio', 'pipon', 'proveedores', id);
+                const data = { nombre: nombre };
+                if(telefono) data.telefono = telefono; else data.telefono = "";
+                if(detalle) data.detalle = detalle; else data.detalle = "";
+                
+                await updateDoc(provRef, data);
+                closeModal('modalEditarProveedor');
+                showToast('Proveedor actualizado.', 'success'); 
+            } catch (error) { console.error(error); showToast('Error al actualizar.', 'error'); }
+        };
+
+        // LÓGICA DE CONFIRMACIÓN PARA ELIMINAR PROVEEDOR
+        window.confirmarEliminarProveedor = function() {
+            proveedorAEliminar = document.getElementById('edit-prov-id').value;
+            const modal = document.getElementById('modalConfirmDelete');
+            const content = document.getElementById('modalConfirmDeleteContent');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                content.classList.remove('scale-95');
+            }, 10);
+        };
+
+        window.cerrarConfirmDelete = function() {
+            const modal = document.getElementById('modalConfirmDelete');
+            const content = document.getElementById('modalConfirmDeleteContent');
+            modal.classList.add('opacity-0');
+            content.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                proveedorAEliminar = null;
+            }, 300);
+        };
+
+        document.getElementById('btn-confirm-delete').addEventListener('click', async () => {
+            if(!proveedorAEliminar) return;
+            try {
+                const provRef = doc(db, 'negocio', 'pipon', 'proveedores', proveedorAEliminar);
+                await deleteDoc(provRef);
+                cerrarConfirmDelete();
+                closeModal('modalEditarProveedor');
+                showToast('Proveedor eliminado con éxito.', 'success');
+            } catch (error) {
+                console.error(error);
+                showToast('Error al eliminar proveedor.', 'error');
+            }
+        });
 
         window.procesarImagen = function(tipo, inputElement) {
             const file = inputElement.files[0];
@@ -1007,13 +1421,9 @@
                 document.getElementById(`${tipo}-comprobante-base64`).value = e.target.result;
                 const labelStr = (tipo === 'producto' || tipo === 'edit-producto') ? 'Foto lista ✓' : 'Imagen adjunta ✓';
                 document.getElementById(`${tipo}-comprobante-label`).innerText = labelStr;
-                
                 const labelParent = document.getElementById(`${tipo}-comprobante-label`).parentElement;
-                if(tipo === 'producto' || tipo === 'edit-producto') {
-                    labelParent.classList.add('border-pipon-orange', 'bg-pipon-yellow', 'text-pipon-brown');
-                } else {
-                    labelParent.classList.add('border-green-500', 'bg-green-50', 'text-green-600');
-                }
+                if(tipo === 'producto' || tipo === 'edit-producto') labelParent.classList.add('border-pipon-orange', 'bg-pipon-yellow', 'text-pipon-brown');
+                else labelParent.classList.add('border-green-500', 'bg-green-50', 'text-green-600');
                 document.getElementById(`${tipo}-comprobante-clear`).classList.remove('hidden');
             };
             reader.readAsDataURL(file); 
@@ -1022,19 +1432,13 @@
         window.limpiarImagen = function(tipo) {
             document.getElementById(`${tipo}-comprobante`).value = ""; 
             document.getElementById(`${tipo}-comprobante-base64`).value = ""; 
-            
             let labelStr = 'Adjuntar foto/captura';
             if (tipo === 'producto') labelStr = 'Subir foto del producto';
             if (tipo === 'edit-producto') labelStr = 'Cambiar foto';
-            
             document.getElementById(`${tipo}-comprobante-label`).innerText = labelStr;
             const labelParent = document.getElementById(`${tipo}-comprobante-label`).parentElement;
-            
-            if(tipo === 'producto' || tipo === 'edit-producto') {
-                labelParent.classList.remove('border-pipon-orange', 'bg-pipon-yellow', 'text-pipon-brown');
-            } else {
-                labelParent.classList.remove('border-green-500', 'bg-green-50', 'text-green-600');
-            }
+            if(tipo === 'producto' || tipo === 'edit-producto') labelParent.classList.remove('border-pipon-orange', 'bg-pipon-yellow', 'text-pipon-brown');
+            else labelParent.classList.remove('border-green-500', 'bg-green-50', 'text-green-600');
             document.getElementById(`${tipo}-comprobante-clear`).classList.add('hidden');
         };
 
@@ -1063,11 +1467,20 @@
                 const ventasRef = collection(db, 'negocio', 'pipon', 'ventas');
                 const gastosRef = collection(db, 'negocio', 'pipon', 'gastos');
                 const productosRef = collection(db, 'negocio', 'pipon', 'productos');
+                const proveedoresRef = collection(db, 'negocio', 'pipon', 'proveedores');
 
                 onSnapshot(productosRef, (snapshot) => {
                     productosData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     productosData.sort((a, b) => a.nombre.localeCompare(b.nombre));
                     renderProductos();
+                });
+
+                onSnapshot(proveedoresRef, (snapshot) => {
+                    proveedoresData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    proveedoresData.sort((a, b) => a.nombre.localeCompare(b.nombre));
+                    renderProveedores();
+                    // Refrescar balances y gastos en caso de que se haya agregado/eliminado un proveedor
+                    if(document.getElementById('content-balances').classList.contains('block')) renderGridBalances();
                 });
 
                 onSnapshot(ventasRef, (snapshot) => {
@@ -1081,13 +1494,11 @@
                 onSnapshot(gastosRef, (snapshot) => {
                     gastosData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     renderBalanceYResumen(); 
-                    renderGastos(); 
                     renderHistorial();
+                    if(document.getElementById('content-proveedores').classList.contains('block')) renderProveedores();
                     if(document.getElementById('content-balances').classList.contains('block')) renderGridBalances();
                 });
-            } catch (error) { 
-                console.error("Error inicializando Firebase:", error); 
-            }
+            } catch (error) { console.error("Error inicializando Firebase:", error); }
         }
         
         inicializar();
