@@ -67,14 +67,12 @@
     <header class="bg-pipon-brown text-white p-4 sticky top-0 z-10 shadow-md">
         <div class="max-w-md mx-auto flex items-center justify-center gap-3 relative">
             <div class="bg-white rounded-full w-10 h-10 flex items-center justify-center overflow-hidden border-2 border-white">
-                <!-- Reemplaza el src con tu link del logo -->
                 <img src="./pipon.jpeg" alt="Logo Pipón" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='https://placehold.co/100x100/FFF2D4/D45115?text=P';">
             </div>
             <h1 class="text-xl font-black tracking-wide uppercase">Pipón</h1>
             
-            <!-- MARCA DE AGUA (Cambia el href por tu enlace) -->
-            <a href="https://psmsaas.github.io/psm/" target="_blank" class="absolute right-0 top-1/2 -translate-y-1/2 text-[9px] font-bold text-white/30 hover:text-white/80 transition-colors tracking-widest no-underline">
-                BY: PSMsaas
+            <a href="https://tu-enlace-aqui.com" target="_blank" class="absolute right-0 top-1/2 -translate-y-1/2 text-[9px] font-bold text-white/30 hover:text-white/80 transition-colors tracking-widest no-underline">
+                BY: PSM
             </a>
         </div>
     </header>
@@ -85,9 +83,18 @@
         <div id="content-inicio" class="tab-content block">
             <div class="bg-white rounded-3xl shadow-sm p-6 text-center border border-pipon-yellow/30 mb-4 relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-2 bg-pipon-orange"></div>
-                <h2 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 mt-2">Balance del Día (Hoy)</h2>
+                
+                <!-- SELECTOR MES / DIA -->
+                <div class="flex justify-center mb-3 relative z-10">
+                    <div class="bg-pipon-cream p-1 rounded-full flex gap-1 border border-pipon-yellow/50">
+                        <button id="btn-vista-mes" onclick="cambiarVistaBalance('mes')" class="px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-pipon-orange text-white shadow-sm transition-all">Este Mes</button>
+                        <button id="btn-vista-dia" onclick="cambiarVistaBalance('dia')" class="px-5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-pipon-brown hover:bg-white/50 transition-all">Hoy</button>
+                    </div>
+                </div>
+
+                <h2 id="lbl-balance-titulo" class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 mt-2">Balance del Mes</h2>
                 <div class="text-5xl font-black text-pipon-brown mb-1" id="balance-total">$0</div>
-                <p id="balance-ayer" class="text-sm font-semibold text-gray-400">Ayer: Cargando...</p>
+                <p id="balance-anterior" class="text-sm font-semibold text-gray-400">Mes pasado: Cargando...</p>
             </div>
 
             <div class="grid grid-cols-2 gap-4 mb-6">
@@ -140,10 +147,8 @@
                 </button>
             </div>
             
-            <!-- Contenedor Gastos sin Especificar -->
             <div id="gasto-sin-especificar-container" class="mb-4"></div>
             
-            <!-- Lista Proveedores -->
             <div id="lista-proveedores" class="flex flex-col gap-3 pb-8">
                 <p class="text-center text-gray-500 mt-10">Cargando proveedores...</p>
             </div>
@@ -167,7 +172,7 @@
                 <div id="calendario-grilla" class="grid grid-cols-7 gap-1 text-sm"></div>
             </div>
 
-            <div id="detalle-dia-seleccionado" class="hidden bg-white rounded-2xl shadow-sm p-5 border border-pipon-yellow/50 relative overflow-hidden transition-all">
+            <div id="detalle-dia-seleccionado" class="hidden bg-white rounded-2xl shadow-sm p-5 border border-pipon-yellow/50 relative overflow-hidden transition-all mb-4">
                 <div class="absolute top-0 left-0 w-full h-1 bg-pipon-orange"></div>
                 <div class="flex justify-between items-center mb-4 border-b border-gray-50 pb-3">
                     <span id="detalle-fecha" class="font-bold text-gray-800 flex items-center gap-2"><i class="fa-regular fa-calendar text-pipon-orange"></i> Selecciona un día</span>
@@ -187,11 +192,25 @@
                     </div>
                 </div>
                 
-                <!-- LISTA DETALLADA DEL DÍA -->
                 <div class="border-t border-gray-100 pt-3">
                     <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Movimientos del Día</h4>
                     <div id="detalle-movimientos-lista" class="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1"></div>
                 </div>
+
+                <!-- SECCIÓN RETROACTIVA -->
+                <div class="mt-4 pt-4 border-t border-dashed border-gray-200">
+                    <p class="text-[10px] text-center text-gray-400 font-bold uppercase tracking-wider mb-2">¿Olvidaste anotar algo el <span id="retro-fecha-label"></span>?</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="abrirRegistroRetroactivo('venta')" class="bg-green-50 text-green-600 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-green-100 hover:bg-green-100 active:scale-95 transition-all"><i class="fa-solid fa-plus-circle"></i> Venta Pasada</button>
+                        <button onclick="abrirRegistroRetroactivo('gasto')" class="bg-red-50 text-red-600 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-red-100 hover:bg-red-100 active:scale-95 transition-all"><i class="fa-solid fa-minus-circle"></i> Gasto Pasado</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAPELERA DEL DÍA -->
+            <div id="papelera-dia-seleccionado" class="hidden bg-red-50 rounded-2xl shadow-sm p-4 border border-red-200 mb-8 transition-all">
+                <h4 class="text-xs font-bold text-red-600 uppercase mb-3 flex items-center gap-2"><i class="fa-solid fa-trash-can"></i> Elementos Eliminados (Este día)</h4>
+                <div id="detalle-eliminados-lista" class="flex flex-col gap-2 max-h-32 overflow-y-auto pr-1"></div>
             </div>
         </div>
 
@@ -253,8 +272,8 @@
 
     <div class="fixed bottom-24 right-4 z-40">
         <div id="fab-menu" class="fab-menu absolute bottom-16 right-0 flex flex-col gap-3 bg-white p-3 rounded-2xl shadow-xl border border-gray-100 w-56">
-            <button onclick="openModal('modalVenta'); toggleFabMenu();" class="flex items-center gap-3 w-full bg-green-50 text-green-700 p-3 rounded-xl font-bold active:bg-green-100 transition-colors"><i class="fa-solid fa-plus-circle text-lg"></i> Nueva Venta</button>
-            <button onclick="openModal('modalGasto'); toggleFabMenu();" class="flex items-center gap-3 w-full bg-red-50 text-red-700 p-3 rounded-xl font-bold active:bg-red-100 transition-colors"><i class="fa-solid fa-minus-circle text-lg"></i> Nuevo Gasto</button>
+            <button onclick="window.fechaTransaccionManual = null; document.getElementById('banner-retro-venta').classList.add('hidden'); openModal('modalVenta'); toggleFabMenu();" class="flex items-center gap-3 w-full bg-green-50 text-green-700 p-3 rounded-xl font-bold active:bg-green-100 transition-colors"><i class="fa-solid fa-plus-circle text-lg"></i> Nueva Venta</button>
+            <button onclick="window.fechaTransaccionManual = null; document.getElementById('banner-retro-gasto').classList.add('hidden'); openModal('modalGasto'); toggleFabMenu();" class="flex items-center gap-3 w-full bg-red-50 text-red-700 p-3 rounded-xl font-bold active:bg-red-100 transition-colors"><i class="fa-solid fa-minus-circle text-lg"></i> Nuevo Gasto</button>
             <div class="h-px bg-gray-100 w-full my-1"></div>
             <button onclick="openModal('modalProducto'); toggleFabMenu();" class="flex items-center gap-3 w-full bg-pipon-cream text-pipon-brown p-3 rounded-xl font-bold active:bg-pipon-yellow transition-colors"><i class="fa-solid fa-box-open text-lg"></i> Nuevo Producto</button>
         </div>
@@ -270,13 +289,17 @@
                 <h2 class="text-2xl font-black text-green-600">Registrar Venta</h2>
                 <button type="button" onclick="closeModal('modalVenta')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
             </div>
+
+            <!-- CARTEL RETROACTIVO -->
+            <div id="banner-retro-venta" class="hidden bg-pipon-yellow/30 text-pipon-brown text-xs font-bold p-3 rounded-xl flex items-center justify-center gap-2 mb-4 border border-pipon-yellow/50">
+                <i class="fa-solid fa-clock-rotate-left"></i> Registrando con fecha pasada (<span id="banner-retro-venta-fecha"></span>)
+            </div>
             
             <form id="form-venta" onsubmit="guardarVenta(event)">
                 <div class="mb-5">
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Producto</label>
                     <select id="venta-producto" onchange="seleccionarProductoVenta()" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:bg-white transition-all font-bold text-gray-700 appearance-none">
                         <option value="">Venta General / Varios</option>
-                        <!-- Opciones de Firebase -->
                     </select>
                 </div>
 
@@ -284,7 +307,8 @@
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Monto Total</label>
                     <div class="flex justify-center items-center gap-1 text-5xl font-black text-gray-800">
                         <span class="text-3xl text-gray-400">$</span>
-                        <input type="number" id="venta-monto" class="w-32 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-green-500 transition-colors" required min="1" step="0.01" inputmode="decimal" placeholder="0">
+                        <!-- SE AMPLIA EL ANCHO A w-56 -->
+                        <input type="number" id="venta-monto" class="w-56 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-green-500 transition-colors" required min="1" step="0.01" inputmode="decimal" placeholder="0">
                     </div>
                 </div>
 
@@ -314,6 +338,41 @@
         </div>
     </div>
 
+    <!-- MODAL EDITAR VENTA -->
+    <div id="modalEditarVenta" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-green-600">Editar Venta</h2>
+                <button type="button" onclick="closeModal('modalEditarVenta')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <form id="form-editar-venta" onsubmit="actualizarVenta(event)">
+                <input type="hidden" id="edit-venta-id">
+                
+                <div class="mb-5 text-center">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Monto Total</label>
+                    <div class="flex justify-center items-center gap-1 text-5xl font-black text-gray-800">
+                        <span class="text-3xl text-gray-400">$</span>
+                        <!-- SE AMPLIA EL ANCHO A w-56 -->
+                        <input type="number" id="edit-venta-monto" class="w-56 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-green-500 transition-colors" required min="1" step="0.01" inputmode="decimal">
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Descripción</label>
+                    <input type="text" id="edit-venta-desc" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:bg-white transition-all font-medium" required>
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="button" onclick="confirmarEliminarTransaccion('venta')" class="w-14 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center text-lg active:bg-red-100 transition-colors"><i class="fa-solid fa-trash"></i></button>
+                    <button type="submit" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-green-200 active:scale-95 transition-all">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
     <!-- MODAL GASTO -->
     <div id="modalGasto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
         <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -323,12 +382,18 @@
                 <button type="button" onclick="closeModal('modalGasto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
             </div>
             
+            <!-- CARTEL RETROACTIVO -->
+            <div id="banner-retro-gasto" class="hidden bg-pipon-yellow/30 text-pipon-brown text-xs font-bold p-3 rounded-xl flex items-center justify-center gap-2 mb-4 border border-pipon-yellow/50">
+                <i class="fa-solid fa-clock-rotate-left"></i> Registrando con fecha pasada (<span id="banner-retro-gasto-fecha"></span>)
+            </div>
+
             <form id="form-gasto" onsubmit="guardarGasto(event)">
                 <div class="mb-5 text-center">
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Monto del Gasto</label>
                     <div class="flex justify-center items-center gap-1 text-5xl font-black text-gray-800">
                         <span class="text-3xl text-gray-400">$</span>
-                        <input type="number" id="gasto-monto" class="w-32 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-red-500 transition-colors" required min="1" step="0.01" inputmode="decimal" placeholder="0">
+                        <!-- SE AMPLIA EL ANCHO A w-56 -->
+                        <input type="number" id="gasto-monto" class="w-56 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-red-500 transition-colors" required min="1" step="0.01" inputmode="decimal" placeholder="0">
                     </div>
                 </div>
 
@@ -341,7 +406,6 @@
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Proveedor (Opcional)</label>
                     <select id="gasto-proveedor" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-red-500 focus:bg-white transition-all font-bold text-gray-700 appearance-none">
                         <option value="">Sin Especificar / Otro</option>
-                        <!-- Rellenado por JS -->
                     </select>
                 </div>
 
@@ -532,6 +596,21 @@
         </div>
     </div>
 
+    <!-- MODAL CONFIRMAR ELIMINAR TRANSACCION -->
+    <div id="modalConfirmDeleteTransaccion" class="fixed inset-0 z-[70] hidden flex-col justify-center items-center bg-black/60 backdrop-blur-sm p-4 opacity-0 transition-opacity">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform scale-95 transition-transform" id="modalConfirmDeleteTransaccionContent">
+            <div class="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-3xl">
+                <i class="fa-solid fa-trash-can"></i>
+            </div>
+            <h3 class="text-xl font-black text-center text-gray-800 mb-2">¿Eliminar movimiento?</h3>
+            <p class="text-center text-sm text-gray-500 font-medium mb-6">Este movimiento se moverá a la papelera y dejará de contar en los balances.</p>
+            <div class="flex gap-3">
+                <button onclick="cerrarConfirmDeleteTransaccion()" class="flex-1 bg-gray-100 text-gray-600 font-bold py-3 rounded-xl active:bg-gray-200 transition-colors">Cancelar</button>
+                <button id="btn-confirm-delete-transaccion" class="flex-1 bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-red-200 active:scale-95 transition-all">Mover a Papelera</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL EDITAR GASTO -->
     <div id="modalEditarGasto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
         <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -548,7 +627,8 @@
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Monto del Gasto</label>
                     <div class="flex justify-center items-center gap-1 text-5xl font-black text-gray-800">
                         <span class="text-3xl text-gray-400">$</span>
-                        <input type="number" id="edit-gasto-monto" class="w-32 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-red-500 transition-colors" required min="1" step="0.01" inputmode="decimal">
+                        <!-- SE AMPLIA EL ANCHO A w-56 -->
+                        <input type="number" id="edit-gasto-monto" class="w-56 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-red-500 transition-colors" required min="1" step="0.01" inputmode="decimal">
                     </div>
                 </div>
 
@@ -560,11 +640,13 @@
                 <div class="mb-8">
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Asignar Proveedor</label>
                     <select id="edit-gasto-proveedor" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-red-500 focus:bg-white transition-all font-bold text-gray-700 appearance-none">
-                        <!-- JS Llena esto -->
                     </select>
                 </div>
 
-                <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-red-200 active:scale-95 transition-all">Guardar Cambios</button>
+                <div class="flex gap-3">
+                    <button type="button" onclick="confirmarEliminarTransaccion('gasto')" class="w-14 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center text-lg active:bg-red-100 transition-colors"><i class="fa-solid fa-trash"></i></button>
+                    <button type="submit" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-red-200 active:scale-95 transition-all">Guardar Cambios</button>
+                </div>
             </form>
         </div>
     </div>
@@ -609,9 +691,13 @@
         let diaSeleccionadoFormat = null; 
         let anioBalances = new Date().getFullYear();
         let mesBalancesSelec = new Date().getMonth();
+        let vistaBalance = 'mes'; 
+        
         let proveedorAEliminar = null;
+        let transaccionAEliminar = { id: null, tipo: null }; 
 
-        // UTILIDADES BÁSICAS
+        window.fechaTransaccionManual = null;
+
         const formatearDinero = (monto) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(monto);
         const formatearHora = (timestamp) => {
             if (!timestamp) return '';
@@ -631,8 +717,24 @@
             ayer.setDate(ayer.getDate() - 1); 
             return date.getDate() === ayer.getDate() && date.getMonth() === ayer.getMonth() && date.getFullYear() === ayer.getFullYear();
         };
-        // Para gestionar gastos huerfanos cuando se elimina un proveedor
+        const esEsteMes = (timestamp) => {
+            if (!timestamp) return false;
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            const hoy = new Date();
+            return date.getMonth() === hoy.getMonth() && date.getFullYear() === hoy.getFullYear();
+        };
+        const esMesPasado = (timestamp) => {
+            if (!timestamp) return false;
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            const hoy = new Date();
+            let mesPasado = hoy.getMonth() - 1;
+            let anio = hoy.getFullYear();
+            if (mesPasado < 0) { mesPasado = 11; anio--; }
+            return date.getMonth() === mesPasado && date.getFullYear() === anio;
+        };
+        
         const esHuerfano = (g) => !g.proveedor || g.proveedor === "" || !proveedoresData.some(p => p.nombre === g.proveedor);
+        const activos = (item) => !item.eliminado; 
 
         window.showToast = (mensaje, tipo = 'success') => {
             const container = document.getElementById('toast-container');
@@ -650,43 +752,83 @@
             }, 3000);
         };
 
+        window.cambiarVistaBalance = function(vista) {
+            vistaBalance = vista;
+            const btnMes = document.getElementById('btn-vista-mes');
+            const btnDia = document.getElementById('btn-vista-dia');
+            const titulo = document.getElementById('lbl-balance-titulo');
+
+            if(vista === 'mes') {
+                btnMes.className = 'px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-pipon-orange text-white shadow-sm transition-all';
+                btnDia.className = 'px-5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-pipon-brown hover:bg-white/50 transition-all';
+                titulo.innerText = 'Balance del Mes';
+            } else {
+                btnDia.className = 'px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-pipon-orange text-white shadow-sm transition-all';
+                btnMes.className = 'px-5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-pipon-brown hover:bg-white/50 transition-all';
+                titulo.innerText = 'Balance del Día (Hoy)';
+            }
+            renderBalanceYResumen();
+        };
+
         function renderBalanceYResumen() {
-            const ventasHoy = ventasData.filter(v => esHoy(v.timestamp));
-            const gastosHoy = gastosData.filter(g => esHoy(g.timestamp));
+            const ventasActivas = ventasData.filter(activos);
+            const gastosActivos = gastosData.filter(activos);
 
-            const totalVentasHoy = ventasHoy.reduce((sum, v) => sum + Number(v.monto), 0);
-            const totalGastosHoy = gastosHoy.reduce((sum, g) => sum + Number(g.monto), 0);
-            const balanceTotalHoy = totalVentasHoy - totalGastosHoy;
+            let totalVentas = 0, totalGastos = 0, balanceTotal = 0;
+            let totalVentasAnt = 0, totalGastosAnt = 0, balanceAnt = 0;
+            let textoAnterior = "";
 
-            document.getElementById('resumen-ingresos').innerText = formatearDinero(totalVentasHoy);
-            document.getElementById('resumen-gastos').innerText = formatearDinero(totalGastosHoy);
+            if (vistaBalance === 'dia') {
+                const ventasHoy = ventasActivas.filter(v => esHoy(v.timestamp));
+                const gastosHoy = gastosActivos.filter(g => esHoy(g.timestamp));
+                totalVentas = ventasHoy.reduce((sum, v) => sum + Number(v.monto), 0);
+                totalGastos = gastosHoy.reduce((sum, g) => sum + Number(g.monto), 0);
+                balanceTotal = totalVentas - totalGastos;
+
+                const ventasAyer = ventasActivas.filter(v => esAyer(v.timestamp));
+                const gastosAyer = gastosActivos.filter(g => esAyer(g.timestamp));
+                totalVentasAnt = ventasAyer.reduce((sum, v) => sum + Number(v.monto), 0);
+                totalGastosAnt = gastosAyer.reduce((sum, g) => sum + Number(g.monto), 0);
+                balanceAnt = totalVentasAnt - totalGastosAnt;
+                textoAnterior = "Ayer:";
+            } else {
+                const ventasMes = ventasActivas.filter(v => esEsteMes(v.timestamp));
+                const gastosMes = gastosActivos.filter(g => esEsteMes(g.timestamp));
+                totalVentas = ventasMes.reduce((sum, v) => sum + Number(v.monto), 0);
+                totalGastos = gastosMes.reduce((sum, g) => sum + Number(g.monto), 0);
+                balanceTotal = totalVentas - totalGastos;
+
+                const ventasMesPas = ventasActivas.filter(v => esMesPasado(v.timestamp));
+                const gastosMesPas = gastosActivos.filter(g => esMesPasado(g.timestamp));
+                totalVentasAnt = ventasMesPas.reduce((sum, v) => sum + Number(v.monto), 0);
+                totalGastosAnt = gastosMesPas.reduce((sum, g) => sum + Number(g.monto), 0);
+                balanceAnt = totalVentasAnt - totalGastosAnt;
+                textoAnterior = "Mes pasado:";
+            }
+
+            document.getElementById('resumen-ingresos').innerText = formatearDinero(totalVentas);
+            document.getElementById('resumen-gastos').innerText = formatearDinero(totalGastos);
             
             const balEl = document.getElementById('balance-total');
-            balEl.innerText = formatearDinero(balanceTotalHoy);
-            if (balanceTotalHoy > 0) balEl.className = 'text-5xl font-black text-green-600 mb-1';
-            else if (balanceTotalHoy < 0) balEl.className = 'text-5xl font-black text-red-600 mb-1';
+            balEl.innerText = formatearDinero(balanceTotal);
+            if (balanceTotal > 0) balEl.className = 'text-5xl font-black text-green-600 mb-1';
+            else if (balanceTotal < 0) balEl.className = 'text-5xl font-black text-red-600 mb-1';
             else balEl.className = 'text-5xl font-black text-pipon-brown mb-1';
 
-            const ventasAyer = ventasData.filter(v => esAyer(v.timestamp));
-            const gastosAyer = gastosData.filter(g => esAyer(g.timestamp));
-            const totalVentasAyer = ventasAyer.reduce((sum, v) => sum + Number(v.monto), 0);
-            const totalGastosAyer = gastosAyer.reduce((sum, g) => sum + Number(g.monto), 0);
-            const balanceTotalAyer = totalVentasAyer - totalGastosAyer;
-
-            const balAyerEl = document.getElementById('balance-ayer');
-            if (totalVentasAyer === 0 && totalGastosAyer === 0) {
-                balAyerEl.innerText = `Ayer: Sin movimientos`;
+            const balAyerEl = document.getElementById('balance-anterior');
+            if (totalVentasAnt === 0 && totalGastosAnt === 0) {
+                balAyerEl.innerText = `${textoAnterior} Sin movimientos`;
                 balAyerEl.className = 'text-sm font-semibold text-gray-400';
             } else {
-                balAyerEl.innerText = `Ayer: ${formatearDinero(balanceTotalAyer)}`;
-                if (balanceTotalAyer > 0) balAyerEl.className = 'text-sm font-bold text-green-500';
-                else if (balanceTotalAyer < 0) balAyerEl.className = 'text-sm font-bold text-red-500';
+                balAyerEl.innerText = `${textoAnterior} ${formatearDinero(balanceAnt)}`;
+                if (balanceAnt > 0) balAyerEl.className = 'text-sm font-bold text-green-500';
+                else if (balanceAnt < 0) balAyerEl.className = 'text-sm font-bold text-red-500';
                 else balAyerEl.className = 'text-sm font-bold text-gray-500';
             }
         }
 
         function renderVentas() {
-            const ventasHoy = ventasData.filter(v => esHoy(v.timestamp)).sort((a,b) => (b.timestamp?.toMillis()||0) - (a.timestamp?.toMillis()||0));
+            const ventasHoy = ventasData.filter(activos).filter(v => esHoy(v.timestamp)).sort((a,b) => (b.timestamp?.toMillis()||0) - (a.timestamp?.toMillis()||0));
             const total = ventasHoy.reduce((sum, v) => sum + Number(v.monto), 0);
             document.getElementById('total-ventas-hoy-badge').innerText = `Total: ${formatearDinero(total)}`;
             const listEl = document.getElementById('lista-ventas');
@@ -706,7 +848,10 @@
                             ${v.comprobante ? `<button onclick="verComprobante('${v.id}', 'ventas')" class="text-[10px] bg-blue-50 text-blue-500 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-blue-100"><i class="fa-solid fa-paperclip"></i> Ver</button>` : ''}
                         </div>
                     </div>
-                    <span class="font-black text-green-600 text-lg">+${formatearDinero(v.monto)}</span>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="font-black text-green-600 text-lg shrink-0">+${formatearDinero(v.monto)}</span>
+                        <button onclick="abrirEditarVenta('${v.id}')" class="w-7 h-7 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center active:bg-gray-200 transition-colors"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                    </div>
                 </div>
             `).join('');
         }
@@ -740,11 +885,12 @@
             const anioActual = new Date().getFullYear();
             const mesActual = new Date().getMonth();
             
-            // Calculo Gastos sin Especificar
             let gastosMesSinEspec = 0;
             let gastosAnioSinEspec = 0;
 
-            gastosData.forEach(g => {
+            const gastosActivos = gastosData.filter(activos);
+
+            gastosActivos.forEach(g => {
                 if (esHuerfano(g) && g.timestamp) {
                     const d = g.timestamp.toDate ? g.timestamp.toDate() : new Date(g.timestamp);
                     if (d.getFullYear() === anioActual) {
@@ -754,8 +900,7 @@
                 }
             });
 
-            // Lista detallada de gastos sin asignar (o huérfanos por eliminación)
-            const gastosSinAsignar = gastosData.filter(esHuerfano).sort((a,b) => (b.timestamp?.toMillis()||0) - (a.timestamp?.toMillis()||0));
+            const gastosSinAsignar = gastosActivos.filter(esHuerfano).sort((a,b) => (b.timestamp?.toMillis()||0) - (a.timestamp?.toMillis()||0));
             let listaSinAsignarHtml = '';
             
             if (gastosSinAsignar.length > 0) {
@@ -813,7 +958,7 @@
                     let gastosMes = 0;
                     let gastosAnio = 0;
                     
-                    gastosData.forEach(g => {
+                    gastosActivos.forEach(g => {
                         if (g.proveedor === p.nombre && g.timestamp) {
                             const d = g.timestamp.toDate ? g.timestamp.toDate() : new Date(g.timestamp);
                             if (d.getFullYear() === anioActual) {
@@ -863,9 +1008,15 @@
                 if(!item.timestamp) return;
                 const dateObj = item.timestamp.toDate ? item.timestamp.toDate() : new Date(item.timestamp);
                 const fecha = dateObj.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }); 
-                if(!dias[fecha]) dias[fecha] = { ventas: 0, gastos: 0, items: [] };
-                dias[fecha][tipo] += Number(item.monto);
-                dias[fecha].items.push({...item, tipo: tipo}); 
+                
+                if(!dias[fecha]) dias[fecha] = { ventas: 0, gastos: 0, items: [], eliminados: [] };
+                
+                if (item.eliminado) {
+                    dias[fecha].eliminados.push({...item, tipo: tipo});
+                } else {
+                    dias[fecha][tipo] += Number(item.monto);
+                    dias[fecha].items.push({...item, tipo: tipo}); 
+                }
             };
             ventasData.forEach(v => agrupar(v, 'ventas'));
             gastosData.forEach(g => agrupar(g, 'gastos'));
@@ -893,7 +1044,7 @@
                 const fechaCiclo = new Date(anioActual, mesActual, dia);
                 const fechaStr = fechaCiclo.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
                 
-                const tieneDatos = datosAgrupados[fechaStr];
+                const tieneDatos = datosAgrupados[fechaStr] && (datosAgrupados[fechaStr].items.length > 0);
                 const esHoyCalendario = fechaStr === hoyStr;
                 const estaSeleccionado = fechaStr === diaSeleccionadoFormat;
 
@@ -915,12 +1066,16 @@
 
         function actualizarCuadroDetalle(datosAgrupados) {
             const cuadroEl = document.getElementById('detalle-dia-seleccionado');
+            const papeleraEl = document.getElementById('papelera-dia-seleccionado');
+            
             if (!diaSeleccionadoFormat) {
                 cuadroEl.classList.add('hidden');
+                papeleraEl.classList.add('hidden');
                 return;
             }
             cuadroEl.classList.remove('hidden');
-            const infoDia = datosAgrupados[diaSeleccionadoFormat] || { ventas: 0, gastos: 0, items: [] };
+            
+            const infoDia = datosAgrupados[diaSeleccionadoFormat] || { ventas: 0, gastos: 0, items: [], eliminados: [] };
             const balanceDia = infoDia.ventas - infoDia.gastos;
 
             document.getElementById('detalle-fecha').innerHTML = `<i class="fa-regular fa-calendar-check text-pipon-orange"></i> ${diaSeleccionadoFormat}`;
@@ -949,6 +1104,8 @@
                         detalleExtra = `<span class="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold ml-2"><i class="fa-solid fa-truck"></i> ${provName}</span>`;
                     }
 
+                    const onClickEdit = esVenta ? `abrirEditarVenta('${item.id}')` : `abrirEditarGasto('${item.id}')`;
+
                     return `
                     <div class="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
                         <div class="flex items-center gap-2 overflow-hidden">
@@ -963,10 +1120,37 @@
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
                             <span class="font-black text-${color}-600 text-sm shrink-0">${signo}${formatearDinero(item.monto)}</span>
-                            ${!esVenta ? `<button onclick="abrirEditarGasto('${item.id}')" class="w-7 h-7 rounded-lg bg-gray-200 text-gray-600 flex items-center justify-center active:bg-gray-300 transition-colors"><i class="fa-solid fa-pen text-[10px]"></i></button>` : ''}
+                            <button onclick="${onClickEdit}" class="w-7 h-7 rounded-lg bg-gray-200 text-gray-600 flex items-center justify-center active:bg-gray-300 transition-colors"><i class="fa-solid fa-pen text-[10px]"></i></button>
                         </div>
                     </div>`;
                 }).join('');
+            }
+
+            document.getElementById('retro-fecha-label').innerText = diaSeleccionadoFormat;
+            
+            if (infoDia.eliminados.length > 0) {
+                papeleraEl.classList.remove('hidden');
+                const listaEliminadosEl = document.getElementById('detalle-eliminados-lista');
+                
+                infoDia.eliminados.sort((a,b) => (b.timestamp?.toMillis()||0) - (a.timestamp?.toMillis()||0));
+                listaEliminadosEl.innerHTML = infoDia.eliminados.map(item => {
+                    const esVenta = item.tipo === 'ventas';
+                    const signo = esVenta ? '+' : '-';
+                    const tipoLabel = esVenta ? 'VENTA' : 'GASTO';
+                    
+                    return `
+                    <div class="flex justify-between items-center bg-white/50 p-2 rounded-lg border border-red-100 opacity-75">
+                        <div class="flex items-center gap-2 overflow-hidden">
+                            <div class="truncate">
+                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">${tipoLabel}</p>
+                                <p class="text-xs font-bold text-gray-600 truncate leading-tight line-through">${item.descripcion || 'Venta General'} (${signo}${formatearDinero(item.monto)})</p>
+                            </div>
+                        </div>
+                        <button onclick="restaurarTransaccion('${item.id}', '${item.tipo}')" class="text-[10px] font-bold bg-white text-gray-600 px-3 py-1.5 rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center gap-1 shrink-0"><i class="fa-solid fa-rotate-left"></i> Restaurar</button>
+                    </div>`;
+                }).join('');
+            } else {
+                papeleraEl.classList.add('hidden');
             }
         }
 
@@ -996,13 +1180,16 @@
             const detalleEl = document.getElementById('detalle-balances');
             detalleEl.classList.remove('hidden');
             
-            const ventasMes = ventasData.filter(v => {
+            const ventasActivas = ventasData.filter(activos);
+            const gastosActivos = gastosData.filter(activos);
+
+            const ventasMes = ventasActivas.filter(v => {
                 if(!v.timestamp) return false;
                 const d = v.timestamp.toDate ? v.timestamp.toDate() : new Date(v.timestamp);
                 return d.getFullYear() === anioBalances && d.getMonth() === mesBalancesSelec;
             });
             
-            const gastosMes = gastosData.filter(g => {
+            const gastosMes = gastosActivos.filter(g => {
                 if(!g.timestamp) return false;
                 const d = g.timestamp.toDate ? g.timestamp.toDate() : new Date(g.timestamp);
                 return d.getFullYear() === anioBalances && d.getMonth() === mesBalancesSelec;
@@ -1019,7 +1206,6 @@
             balNetoEl.innerText = formatearDinero(balanceNeta);
             balNetoEl.className = `text-2xl font-black ${balanceNeta > 0 ? 'text-green-600' : (balanceNeta < 0 ? 'text-red-600' : 'text-gray-800')}`;
             
-            // Ranking Ventas
             const estadisticasProd = {};
             ventasMes.forEach(v => {
                 const nombreProd = v.descripcion || 'Venta General';
@@ -1047,7 +1233,6 @@
                 `).join('');
             }
 
-            // Gastos por Proveedor
             const estadisticasProv = {};
             gastosMes.forEach(g => {
                 let nombreProv = g.proveedor;
@@ -1128,6 +1313,25 @@
             }
         };
 
+        window.abrirRegistroRetroactivo = function(tipo) {
+            window.fechaTransaccionManual = diaSeleccionadoFormat;
+            const modalId = tipo === 'venta' ? 'modalVenta' : 'modalGasto';
+            const bannerId = tipo === 'venta' ? 'banner-retro-venta' : 'banner-retro-gasto';
+            const fechaLabelId = tipo === 'venta' ? 'banner-retro-venta-fecha' : 'banner-retro-gasto-fecha';
+            
+            document.getElementById(bannerId).classList.remove('hidden');
+            document.getElementById(fechaLabelId).innerText = diaSeleccionadoFormat;
+            
+            openModal(modalId);
+        };
+
+        function obtenerFechaTransaccion() {
+            if (!window.fechaTransaccionManual) return new Date(); 
+            const partes = window.fechaTransaccionManual.split('/'); 
+            const d = new Date();
+            return new Date(partes[2], partes[1] - 1, partes[0], d.getHours(), d.getMinutes(), d.getSeconds());
+        }
+
         window.openModal = function(modalId) {
             const modal = document.getElementById(modalId);
             const modalContent = modal.querySelector('div');
@@ -1156,6 +1360,8 @@
                 document.getElementById('venta-metodo').value = "Efectivo";
                 document.querySelectorAll('.metodo-btn-venta')[0].className = "metodo-btn-venta border-2 border-green-500 bg-green-50 text-green-700 font-bold py-3 rounded-xl transition-all";
                 document.querySelectorAll('.metodo-btn-venta')[1].className = "metodo-btn-venta border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-xl transition-all";
+                document.getElementById('banner-retro-venta').classList.add('hidden');
+                window.fechaTransaccionManual = null;
             }
             if(modalId === 'modalGasto') {
                 document.getElementById('form-gasto').reset();
@@ -1163,12 +1369,15 @@
                 document.getElementById('gasto-metodo').value = "Efectivo";
                 document.querySelectorAll('.metodo-btn-gasto')[0].className = "metodo-btn-gasto border-2 border-red-500 bg-red-50 text-red-700 font-bold py-3 rounded-xl transition-all";
                 document.querySelectorAll('.metodo-btn-gasto')[1].className = "metodo-btn-gasto border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-xl transition-all";
+                document.getElementById('banner-retro-gasto').classList.add('hidden');
+                window.fechaTransaccionManual = null;
             }
             if(modalId === 'modalProducto') { document.getElementById('form-producto').reset(); limpiarImagen('producto'); }
             if(modalId === 'modalEditarProducto') { document.getElementById('form-editar-producto').reset(); limpiarImagen('edit-producto'); }
             if(modalId === 'modalProveedor') { document.getElementById('form-proveedor').reset(); }
             if(modalId === 'modalEditarProveedor') { document.getElementById('form-editar-proveedor').reset(); }
             if(modalId === 'modalEditarGasto') { document.getElementById('form-editar-gasto').reset(); }
+            if(modalId === 'modalEditarVenta') { document.getElementById('form-editar-venta').reset(); }
         };
 
         window.seleccionarMetodo = function(tipo, metodo, elementoBtn) {
@@ -1204,15 +1413,41 @@
             
             const metodo = document.getElementById('venta-metodo').value;
             const comprobante = document.getElementById('venta-comprobante-base64').value;
+            const fechaDeGuardado = obtenerFechaTransaccion();
             
             try {
                 const ventasRef = collection(db, 'negocio', 'pipon', 'ventas');
-                const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: new Date() };
+                const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: fechaDeGuardado, eliminado: false };
                 if(comprobante) data.comprobante = comprobante;
                 await addDoc(ventasRef, data);
                 closeModal('modalVenta');
                 showToast('¡Venta guardada con éxito!', 'success');
             } catch (error) { console.error(error); showToast('Error al guardar.', 'error'); }
+        };
+
+        window.abrirEditarVenta = function(id) {
+            const venta = ventasData.find(v => v.id === id);
+            if(!venta) return;
+            
+            document.getElementById('edit-venta-id').value = id;
+            document.getElementById('edit-venta-monto').value = venta.monto;
+            document.getElementById('edit-venta-desc').value = venta.descripcion;
+            
+            openModal('modalEditarVenta');
+        };
+
+        window.actualizarVenta = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('edit-venta-id').value;
+            const monto = document.getElementById('edit-venta-monto').value;
+            const desc = document.getElementById('edit-venta-desc').value;
+            
+            try {
+                const ventaRef = doc(db, 'negocio', 'pipon', 'ventas', id);
+                await updateDoc(ventaRef, { monto: Number(monto), descripcion: desc });
+                closeModal('modalEditarVenta');
+                showToast('Venta actualizada.', 'success'); 
+            } catch (error) { console.error(error); showToast('Error al actualizar.', 'error'); }
         };
 
         window.guardarGasto = async function(e) {
@@ -1222,10 +1457,11 @@
             const proveedorSeleccionado = document.getElementById('gasto-proveedor').value;
             const metodo = document.getElementById('gasto-metodo').value;
             const comprobante = document.getElementById('gasto-comprobante-base64').value;
+            const fechaDeGuardado = obtenerFechaTransaccion();
             
             try {
                 const gastosRef = collection(db, 'negocio', 'pipon', 'gastos');
-                const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: new Date() };
+                const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: fechaDeGuardado, eliminado: false };
                 if(proveedorSeleccionado) data.proveedor = proveedorSeleccionado;
                 if(comprobante) data.comprobante = comprobante;
                 
@@ -1264,12 +1500,65 @@
             try {
                 const gastoRef = doc(db, 'negocio', 'pipon', 'gastos', id);
                 const data = { monto: Number(monto), descripcion: desc };
-                if(prov) data.proveedor = prov; else data.proveedor = ""; // limpia si es sin asignar
+                if(prov) data.proveedor = prov; else data.proveedor = ""; 
                 
                 await updateDoc(gastoRef, data);
                 closeModal('modalEditarGasto');
                 showToast('Gasto actualizado.', 'success'); 
             } catch (error) { console.error(error); showToast('Error al actualizar.', 'error'); }
+        };
+
+        window.confirmarEliminarTransaccion = function(tipo) {
+            const id = tipo === 'venta' ? document.getElementById('edit-venta-id').value : document.getElementById('edit-gasto-id').value;
+            transaccionAEliminar = { id: id, tipo: tipo };
+            
+            const modal = document.getElementById('modalConfirmDeleteTransaccion');
+            const content = document.getElementById('modalConfirmDeleteTransaccionContent');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                content.classList.remove('scale-95');
+            }, 10);
+        };
+
+        window.cerrarConfirmDeleteTransaccion = function() {
+            const modal = document.getElementById('modalConfirmDeleteTransaccion');
+            const content = document.getElementById('modalConfirmDeleteTransaccionContent');
+            modal.classList.add('opacity-0');
+            content.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                transaccionAEliminar = { id: null, tipo: null };
+            }, 300);
+        };
+
+        document.getElementById('btn-confirm-delete-transaccion').addEventListener('click', async () => {
+            if(!transaccionAEliminar.id) return;
+            try {
+                const coleccion = transaccionAEliminar.tipo === 'venta' ? 'ventas' : 'gastos';
+                const docRef = doc(db, 'negocio', 'pipon', coleccion, transaccionAEliminar.id);
+                await updateDoc(docRef, { eliminado: true });
+                
+                cerrarConfirmDeleteTransaccion();
+                closeModal(transaccionAEliminar.tipo === 'venta' ? 'modalEditarVenta' : 'modalEditarGasto');
+                showToast('Movimiento movido a papelera.', 'info');
+            } catch (error) {
+                console.error(error);
+                showToast('Error al eliminar movimiento.', 'error');
+            }
+        });
+
+        window.restaurarTransaccion = async function(id, tipo) {
+             try {
+                const docRef = doc(db, 'negocio', 'pipon', tipo, id);
+                await updateDoc(docRef, { eliminado: false });
+                showToast('Movimiento restaurado con éxito.', 'success');
+            } catch (error) {
+                console.error(error);
+                showToast('Error al restaurar.', 'error');
+            }
         };
 
         window.guardarProducto = async function(e) {
@@ -1373,7 +1662,6 @@
             } catch (error) { console.error(error); showToast('Error al actualizar.', 'error'); }
         };
 
-        // LÓGICA DE CONFIRMACIÓN PARA ELIMINAR PROVEEDOR
         window.confirmarEliminarProveedor = function() {
             proveedorAEliminar = document.getElementById('edit-prov-id').value;
             const modal = document.getElementById('modalConfirmDelete');
@@ -1479,7 +1767,6 @@
                     proveedoresData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     proveedoresData.sort((a, b) => a.nombre.localeCompare(b.nombre));
                     renderProveedores();
-                    // Refrescar balances y gastos en caso de que se haya agregado/eliminado un proveedor
                     if(document.getElementById('content-balances').classList.contains('block')) renderGridBalances();
                 });
 
