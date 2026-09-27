@@ -4,12 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Control Pipón</title>
-    
-    <!-- Tailwind CSS -->
+    <link rel="icon" type="image/png" href="./favicon.png">
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     
     <script>
@@ -61,16 +60,55 @@
     </style>
 </head>
 <body class="pb-28">
-
     <div id="toast-container" class="fixed top-4 left-0 right-0 px-4 flex flex-col gap-2 items-center pointer-events-none"></div>
+
+    <!-- LOGIN: tapa todo el sistema hasta que se inicie sesión -->
+    <div id="pantalla-login" class="fixed inset-0 z-[100] bg-pipon-cream flex flex-col items-center justify-center p-6 overflow-y-auto">
+        <div class="w-full max-w-sm">
+            <div class="text-center mb-8">
+                <div class="bg-white rounded-full w-24 h-24 mx-auto mb-4 flex items-center justify-center overflow-hidden border-4 border-white shadow-md">
+                    <img src="./pipon.jpeg" alt="Logo Pipón" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='https://placehold.co/100x100/FFF2D4/D45115?text=P';">
+                </div>
+                <h1 class="text-3xl font-black tracking-wide uppercase text-pipon-brown">Pipón</h1>
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Sistema de gestión</p>
+            </div>
+
+            <div id="login-cargando" class="text-center text-gray-400">
+                <i class="fa-solid fa-spinner fa-spin text-2xl text-pipon-orange"></i>
+            </div>
+
+            <form id="form-login" onsubmit="iniciarSesion(event)" class="hidden bg-white rounded-3xl shadow-sm p-6 border border-pipon-yellow/30 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-2 bg-pipon-orange"></div>
+                <div class="mb-4 mt-2">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Usuario</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-user absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"></i>
+                        <input type="text" id="login-usuario" autocomplete="username" autocapitalize="none" spellcheck="false" class="w-full bg-gray-50 border border-gray-200 rounded-xl pl-11 pr-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-bold text-gray-800" required>
+                    </div>
+                </div>
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Contraseña</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"></i>
+                        <input type="password" id="login-clave" autocomplete="current-password" class="w-full bg-gray-50 border border-gray-200 rounded-xl pl-11 pr-12 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-bold text-gray-800" required>
+                        <button type="button" onclick="alternarVerClave()" class="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 text-gray-400" aria-label="Mostrar contraseña"><i id="login-ojo" class="fa-solid fa-eye"></i></button>
+                    </div>
+                </div>
+                <p id="login-error" class="hidden text-sm font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-2.5 mb-4"></p>
+                <button type="submit" id="login-boton" class="w-full bg-pipon-orange hover:bg-[#b84511] text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-orange-200 active:scale-95 transition-all">Ingresar</button>
+            </form>
+        </div>
+    </div>
 
     <header class="bg-pipon-brown text-white p-4 sticky top-0 z-10 shadow-md">
         <div class="max-w-md mx-auto flex items-center justify-center gap-3 relative">
+            <button onclick="cerrarSesion()" class="absolute left-0 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full text-white/40 hover:text-white/90 active:bg-white/10 transition-colors" aria-label="Cerrar sesión" title="Cerrar sesión"><i class="fa-solid fa-right-from-bracket"></i></button>
             <div class="bg-white rounded-full w-10 h-10 flex items-center justify-center overflow-hidden border-2 border-white">
                 <img src="./pipon.jpeg" alt="Logo Pipón" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='https://placehold.co/100x100/FFF2D4/D45115?text=P';">
             </div>
             <h1 class="text-xl font-black tracking-wide uppercase">Pipón</h1>
             
+            <!-- MARCA DE AGUA PSM -->
             <a href="https://psmsaas.github.io/psm/" target="_blank" class="absolute right-0 top-1/2 -translate-y-1/2 text-[9px] font-bold text-white/30 hover:text-white/80 transition-colors tracking-widest no-underline">
                 BY: PSMsaas
             </a>
@@ -78,23 +116,12 @@
     </header>
 
     <main class="p-4 max-w-md mx-auto">
-        
-        <!-- PESTAÑA: INICIO -->
         <div id="content-inicio" class="tab-content block">
             <div class="bg-white rounded-3xl shadow-sm p-6 text-center border border-pipon-yellow/30 mb-4 relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-2 bg-pipon-orange"></div>
-                
-                <!-- SELECTOR MES / DIA -->
-                <div class="flex justify-center mb-3 relative z-10">
-                    <div class="bg-pipon-cream p-1 rounded-full flex gap-1 border border-pipon-yellow/50">
-                        <button id="btn-vista-mes" onclick="cambiarVistaBalance('mes')" class="px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-pipon-orange text-white shadow-sm transition-all">Este Mes</button>
-                        <button id="btn-vista-dia" onclick="cambiarVistaBalance('dia')" class="px-5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-pipon-brown hover:bg-white/50 transition-all">Hoy</button>
-                    </div>
-                </div>
-
-                <h2 id="lbl-balance-titulo" class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 mt-2">Balance del Mes</h2>
+                <h2 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 mt-2">Balance del Día (Hoy)</h2>
                 <div class="text-5xl font-black text-pipon-brown mb-1" id="balance-total">$0</div>
-                <p id="balance-anterior" class="text-sm font-semibold text-gray-400">Mes pasado: Cargando...</p>
+                <p id="balance-ayer" class="text-sm font-semibold text-gray-400">Ayer: Cargando...</p>
             </div>
 
             <div class="grid grid-cols-2 gap-4 mb-6">
@@ -110,6 +137,8 @@
                 </div>
             </div>
 
+            <div id="alertas-mayorista" class="hidden flex-col gap-3 mb-6"></div>
+
             <h3 class="font-bold text-pipon-brown mb-3 px-1">Resumen rápido</h3>
             <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 text-center">
                 <i class="fa-solid fa-chart-pie text-4xl text-gray-200 mb-3 block"></i>
@@ -117,7 +146,6 @@
             </div>
         </div>
 
-        <!-- PESTAÑA: VENTAS -->
         <div id="content-ventas" class="tab-content hidden">
             <div class="flex justify-between items-end mb-4 px-1">
                 <h2 class="text-xl font-bold text-pipon-brown">Ventas de Hoy</h2>
@@ -128,7 +156,16 @@
             </div>
         </div>
 
-        <!-- PESTAÑA: CATÁLOGO -->
+        <div id="content-gastos" class="tab-content hidden">
+            <div class="flex justify-between items-end mb-4 px-1">
+                <h2 class="text-xl font-bold text-pipon-brown">Gastos de Hoy</h2>
+                <span class="text-sm font-bold text-red-600 bg-red-100 px-3 py-1 rounded-full" id="total-gastos-hoy-badge">Total: $0</span>
+            </div>
+            <div id="lista-gastos" class="flex flex-col gap-3 pb-8">
+                <p class="text-center text-gray-500 mt-10">Cargando gastos...</p>
+            </div>
+        </div>
+
         <div id="content-catalogo" class="tab-content hidden">
             <div class="flex justify-center items-end mb-4 px-1">
                 <h2 class="text-xl font-bold text-pipon-brown">Catálogo</h2>
@@ -138,23 +175,6 @@
             </div>
         </div>
 
-        <!-- PESTAÑA: PROVEEDORES -->
-        <div id="content-proveedores" class="tab-content hidden">
-            <div class="flex justify-between items-center mb-4 px-1">
-                <h2 class="text-xl font-bold text-pipon-brown">Proveedores</h2>
-                <button onclick="openModal('modalProveedor')" class="text-sm font-bold text-blue-600 bg-blue-100 px-4 py-1.5 rounded-full flex items-center gap-1 active:bg-blue-200 transition-colors shadow-sm">
-                    <i class="fa-solid fa-plus"></i> Añadir
-                </button>
-            </div>
-            
-            <div id="gasto-sin-especificar-container" class="mb-4"></div>
-            
-            <div id="lista-proveedores" class="flex flex-col gap-3 pb-8">
-                <p class="text-center text-gray-500 mt-10">Cargando proveedores...</p>
-            </div>
-        </div>
-
-        <!-- PESTAÑA: HISTORIAL -->
         <div id="content-historial" class="tab-content hidden">
             <div class="flex justify-between items-end mb-4 px-1">
                 <h2 class="text-xl font-bold text-pipon-brown">Historial Diario</h2>
@@ -170,9 +190,14 @@
                     <div>DOM</div><div>LUN</div><div>MAR</div><div>MIE</div><div>JUE</div><div>VIE</div><div>SAB</div>
                 </div>
                 <div id="calendario-grilla" class="grid grid-cols-7 gap-1 text-sm"></div>
+                <div class="flex justify-center gap-4 mt-3 text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-pipon-orange"></span>Minorista</span>
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-violet-500"></span>Mayorista</span>
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-300"></span>Solo gastos</span>
+                </div>
             </div>
 
-            <div id="detalle-dia-seleccionado" class="hidden bg-white rounded-2xl shadow-sm p-5 border border-pipon-yellow/50 relative overflow-hidden transition-all mb-4">
+            <div id="detalle-dia-seleccionado" class="hidden bg-white rounded-2xl shadow-sm p-5 border border-pipon-yellow/50 relative overflow-hidden transition-all">
                 <div class="absolute top-0 left-0 w-full h-1 bg-pipon-orange"></div>
                 <div class="flex justify-between items-center mb-4 border-b border-gray-50 pb-3">
                     <span id="detalle-fecha" class="font-bold text-gray-800 flex items-center gap-2"><i class="fa-regular fa-calendar text-pipon-orange"></i> Selecciona un día</span>
@@ -181,9 +206,22 @@
                         <span id="detalle-balance" class="text-xl font-black">$0</span>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div class="bg-orange-50 p-3 rounded-xl border border-orange-100">
+                        <div class="flex items-center gap-1.5 mb-1 text-pipon-orange"><span class="w-2 h-2 rounded-full bg-pipon-orange"></span><p class="text-[10px] uppercase font-bold">Minorista</p></div>
+                        <p id="detalle-minorista-monto" class="font-bold text-pipon-brown text-lg">$0</p>
+                        <p id="detalle-minorista-cant" class="text-[11px] text-gray-500 font-medium">0 ventas</p>
+                    </div>
+                    <div class="bg-violet-50 p-3 rounded-xl border border-violet-100">
+                        <div class="flex items-center gap-1.5 mb-1 text-violet-600"><span class="w-2 h-2 rounded-full bg-violet-500"></span><p class="text-[10px] uppercase font-bold">Mayorista</p></div>
+                        <p id="detalle-mayorista-monto" class="font-bold text-violet-700 text-lg">$0</p>
+                        <p id="detalle-mayorista-contactos" class="text-[11px] text-gray-500 font-medium">0 contactos</p>
+                        <p id="detalle-mayorista-unidades" class="text-[11px] text-gray-500 font-medium">0 unidades</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
                     <div class="bg-green-50 p-3 rounded-xl border border-green-100">
-                        <div class="flex items-center gap-1.5 mb-1 text-green-600"><i class="fa-solid fa-arrow-down text-[10px]"></i><p class="text-[10px] uppercase font-bold">Ingresos</p></div>
+                        <div class="flex items-center gap-1.5 mb-1 text-green-600"><i class="fa-solid fa-arrow-down text-[10px]"></i><p class="text-[10px] uppercase font-bold">Ingresos totales</p></div>
                         <p id="detalle-ventas" class="font-bold text-green-700 text-lg">$0</p>
                     </div>
                     <div class="bg-red-50 p-3 rounded-xl border border-red-100">
@@ -191,30 +229,9 @@
                         <p id="detalle-gastos" class="font-bold text-red-700 text-lg">$0</p>
                     </div>
                 </div>
-                
-                <div class="border-t border-gray-100 pt-3">
-                    <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Movimientos del Día</h4>
-                    <div id="detalle-movimientos-lista" class="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1"></div>
-                </div>
-
-                <!-- SECCIÓN RETROACTIVA -->
-                <div class="mt-4 pt-4 border-t border-dashed border-gray-200">
-                    <p class="text-[10px] text-center text-gray-400 font-bold uppercase tracking-wider mb-2">¿Olvidaste anotar algo el <span id="retro-fecha-label"></span>?</p>
-                    <div class="grid grid-cols-2 gap-3">
-                        <button onclick="abrirRegistroRetroactivo('venta')" class="bg-green-50 text-green-600 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-green-100 hover:bg-green-100 active:scale-95 transition-all"><i class="fa-solid fa-plus-circle"></i> Venta Pasada</button>
-                        <button onclick="abrirRegistroRetroactivo('gasto')" class="bg-red-50 text-red-600 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-red-100 hover:bg-red-100 active:scale-95 transition-all"><i class="fa-solid fa-minus-circle"></i> Gasto Pasado</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- PAPELERA DEL DÍA -->
-            <div id="papelera-dia-seleccionado" class="hidden bg-red-50 rounded-2xl shadow-sm p-4 border border-red-200 mb-8 transition-all">
-                <h4 class="text-xs font-bold text-red-600 uppercase mb-3 flex items-center gap-2"><i class="fa-solid fa-trash-can"></i> Elementos Eliminados (Este día)</h4>
-                <div id="detalle-eliminados-lista" class="flex flex-col gap-2 max-h-32 overflow-y-auto pr-1"></div>
             </div>
         </div>
 
-        <!-- PESTAÑA: BALANCES -->
         <div id="content-balances" class="tab-content hidden">
             <div class="flex justify-between items-end mb-4 px-1">
                 <h2 class="text-xl font-bold text-pipon-brown">Balance General</h2>
@@ -223,13 +240,13 @@
             <div class="bg-white rounded-2xl shadow-sm p-4 border border-gray-100 mb-4">
                 <div class="flex justify-between items-center mb-4">
                     <button onclick="cambiarAnioBalances(-1)" class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-600 active:bg-gray-200"><i class="fa-solid fa-chevron-left"></i></button>
-                    <h3 id="balances-anio" class="font-bold text-gray-800 uppercase tracking-wide text-lg">Año</h3>
+                    <h3 id="balances-anio" class="font-bold text-gray-800 uppercase tracking-wide text-lg">2026</h3>
                     <button onclick="cambiarAnioBalances(1)" class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-600 active:bg-gray-200"><i class="fa-solid fa-chevron-right"></i></button>
                 </div>
                 <div id="balances-meses-grilla" class="grid grid-cols-4 gap-2"></div>
             </div>
 
-            <div id="detalle-balances" class="hidden bg-white rounded-2xl shadow-sm p-5 border border-pipon-yellow/50 relative overflow-hidden transition-all mb-8">
+            <div id="detalle-balances" class="hidden bg-white rounded-2xl shadow-sm p-5 border border-pipon-yellow/50 relative overflow-hidden transition-all">
                 <div class="absolute top-0 left-0 w-full h-1 bg-pipon-orange"></div>
                 
                 <h3 class="font-bold text-gray-800 mb-4 text-center border-b border-gray-50 pb-2">Resumen del Mes</h3>
@@ -238,6 +255,7 @@
                     <div class="bg-green-50 p-3 rounded-xl border border-green-100 text-center">
                         <p class="text-[10px] uppercase font-bold text-green-600 mb-1"><i class="fa-solid fa-arrow-down"></i> Ingresos</p>
                         <p id="bal-ingresos" class="font-black text-green-700 text-lg">$0</p>
+                        <p id="bal-ingresos-split" class="text-[10px] text-gray-500 font-semibold mt-1 leading-tight"></p>
                     </div>
                     <div class="bg-red-50 p-3 rounded-xl border border-red-100 text-center">
                         <p class="text-[10px] uppercase font-bold text-red-600 mb-1"><i class="fa-solid fa-arrow-up"></i> Gastos</p>
@@ -251,29 +269,40 @@
                 </div>
 
                 <h3 class="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2"><i class="fa-solid fa-ranking-star text-pipon-orange"></i> Ranking de Ventas</h3>
-                <div id="balances-ranking" class="flex flex-col gap-2 mb-6"></div>
-
-                <h3 class="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2"><i class="fa-solid fa-truck text-blue-500"></i> Gastos por Proveedor</h3>
-                <div id="balances-gastos-proveedores" class="flex flex-col gap-2"></div>
+                <div id="balances-ranking" class="flex flex-col gap-2">
+                    <!-- Javascript llenará el ranking -->
+                </div>
             </div>
+        </div>
+
+        <div id="content-mayorista" class="tab-content hidden">
+            <div class="flex justify-between items-end mb-4 px-1">
+                <h2 class="text-xl font-bold text-pipon-brown">Mayorista</h2>
+                <button onclick="abrirVenta('mayorista')" class="text-sm font-bold text-white bg-violet-600 px-4 py-1.5 rounded-full shadow-sm active:scale-95 transition-transform"><i class="fa-solid fa-plus mr-1"></i>Pedido</button>
+            </div>
+            <div id="subtabs-mayorista" class="grid grid-cols-3 gap-1 bg-white p-1 rounded-2xl shadow-sm border border-gray-100 mb-4"></div>
+            <div id="mayorista-pedidos" class="subtab-mayorista"></div>
+            <div id="mayorista-historial" class="subtab-mayorista hidden"></div>
+            <div id="mayorista-contactos" class="subtab-mayorista hidden"></div>
         </div>
     </main>
 
     <nav class="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 z-30 pb-safe">
-        <div class="max-w-md mx-auto grid grid-cols-6 px-1 py-2 gap-0.5">
+        <div class="max-w-md mx-auto grid grid-cols-7 px-1 py-2 gap-0.5">
             <button onclick="switchTab('inicio')" id="nav-inicio" class="nav-btn flex flex-col items-center justify-center py-2 text-pipon-orange transition-colors rounded-xl"><i class="fa-solid fa-house text-lg mb-1"></i><span class="text-[9px] font-bold">Inicio</span></button>
             <button onclick="switchTab('ventas')" id="nav-ventas" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-cash-register text-lg mb-1"></i><span class="text-[9px] font-bold">Ventas</span></button>
+            <button onclick="switchTab('mayorista')" id="nav-mayorista" class="nav-btn relative flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-boxes-stacked text-lg mb-1"></i><span class="text-[9px] font-bold">Mayorista</span><span id="badge-mayorista" class="hidden absolute top-0 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black items-center justify-center"></span></button>
             <button onclick="switchTab('catalogo')" id="nav-catalogo" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-book-open text-lg mb-1"></i><span class="text-[9px] font-bold">Catálogo</span></button>
-            <button onclick="switchTab('proveedores')" id="nav-proveedores" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-address-book text-lg mb-1"></i><span class="text-[9px] font-bold">Agenda</span></button>
+            <button onclick="switchTab('gastos')" id="nav-gastos" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-receipt text-lg mb-1"></i><span class="text-[9px] font-bold">Gastos</span></button>
             <button onclick="switchTab('historial')" id="nav-historial" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-calendar-days text-lg mb-1"></i><span class="text-[9px] font-bold">Historial</span></button>
-            <button onclick="switchTab('balances')" id="nav-balances" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-chart-pie text-lg mb-1"></i><span class="text-[9px] font-bold">Balances</span></button>
+            <button onclick="switchTab('balances')" id="nav-balances" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-chart-line text-lg mb-1"></i><span class="text-[9px] font-bold">Balances</span></button>
         </div>
     </nav>
 
     <div class="fixed bottom-24 right-4 z-40">
         <div id="fab-menu" class="fab-menu absolute bottom-16 right-0 flex flex-col gap-3 bg-white p-3 rounded-2xl shadow-xl border border-gray-100 w-56">
-            <button onclick="window.fechaTransaccionManual = null; document.getElementById('banner-retro-venta').classList.add('hidden'); openModal('modalVenta'); toggleFabMenu();" class="flex items-center gap-3 w-full bg-green-50 text-green-700 p-3 rounded-xl font-bold active:bg-green-100 transition-colors"><i class="fa-solid fa-plus-circle text-lg"></i> Nueva Venta</button>
-            <button onclick="window.fechaTransaccionManual = null; document.getElementById('banner-retro-gasto').classList.add('hidden'); openModal('modalGasto'); toggleFabMenu();" class="flex items-center gap-3 w-full bg-red-50 text-red-700 p-3 rounded-xl font-bold active:bg-red-100 transition-colors"><i class="fa-solid fa-minus-circle text-lg"></i> Nuevo Gasto</button>
+            <button onclick="abrirVenta('minorista'); toggleFabMenu();" class="flex items-center gap-3 w-full bg-green-50 text-green-700 p-3 rounded-xl font-bold active:bg-green-100 transition-colors"><i class="fa-solid fa-plus-circle text-lg"></i> Nueva Venta</button>
+            <button onclick="openModal('modalGasto'); toggleFabMenu();" class="flex items-center gap-3 w-full bg-red-50 text-red-700 p-3 rounded-xl font-bold active:bg-red-100 transition-colors"><i class="fa-solid fa-minus-circle text-lg"></i> Nuevo Gasto</button>
             <div class="h-px bg-gray-100 w-full my-1"></div>
             <button onclick="openModal('modalProducto'); toggleFabMenu();" class="flex items-center gap-3 w-full bg-pipon-cream text-pipon-brown p-3 rounded-xl font-bold active:bg-pipon-yellow transition-colors"><i class="fa-solid fa-box-open text-lg"></i> Nuevo Producto</button>
         </div>
@@ -281,25 +310,25 @@
     </div>
     <div id="fab-overlay" onclick="toggleFabMenu()" class="fixed inset-0 bg-black/20 z-30 hidden backdrop-blur-sm transition-opacity opacity-0"></div>
 
-    <!-- MODAL VENTA -->
     <div id="modalVenta" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
-        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
             <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-black text-green-600">Registrar Venta</h2>
-                <button type="button" onclick="closeModal('modalVenta')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            <div class="flex justify-between items-center mb-5">
+                <h2 id="titulo-modal-venta" class="text-2xl font-black text-green-600">Registrar Venta</h2>
+                <button onclick="closeModal('modalVenta')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
             </div>
 
-            <!-- CARTEL RETROACTIVO -->
-            <div id="banner-retro-venta" class="hidden bg-pipon-yellow/30 text-pipon-brown text-xs font-bold p-3 rounded-xl flex items-center justify-center gap-2 mb-4 border border-pipon-yellow/50">
-                <i class="fa-solid fa-clock-rotate-left"></i> Registrando con fecha pasada (<span id="banner-retro-venta-fecha"></span>)
+            <div id="selector-tipo-venta" class="grid grid-cols-2 gap-1 bg-gray-100 p-1 rounded-2xl mb-6">
+                <button type="button" id="tipo-btn-minorista" onclick="seleccionarTipoVenta('minorista')"><i class="fa-solid fa-store mr-1.5"></i>Minorista</button>
+                <button type="button" id="tipo-btn-mayorista" onclick="seleccionarTipoVenta('mayorista')"><i class="fa-solid fa-boxes-stacked mr-1.5"></i>Mayorista</button>
             </div>
-            
+
             <form id="form-venta" onsubmit="guardarVenta(event)">
                 <div class="mb-5">
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Producto</label>
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Producto / Detalle</label>
                     <select id="venta-producto" onchange="seleccionarProductoVenta()" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:bg-white transition-all font-bold text-gray-700 appearance-none">
                         <option value="">Venta General / Varios</option>
+                        <!-- Se llena con JS -->
                     </select>
                 </div>
 
@@ -307,8 +336,7 @@
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Monto Total</label>
                     <div class="flex justify-center items-center gap-1 text-5xl font-black text-gray-800">
                         <span class="text-3xl text-gray-400">$</span>
-                        <!-- SE AMPLIA EL ANCHO A w-56 -->
-                        <input type="number" id="venta-monto" class="w-56 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-green-500 transition-colors" required min="1" step="0.01" inputmode="decimal" placeholder="0">
+                        <input type="number" id="venta-monto" class="w-32 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-green-500 transition-colors" required min="1" step="0.01" inputmode="decimal" placeholder="0">
                     </div>
                 </div>
 
@@ -335,78 +363,64 @@
 
                 <button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-green-200 active:scale-95 transition-all">Guardar Venta</button>
             </form>
-        </div>
-    </div>
 
-    <!-- MODAL EDITAR VENTA -->
-    <div id="modalEditarVenta" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
-        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-black text-green-600">Editar Venta</h2>
-                <button type="button" onclick="closeModal('modalEditarVenta')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            
-            <form id="form-editar-venta" onsubmit="actualizarVenta(event)">
-                <input type="hidden" id="edit-venta-id">
-                
-                <div class="mb-5 text-center">
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Monto Total</label>
-                    <div class="flex justify-center items-center gap-1 text-5xl font-black text-gray-800">
-                        <span class="text-3xl text-gray-400">$</span>
-                        <!-- SE AMPLIA EL ANCHO A w-56 -->
-                        <input type="number" id="edit-venta-monto" class="w-56 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-green-500 transition-colors" required min="1" step="0.01" inputmode="decimal">
-                    </div>
+            <form id="form-pedido" class="hidden" onsubmit="guardarPedido(event)">
+                <input type="hidden" id="pedido-edit-id" value="">
+
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Contacto Mayorista</label>
+                    <select id="pedido-contacto" onchange="seleccionarContactoPedido()" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-violet-500 focus:bg-white transition-all font-bold text-gray-700 appearance-none"></select>
                 </div>
 
-                <div class="mb-8">
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Descripción</label>
-                    <input type="text" id="edit-venta-desc" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:bg-white transition-all font-medium" required>
+                <div id="pedido-nuevo-contacto" class="hidden flex-col gap-3 mb-4 bg-violet-50/60 p-3 rounded-xl border border-violet-100">
+                    <input type="text" id="pedido-nuevo-nombre" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-violet-500 font-medium" placeholder="Nombre del negocio / contacto">
+                    <input type="tel" id="pedido-nuevo-telefono" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-violet-500 font-medium" placeholder="WhatsApp: 11 2345 6789 (sin 0 ni 15)">
                 </div>
 
-                <div class="flex gap-3">
-                    <button type="button" onclick="confirmarEliminarTransaccion('venta')" class="w-14 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center text-lg active:bg-red-100 transition-colors"><i class="fa-solid fa-trash"></i></button>
-                    <button type="submit" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-green-200 active:scale-95 transition-all">Guardar Cambios</button>
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Productos y Cantidades</label>
+                    <div id="pedido-productos" class="flex flex-col gap-2"></div>
                 </div>
+
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Descuento sobre el total</label>
+                    <div id="pedido-descuento-btns" class="grid grid-cols-4 gap-2"></div>
+                    <input type="hidden" id="pedido-descuento" value="0">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Notas (Opcional)</label>
+                    <textarea id="pedido-notas" rows="2" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-violet-500 focus:bg-white transition-all font-medium resize-none" placeholder="Ej: entregar el viernes a la mañana"></textarea>
+                </div>
+
+                <div id="pedido-resumen" class="bg-violet-50 border border-violet-100 rounded-xl p-4 mb-5 text-sm"></div>
+
+                <button type="submit" id="pedido-submit" class="w-full bg-violet-600 hover:bg-violet-700 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-violet-200 active:scale-95 transition-all">Crear Pedido</button>
+                <p class="text-[11px] text-gray-400 text-center mt-3 font-medium">El pedido no suma al balance hasta que lo marques como entregado y cobrado.</p>
             </form>
         </div>
     </div>
 
-
-    <!-- MODAL GASTO -->
     <div id="modalGasto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
-        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative">
             <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-black text-red-600">Registrar Gasto</h2>
-                <button type="button" onclick="closeModal('modalGasto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="closeModal('modalGasto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
             </div>
             
-            <!-- CARTEL RETROACTIVO -->
-            <div id="banner-retro-gasto" class="hidden bg-pipon-yellow/30 text-pipon-brown text-xs font-bold p-3 rounded-xl flex items-center justify-center gap-2 mb-4 border border-pipon-yellow/50">
-                <i class="fa-solid fa-clock-rotate-left"></i> Registrando con fecha pasada (<span id="banner-retro-gasto-fecha"></span>)
-            </div>
-
             <form id="form-gasto" onsubmit="guardarGasto(event)">
                 <div class="mb-5 text-center">
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Monto del Gasto</label>
                     <div class="flex justify-center items-center gap-1 text-5xl font-black text-gray-800">
                         <span class="text-3xl text-gray-400">$</span>
-                        <!-- SE AMPLIA EL ANCHO A w-56 -->
-                        <input type="number" id="gasto-monto" class="w-56 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-red-500 transition-colors" required min="1" step="0.01" inputmode="decimal" placeholder="0">
+                        <input type="number" id="gasto-monto" class="w-32 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-red-500 transition-colors" required min="1" step="0.01" inputmode="decimal" placeholder="0">
                     </div>
                 </div>
 
                 <div class="mb-5">
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿En qué se gastó?</label>
                     <input type="text" id="gasto-desc" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-red-500 focus:bg-white transition-all font-medium" placeholder="Ej: Harina, Envases..." required>
-                </div>
-
-                <div class="mb-5">
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Proveedor (Opcional)</label>
-                    <select id="gasto-proveedor" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-red-500 focus:bg-white transition-all font-bold text-gray-700 appearance-none">
-                        <option value="">Sin Especificar / Otro</option>
-                    </select>
                 </div>
 
                 <div class="mb-8">
@@ -435,19 +449,18 @@
         </div>
     </div>
 
-    <!-- MODAL PRODUCTO -->
     <div id="modalProducto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
-        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative">
             <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-black text-pipon-brown">Crear Producto</h2>
-                <button type="button" onclick="closeModal('modalProducto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="closeModal('modalProducto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
             </div>
             
             <form id="form-producto" onsubmit="guardarProducto(event)">
                 <div class="mb-5">
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Nombre del Producto</label>
-                    <input type="text" id="producto-nombre" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-bold text-gray-800" placeholder="Ej: Sanguche de Bondiola..." required>
+                    <input type="text" id="producto-nombre" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-bold text-gray-800" placeholder="Ej: Docena de Churros..." required>
                 </div>
 
                 <div class="mb-5">
@@ -475,13 +488,12 @@
         </div>
     </div>
 
-    <!-- MODAL EDITAR PRODUCTO -->
     <div id="modalEditarProducto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
-        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative">
             <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-black text-pipon-orange">Editar Producto</h2>
-                <button type="button" onclick="closeModal('modalEditarProducto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="closeModal('modalEditarProducto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
             </div>
             
             <form id="form-editar-producto" onsubmit="actualizarProducto(event)">
@@ -517,146 +529,87 @@
         </div>
     </div>
 
-    <!-- MODAL NUEVO PROVEEDOR -->
-    <div id="modalProveedor" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
-        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
+    <div id="modalContacto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
             <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-black text-blue-600">Nuevo Proveedor</h2>
-                <button type="button" onclick="closeModal('modalProveedor')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+                <h2 id="titulo-modal-contacto" class="text-2xl font-black text-violet-600">Nuevo Contacto</h2>
+                <button onclick="closeModal('modalContacto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            
-            <form id="form-proveedor" onsubmit="guardarProveedor(event)">
-                <div class="mb-5">
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Nombre o Empresa</label>
-                    <input type="text" id="prov-nombre" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-bold text-gray-800" placeholder="Ej: Panadería San José" required>
+
+            <form id="form-contacto" onsubmit="guardarContacto(event)">
+                <input type="hidden" id="contacto-id" value="">
+
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Nombre</label>
+                    <input type="text" id="contacto-nombre" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-violet-500 focus:bg-white transition-all font-bold text-gray-800" placeholder="Ej: Kiosco Don Juan" required>
                 </div>
 
-                <div class="mb-5">
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Teléfono / WhatsApp (Opcional)</label>
-                    <input type="tel" id="prov-telefono" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-medium text-gray-800" placeholder="Ej: 3451234567">
-                </div>
-                
-                <div class="mb-8">
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿Qué nos vende? (Opcional)</label>
-                    <input type="text" id="prov-detalle" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-medium text-gray-800" placeholder="Ej: Pan, fiambres, envases...">
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">WhatsApp</label>
+                    <input type="tel" id="contacto-telefono" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-violet-500 focus:bg-white transition-all font-medium" placeholder="11 2345 6789 (sin 0 ni 15)">
                 </div>
 
-                <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-blue-200 active:scale-95 transition-all">Guardar Proveedor</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL EDITAR PROVEEDOR -->
-    <div id="modalEditarProveedor" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
-        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-black text-blue-600">Editar Proveedor</h2>
-                <button type="button" onclick="closeModal('modalEditarProveedor')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            
-            <form id="form-editar-proveedor" onsubmit="actualizarProveedor(event)">
-                <input type="hidden" id="edit-prov-id">
-                <div class="mb-5">
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Nombre o Empresa</label>
-                    <input type="text" id="edit-prov-nombre" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-bold text-gray-800" required>
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Descuento acordado</label>
+                    <div id="contacto-descuento-btns" class="grid grid-cols-4 gap-2"></div>
+                    <input type="hidden" id="contacto-descuento" value="0">
                 </div>
 
-                <div class="mb-5">
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Teléfono / WhatsApp (Opcional)</label>
-                    <input type="tel" id="edit-prov-telefono" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-medium text-gray-800">
-                </div>
-                
-                <div class="mb-8">
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿Qué nos vende? (Opcional)</label>
-                    <input type="text" id="edit-prov-detalle" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-medium text-gray-800">
-                </div>
-
-                <div class="flex gap-3">
-                    <button type="button" onclick="confirmarEliminarProveedor()" class="w-14 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center text-lg active:bg-red-100 transition-colors"><i class="fa-solid fa-trash"></i></button>
-                    <button type="submit" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-blue-200 active:scale-95 transition-all">Guardar Cambios</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL CONFIRMAR ELIMINAR PROVEEDOR -->
-    <div id="modalConfirmDelete" class="fixed inset-0 z-[70] hidden flex-col justify-center items-center bg-black/60 backdrop-blur-sm p-4 opacity-0 transition-opacity">
-        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform scale-95 transition-transform" id="modalConfirmDeleteContent">
-            <div class="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-3xl">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-            </div>
-            <h3 class="text-xl font-black text-center text-gray-800 mb-2">¿Eliminar proveedor?</h3>
-            <p class="text-center text-sm text-gray-500 font-medium mb-6">Los gastos asociados a este proveedor pasarán a la lista de "Falta asignar proveedor". Esta acción no se puede deshacer.</p>
-            <div class="flex gap-3">
-                <button onclick="cerrarConfirmDelete()" class="flex-1 bg-gray-100 text-gray-600 font-bold py-3 rounded-xl active:bg-gray-200 transition-colors">Cancelar</button>
-                <button id="btn-confirm-delete" class="flex-1 bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-red-200 active:scale-95 transition-all">Eliminar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL CONFIRMAR ELIMINAR TRANSACCION -->
-    <div id="modalConfirmDeleteTransaccion" class="fixed inset-0 z-[70] hidden flex-col justify-center items-center bg-black/60 backdrop-blur-sm p-4 opacity-0 transition-opacity">
-        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform scale-95 transition-transform" id="modalConfirmDeleteTransaccionContent">
-            <div class="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-3xl">
-                <i class="fa-solid fa-trash-can"></i>
-            </div>
-            <h3 class="text-xl font-black text-center text-gray-800 mb-2">¿Eliminar movimiento?</h3>
-            <p class="text-center text-sm text-gray-500 font-medium mb-6">Este movimiento se moverá a la papelera y dejará de contar en los balances.</p>
-            <div class="flex gap-3">
-                <button onclick="cerrarConfirmDeleteTransaccion()" class="flex-1 bg-gray-100 text-gray-600 font-bold py-3 rounded-xl active:bg-gray-200 transition-colors">Cancelar</button>
-                <button id="btn-confirm-delete-transaccion" class="flex-1 bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-red-200 active:scale-95 transition-all">Mover a Papelera</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL EDITAR GASTO -->
-    <div id="modalEditarGasto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
-        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-black text-red-600">Editar Gasto</h2>
-                <button type="button" onclick="closeModal('modalEditarGasto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            
-            <form id="form-editar-gasto" onsubmit="actualizarGasto(event)">
-                <input type="hidden" id="edit-gasto-id">
-                
-                <div class="mb-5 text-center">
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Monto del Gasto</label>
-                    <div class="flex justify-center items-center gap-1 text-5xl font-black text-gray-800">
-                        <span class="text-3xl text-gray-400">$</span>
-                        <!-- SE AMPLIA EL ANCHO A w-56 -->
-                        <input type="number" id="edit-gasto-monto" class="w-56 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-red-500 transition-colors" required min="1" step="0.01" inputmode="decimal">
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Avisarme si pasan... sin comprar</label>
+                    <div class="flex items-center gap-3">
+                        <input type="number" id="contacto-dias-aviso" min="1" step="1" inputmode="numeric" class="w-24 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-violet-500 focus:bg-white transition-all font-black text-center text-gray-800" placeholder="—">
+                        <span class="text-sm font-bold text-gray-500">días <span class="font-medium text-gray-400">(vacío = sin aviso)</span></span>
                     </div>
                 </div>
 
-                <div class="mb-5">
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿En qué se gastó?</label>
-                    <input type="text" id="edit-gasto-desc" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-red-500 focus:bg-white transition-all font-medium" required>
+                <div class="mb-6">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Notas del acuerdo (Opcional)</label>
+                    <textarea id="contacto-notas" rows="2" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-violet-500 focus:bg-white transition-all font-medium resize-none" placeholder="Ej: compra martes y viernes, paga por transferencia"></textarea>
                 </div>
 
-                <div class="mb-8">
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Asignar Proveedor</label>
-                    <select id="edit-gasto-proveedor" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-red-500 focus:bg-white transition-all font-bold text-gray-700 appearance-none">
-                    </select>
+                <div id="contacto-acciones" class="hidden flex-col gap-2 mb-6 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Link de pedido personalizado</p>
+                    <button type="button" id="contacto-enviar-link" class="w-full bg-green-500 text-white font-bold py-3 rounded-xl text-sm active:scale-95 transition-all"><i class="fa-brands fa-whatsapp mr-2"></i>Enviarle su link por WhatsApp</button>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" id="contacto-copiar-link" class="bg-white border border-gray-200 text-gray-600 font-bold py-2.5 rounded-xl text-sm"><i class="fa-regular fa-copy mr-1.5"></i>Copiar link</button>
+                        <button type="button" id="contacto-ver-historial" class="bg-white border border-gray-200 text-gray-600 font-bold py-2.5 rounded-xl text-sm"><i class="fa-solid fa-clock-rotate-left mr-1.5"></i>Ver compras</button>
+                    </div>
                 </div>
 
-                <div class="flex gap-3">
-                    <button type="button" onclick="confirmarEliminarTransaccion('gasto')" class="w-14 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center text-lg active:bg-red-100 transition-colors"><i class="fa-solid fa-trash"></i></button>
-                    <button type="submit" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-red-200 active:scale-95 transition-all">Guardar Cambios</button>
-                </div>
+                <button type="submit" class="w-full bg-violet-600 hover:bg-violet-700 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-violet-200 active:scale-95 transition-all">Guardar Contacto</button>
             </form>
         </div>
     </div>
 
-    <!-- VISUALIZADOR DE COMPROBANTES -->
-    <div id="modalComprobante" class="fixed inset-0 z-[60] hidden flex-col justify-center items-center bg-black/80 backdrop-blur-sm p-4">
+    <div id="modalHistorialContacto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-5">
+                <h2 class="text-2xl font-black text-violet-600">Compras</h2>
+                <button onclick="closeModal('modalHistorialContacto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="historial-contacto-contenido"></div>
+        </div>
+    </div>
+
+    <div id="modalPedidoDetalle" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-5">
+                <h2 class="text-2xl font-black text-violet-600">Detalle del Pedido</h2>
+                <button onclick="closeModal('modalPedidoDetalle')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="pedido-detalle-contenido"></div>
+        </div>
+    </div>
+
+    <div id="modalComprobante"class="fixed inset-0 z-[60] hidden flex-col justify-center items-center bg-black/80 backdrop-blur-sm p-4">
         <div class="w-full max-w-md bg-white rounded-2xl overflow-hidden shadow-2xl modal-enter relative">
             <div class="flex justify-between items-center p-4 border-b border-gray-100 bg-gray-50">
-                <h3 class="font-bold text-gray-800">Comprobante</h3>
-                <button type="button" onclick="cerrarComprobante()" class="w-8 h-8 bg-gray-200 rounded-full text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+                <h3 class="font-bold text-gray-800">Visualizador</h3>
+                <button onclick="cerrarComprobante()" class="w-8 h-8 bg-gray-200 rounded-full text-gray-600"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-4 bg-gray-100 flex justify-center max-h-[70vh] overflow-auto">
                 <img id="imagen-comprobante-vista" src="" alt="Comprobante" class="max-w-full rounded shadow-sm">
@@ -666,9 +619,10 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // CONFIGURACIÓN FIREBASE (REEMPLAZAR CON TU CONFIG SI ES NECESARIO)
         const firebaseConfig = {
             apiKey: "AIzaSyBjzZmNyG_NmfNlEc3QusG55YLYIUwXIQY",
             authDomain: "sistema-pipon.firebaseapp.com",
@@ -681,23 +635,62 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        
+
+        // MODO PRUEBA: abrir con ?prueba en la URL. Lee los datos reales pero todo lo que se
+        // crea o modifica queda solo en memoria (se pierde al recargar). Nunca escribe en Firebase.
+        const MODO_PRUEBA = new URLSearchParams(location.search).has('prueba');
+        let crearDoc = addDoc;
+        let actualizarDoc = updateDoc;
+        let escuchar = onSnapshot;
+
+        if (MODO_PRUEBA) {
+            const memoria = {};
+            const oyentes = {};
+            const cargas = {};
+            const convertirFechas = (datos) => Object.fromEntries(Object.entries(datos).map(([k, v]) => [k, v instanceof Date ? Timestamp.fromDate(v) : v]));
+            const asegurar = (refColeccion) => cargas[refColeccion.path] ||= getDocs(refColeccion).then(snap => {
+                memoria[refColeccion.path] = new Map(snap.docs.map(d => [d.id, d.data()]));
+            });
+            const emitir = (ruta) => {
+                const docs = [...memoria[ruta].entries()].map(([id, datos]) => ({ id, data: () => datos }));
+                (oyentes[ruta] || []).forEach(cb => cb({ docs }));
+            };
+            escuchar = (refColeccion, cb) => {
+                (oyentes[refColeccion.path] ||= []).push(cb);
+                asegurar(refColeccion).then(() => emitir(refColeccion.path));
+                return () => {};
+            };
+            crearDoc = async (refColeccion, datos) => {
+                await asegurar(refColeccion);
+                const id = 'prueba-' + Date.now() + Math.random().toString(36).slice(2, 6);
+                memoria[refColeccion.path].set(id, convertirFechas(datos));
+                emitir(refColeccion.path);
+                return { id };
+            };
+            actualizarDoc = async (refDoc, datos) => {
+                await asegurar(refDoc.parent);
+                const actual = memoria[refDoc.parent.path].get(refDoc.id) || {};
+                memoria[refDoc.parent.path].set(refDoc.id, { ...actual, ...convertirFechas(datos) });
+                emitir(refDoc.parent.path);
+            };
+            document.body.insertAdjacentHTML('afterbegin', `<div class="bg-yellow-300 text-yellow-900 text-center text-[11px] font-black py-1 tracking-wider">MODO PRUEBA · Nada de lo que cargues se guarda</div>`);
+        }
+
         let ventasData = [];
         let gastosData = [];
         let productosData = [];
-        let proveedoresData = [];
+        let mayoristasData = [];
+        let pedidosData = [];
 
+        // Variables para Historial Diario
         let fechaCalendario = new Date(); 
         let diaSeleccionadoFormat = null; 
+
+        // Variables para Balances Mensuales
         let anioBalances = new Date().getFullYear();
-        let mesBalancesSelec = new Date().getMonth();
-        let vistaBalance = 'mes'; 
-        
-        let proveedorAEliminar = null;
-        let transaccionAEliminar = { id: null, tipo: null }; 
+        let mesBalancesSelec = new Date().getMonth(); // 0 a 11
 
-        window.fechaTransaccionManual = null;
-
+        // UTILIDADES BÁSICAS
         const formatearDinero = (monto) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(monto);
         const formatearHora = (timestamp) => {
             if (!timestamp) return '';
@@ -717,30 +710,27 @@
             ayer.setDate(ayer.getDate() - 1); 
             return date.getDate() === ayer.getDate() && date.getMonth() === ayer.getMonth() && date.getFullYear() === ayer.getFullYear();
         };
-        const esEsteMes = (timestamp) => {
-            if (!timestamp) return false;
-            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-            const hoy = new Date();
-            return date.getMonth() === hoy.getMonth() && date.getFullYear() === hoy.getFullYear();
+        const aFecha = (timestamp) => timestamp ? (timestamp.toDate ? timestamp.toDate() : new Date(timestamp)) : null;
+        const formatearFecha = (timestamp) => {
+            const d = aFecha(timestamp);
+            return d ? d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
         };
-        const esMesPasado = (timestamp) => {
-            if (!timestamp) return false;
-            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-            const hoy = new Date();
-            let mesPasado = hoy.getMonth() - 1;
-            let anio = hoy.getFullYear();
-            if (mesPasado < 0) { mesPasado = 11; anio--; }
-            return date.getMonth() === mesPasado && date.getFullYear() === anio;
-        };
-        
-        const esHuerfano = (g) => !g.proveedor || g.proveedor === "" || !proveedoresData.some(p => p.nombre === g.proveedor);
-        const activos = (item) => !item.eliminado; 
+        const formatearFechaHora = (timestamp) => timestamp ? `${formatearFecha(timestamp)} ${formatearHora(timestamp)}` : '';
+        const diasEntre = (desde, hasta) => Math.round((new Date(hasta.getFullYear(), hasta.getMonth(), hasta.getDate()) - new Date(desde.getFullYear(), desde.getMonth(), desde.getDate())) / 86400000);
+        const escaparHtml = (texto) => String(texto ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const plural = (n, singular, pluralTxt) => `${n} ${n === 1 ? singular : pluralTxt}`;
+
+        // Los pedidos mayoristas entregados/cobrados cuentan como ingreso en la fecha de entrega
+        const ventasMayoristasEntregadas = () => pedidosData
+            .filter(p => p.estado === 'entregado' && p.fechaEntrega)
+            .map(p => ({ ...p, monto: p.total, timestamp: p.fechaEntrega, tipo: 'mayorista' }));
+        const todosLosIngresos = () => [...ventasData, ...ventasMayoristasEntregadas()];
 
         window.showToast = (mensaje, tipo = 'success') => {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
-            const colorClass = tipo === 'success' ? 'bg-green-600' : (tipo === 'info' ? 'bg-blue-600' : 'bg-red-600');
-            const icon = tipo === 'success' ? 'fa-check' : (tipo === 'info' ? 'fa-info-circle' : 'fa-circle-xmark');
+            const colorClass = tipo === 'success' ? 'bg-green-600' : 'bg-red-600';
+            const icon = tipo === 'success' ? 'fa-check' : 'fa-info';
             toast.className = `toast ${colorClass} text-white px-5 py-3 rounded-full shadow-lg font-bold text-sm flex items-center gap-2 pointer-events-auto`;
             toast.innerHTML = `<i class="fa-solid ${icon}"></i> ${mensaje}`;
             container.appendChild(toast);
@@ -752,83 +742,44 @@
             }, 3000);
         };
 
-        window.cambiarVistaBalance = function(vista) {
-            vistaBalance = vista;
-            const btnMes = document.getElementById('btn-vista-mes');
-            const btnDia = document.getElementById('btn-vista-dia');
-            const titulo = document.getElementById('lbl-balance-titulo');
-
-            if(vista === 'mes') {
-                btnMes.className = 'px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-pipon-orange text-white shadow-sm transition-all';
-                btnDia.className = 'px-5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-pipon-brown hover:bg-white/50 transition-all';
-                titulo.innerText = 'Balance del Mes';
-            } else {
-                btnDia.className = 'px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-pipon-orange text-white shadow-sm transition-all';
-                btnMes.className = 'px-5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-pipon-brown hover:bg-white/50 transition-all';
-                titulo.innerText = 'Balance del Día (Hoy)';
-            }
-            renderBalanceYResumen();
-        };
-
         function renderBalanceYResumen() {
-            const ventasActivas = ventasData.filter(activos);
-            const gastosActivos = gastosData.filter(activos);
+            const ingresos = todosLosIngresos();
+            const ventasHoy = ingresos.filter(v => esHoy(v.timestamp));
+            const gastosHoy = gastosData.filter(g => esHoy(g.timestamp));
 
-            let totalVentas = 0, totalGastos = 0, balanceTotal = 0;
-            let totalVentasAnt = 0, totalGastosAnt = 0, balanceAnt = 0;
-            let textoAnterior = "";
+            const totalVentasHoy = ventasHoy.reduce((sum, v) => sum + Number(v.monto), 0);
+            const totalGastosHoy = gastosHoy.reduce((sum, g) => sum + Number(g.monto), 0);
+            const balanceTotalHoy = totalVentasHoy - totalGastosHoy;
 
-            if (vistaBalance === 'dia') {
-                const ventasHoy = ventasActivas.filter(v => esHoy(v.timestamp));
-                const gastosHoy = gastosActivos.filter(g => esHoy(g.timestamp));
-                totalVentas = ventasHoy.reduce((sum, v) => sum + Number(v.monto), 0);
-                totalGastos = gastosHoy.reduce((sum, g) => sum + Number(g.monto), 0);
-                balanceTotal = totalVentas - totalGastos;
-
-                const ventasAyer = ventasActivas.filter(v => esAyer(v.timestamp));
-                const gastosAyer = gastosActivos.filter(g => esAyer(g.timestamp));
-                totalVentasAnt = ventasAyer.reduce((sum, v) => sum + Number(v.monto), 0);
-                totalGastosAnt = gastosAyer.reduce((sum, g) => sum + Number(g.monto), 0);
-                balanceAnt = totalVentasAnt - totalGastosAnt;
-                textoAnterior = "Ayer:";
-            } else {
-                const ventasMes = ventasActivas.filter(v => esEsteMes(v.timestamp));
-                const gastosMes = gastosActivos.filter(g => esEsteMes(g.timestamp));
-                totalVentas = ventasMes.reduce((sum, v) => sum + Number(v.monto), 0);
-                totalGastos = gastosMes.reduce((sum, g) => sum + Number(g.monto), 0);
-                balanceTotal = totalVentas - totalGastos;
-
-                const ventasMesPas = ventasActivas.filter(v => esMesPasado(v.timestamp));
-                const gastosMesPas = gastosActivos.filter(g => esMesPasado(g.timestamp));
-                totalVentasAnt = ventasMesPas.reduce((sum, v) => sum + Number(v.monto), 0);
-                totalGastosAnt = gastosMesPas.reduce((sum, g) => sum + Number(g.monto), 0);
-                balanceAnt = totalVentasAnt - totalGastosAnt;
-                textoAnterior = "Mes pasado:";
-            }
-
-            document.getElementById('resumen-ingresos').innerText = formatearDinero(totalVentas);
-            document.getElementById('resumen-gastos').innerText = formatearDinero(totalGastos);
+            document.getElementById('resumen-ingresos').innerText = formatearDinero(totalVentasHoy);
+            document.getElementById('resumen-gastos').innerText = formatearDinero(totalGastosHoy);
             
             const balEl = document.getElementById('balance-total');
-            balEl.innerText = formatearDinero(balanceTotal);
-            if (balanceTotal > 0) balEl.className = 'text-5xl font-black text-green-600 mb-1';
-            else if (balanceTotal < 0) balEl.className = 'text-5xl font-black text-red-600 mb-1';
+            balEl.innerText = formatearDinero(balanceTotalHoy);
+            if (balanceTotalHoy > 0) balEl.className = 'text-5xl font-black text-green-600 mb-1';
+            else if (balanceTotalHoy < 0) balEl.className = 'text-5xl font-black text-red-600 mb-1';
             else balEl.className = 'text-5xl font-black text-pipon-brown mb-1';
 
-            const balAyerEl = document.getElementById('balance-anterior');
-            if (totalVentasAnt === 0 && totalGastosAnt === 0) {
-                balAyerEl.innerText = `${textoAnterior} Sin movimientos`;
+            const ventasAyer = ingresos.filter(v => esAyer(v.timestamp));
+            const gastosAyer = gastosData.filter(g => esAyer(g.timestamp));
+            const totalVentasAyer = ventasAyer.reduce((sum, v) => sum + Number(v.monto), 0);
+            const totalGastosAyer = gastosAyer.reduce((sum, g) => sum + Number(g.monto), 0);
+            const balanceTotalAyer = totalVentasAyer - totalGastosAyer;
+
+            const balAyerEl = document.getElementById('balance-ayer');
+            if (totalVentasAyer === 0 && totalGastosAyer === 0) {
+                balAyerEl.innerText = `Ayer: Sin movimientos`;
                 balAyerEl.className = 'text-sm font-semibold text-gray-400';
             } else {
-                balAyerEl.innerText = `${textoAnterior} ${formatearDinero(balanceAnt)}`;
-                if (balanceAnt > 0) balAyerEl.className = 'text-sm font-bold text-green-500';
-                else if (balanceAnt < 0) balAyerEl.className = 'text-sm font-bold text-red-500';
+                balAyerEl.innerText = `Ayer: ${formatearDinero(balanceTotalAyer)}`;
+                if (balanceTotalAyer > 0) balAyerEl.className = 'text-sm font-bold text-green-500';
+                else if (balanceTotalAyer < 0) balAyerEl.className = 'text-sm font-bold text-red-500';
                 else balAyerEl.className = 'text-sm font-bold text-gray-500';
             }
         }
 
         function renderVentas() {
-            const ventasHoy = ventasData.filter(activos).filter(v => esHoy(v.timestamp)).sort((a,b) => (b.timestamp?.toMillis()||0) - (a.timestamp?.toMillis()||0));
+            const ventasHoy = todosLosIngresos().filter(v => esHoy(v.timestamp)).sort((a,b) => (b.timestamp?.toMillis()||0) - (a.timestamp?.toMillis()||0));
             const total = ventasHoy.reduce((sum, v) => sum + Number(v.monto), 0);
             document.getElementById('total-ventas-hoy-badge').innerText = `Total: ${formatearDinero(total)}`;
             const listEl = document.getElementById('lista-ventas');
@@ -838,7 +789,19 @@
                 return;
             }
             
-            listEl.innerHTML = ventasHoy.map(v => `
+            listEl.innerHTML = ventasHoy.map(v => v.tipo === 'mayorista' ? `
+                <button onclick="verDetallePedido('${v.id}')" class="w-full text-left bg-white rounded-xl p-4 flex justify-between items-center shadow-sm border-l-4 border-l-violet-500">
+                    <div class="min-w-0">
+                        <p class="font-bold text-gray-800 truncate">${escaparHtml(nombrePedido(v))}</p>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="text-xs text-gray-400"><i class="fa-regular fa-clock"></i> ${formatearHora(v.timestamp)}</span>
+                            <span class="text-[10px] bg-violet-100 text-violet-700 font-bold px-2 py-0.5 rounded">Mayorista · ${v.unidades} u.</span>
+                            <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">${escaparHtml(v.metodo || '')}</span>
+                        </div>
+                    </div>
+                    <span class="font-black text-violet-600 text-lg shrink-0">+${formatearDinero(v.monto)}</span>
+                </button>
+            ` : `
                 <div class="bg-white rounded-xl p-4 flex justify-between items-center shadow-sm border-l-4 border-l-green-500">
                     <div>
                         <p class="font-bold text-gray-800">${v.descripcion || 'Venta general'}</p>
@@ -848,10 +811,33 @@
                             ${v.comprobante ? `<button onclick="verComprobante('${v.id}', 'ventas')" class="text-[10px] bg-blue-50 text-blue-500 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-blue-100"><i class="fa-solid fa-paperclip"></i> Ver</button>` : ''}
                         </div>
                     </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                        <span class="font-black text-green-600 text-lg shrink-0">+${formatearDinero(v.monto)}</span>
-                        <button onclick="abrirEditarVenta('${v.id}')" class="w-7 h-7 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center active:bg-gray-200 transition-colors"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                    <span class="font-black text-green-600 text-lg">+${formatearDinero(v.monto)}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderGastos() {
+            const gastosHoy = gastosData.filter(g => esHoy(g.timestamp)).sort((a,b) => (b.timestamp?.toMillis()||0) - (a.timestamp?.toMillis()||0));
+            const total = gastosHoy.reduce((sum, g) => sum + Number(g.monto), 0);
+            document.getElementById('total-gastos-hoy-badge').innerText = `Total: ${formatearDinero(total)}`;
+            const listEl = document.getElementById('lista-gastos');
+
+            if (gastosHoy.length === 0) {
+                listEl.innerHTML = `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm mt-4"><i class="fa-solid fa-receipt text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium">No hay gastos hoy.</p></div>`;
+                return;
+            }
+            
+            listEl.innerHTML = gastosHoy.map(g => `
+                <div class="bg-white rounded-xl p-4 flex justify-between items-center shadow-sm border-l-4 border-l-red-500">
+                    <div>
+                        <p class="font-bold text-gray-800">${g.descripcion}</p>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="text-xs text-gray-400"><i class="fa-regular fa-clock"></i> ${formatearHora(g.timestamp)}</span>
+                            <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">${g.metodo}</span>
+                            ${g.comprobante ? `<button onclick="verComprobante('${g.id}', 'gastos')" class="text-[10px] bg-blue-50 text-blue-500 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-blue-100"><i class="fa-solid fa-paperclip"></i> Ver</button>` : ''}
+                        </div>
                     </div>
+                    <span class="font-black text-red-600 text-lg">-${formatearDinero(g.monto)}</span>
                 </div>
             `).join('');
         }
@@ -875,151 +861,50 @@
 
             const selectVenta = document.getElementById('venta-producto');
             let opcionesHtml = `<option value="">Venta General / Otro</option>`;
-            productosData.forEach(p => { opcionesHtml += `<option value="${p.id}">${p.nombre}</option>`; });
+            productosData.forEach(p => {
+                opcionesHtml += `<option value="${p.id}">${p.nombre}</option>`;
+            });
             selectVenta.innerHTML = opcionesHtml;
         }
 
-        function renderProveedores() {
-            const listEl = document.getElementById('lista-proveedores');
-            const gastoSinEspecContainer = document.getElementById('gasto-sin-especificar-container');
-            const anioActual = new Date().getFullYear();
-            const mesActual = new Date().getMonth();
+        window.seleccionarProductoVenta = function() {
+            const select = document.getElementById('venta-producto');
+            const productId = select.value;
+            const inputMonto = document.getElementById('venta-monto');
             
-            let gastosMesSinEspec = 0;
-            let gastosAnioSinEspec = 0;
-
-            const gastosActivos = gastosData.filter(activos);
-
-            gastosActivos.forEach(g => {
-                if (esHuerfano(g) && g.timestamp) {
-                    const d = g.timestamp.toDate ? g.timestamp.toDate() : new Date(g.timestamp);
-                    if (d.getFullYear() === anioActual) {
-                        gastosAnioSinEspec += Number(g.monto);
-                        if (d.getMonth() === mesActual) { gastosMesSinEspec += Number(g.monto); }
-                    }
-                }
-            });
-
-            const gastosSinAsignar = gastosActivos.filter(esHuerfano).sort((a,b) => (b.timestamp?.toMillis()||0) - (a.timestamp?.toMillis()||0));
-            let listaSinAsignarHtml = '';
-            
-            if (gastosSinAsignar.length > 0) {
-                listaSinAsignarHtml = `
-                    <div class="mt-4 bg-white p-3 rounded-xl border border-red-100 shadow-sm">
-                        <h4 class="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center justify-between">
-                            <span class="flex items-center gap-1"><i class="fa-solid fa-circle-exclamation text-pipon-orange"></i> Falta asignar proveedor</span>
-                            <span class="bg-gray-100 text-gray-500 px-2 rounded-full">${gastosSinAsignar.length}</span>
-                        </h4>
-                        <div class="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
-                            ${gastosSinAsignar.map(g => `
-                                <div class="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
-                                    <div class="flex items-center gap-2 overflow-hidden">
-                                        <div class="w-6 h-6 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0"><i class="fa-solid fa-arrow-up text-[9px]"></i></div>
-                                        <div class="truncate">
-                                            <p class="text-xs font-bold text-gray-800 truncate leading-tight">${g.descripcion}</p>
-                                            <p class="text-[9px] text-gray-400 mt-0.5"><i class="fa-regular fa-clock"></i> ${new Date(g.timestamp?.toDate() || g.timestamp).toLocaleDateString('es-AR')} - ${formatearHora(g.timestamp)}</p>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center gap-2 shrink-0">
-                                        <span class="font-black text-red-600 text-sm">-${formatearDinero(g.monto)}</span>
-                                        <button onclick="abrirEditarGasto('${g.id}')" class="w-7 h-7 rounded-lg bg-gray-200 text-gray-600 flex items-center justify-center active:bg-gray-300 transition-colors"><i class="fa-solid fa-pen text-[10px]"></i></button>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            }
-
-            gastoSinEspecContainer.innerHTML = `
-                <div class="bg-gray-50 rounded-xl p-4 border border-gray-200 shadow-sm relative flex flex-col gap-3">
-                    <div class="pr-10">
-                        <p class="font-bold text-gray-700 text-lg leading-tight">Gastos sin Especificar</p>
-                        <p class="text-xs text-gray-500 font-medium mt-1"><i class="fa-solid fa-tag text-gray-400"></i> Gastos varios o proveedores eliminados</p>
-                    </div>
-                    <div class="flex gap-4 pt-3 border-t border-gray-200">
-                        <div>
-                            <p class="text-[9px] text-gray-500 uppercase font-bold tracking-wider">Gasto Mensual</p>
-                            <p class="font-black text-red-500 text-sm">${formatearDinero(gastosMesSinEspec)}</p>
-                        </div>
-                        <div>
-                            <p class="text-[9px] text-gray-500 uppercase font-bold tracking-wider">Gasto Anual</p>
-                            <p class="font-black text-red-500 text-sm">${formatearDinero(gastosAnioSinEspec)}</p>
-                        </div>
-                    </div>
-                </div>
-                ${listaSinAsignarHtml}
-            `;
-            
-            if (proveedoresData.length === 0) {
-                listEl.innerHTML = `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm mt-4"><i class="fa-solid fa-truck text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium">No hay proveedores registrados.</p></div>`;
+            if(productId) {
+                const producto = productosData.find(p => p.id === productId);
+                if(producto) inputMonto.value = producto.precio;
             } else {
-                listEl.innerHTML = proveedoresData.map(p => {
-                    let gastosMes = 0;
-                    let gastosAnio = 0;
-                    
-                    gastosActivos.forEach(g => {
-                        if (g.proveedor === p.nombre && g.timestamp) {
-                            const d = g.timestamp.toDate ? g.timestamp.toDate() : new Date(g.timestamp);
-                            if (d.getFullYear() === anioActual) {
-                                gastosAnio += Number(g.monto);
-                                if (d.getMonth() === mesActual) { gastosMes += Number(g.monto); }
-                            }
-                        }
-                    });
-
-                    return `
-                    <div class="bg-white rounded-xl p-4 shadow-sm border-l-4 border-l-blue-500 relative flex flex-col gap-3">
-                        <button onclick="abrirEditarProveedor('${p.id}')" class="absolute top-4 right-4 w-8 h-8 bg-gray-50 text-gray-400 rounded-full flex items-center justify-center hover:bg-gray-100 active:bg-gray-200 transition-colors shadow-sm"><i class="fa-solid fa-pen text-[11px]"></i></button>
-                        
-                        <div class="pr-10">
-                            <p class="font-bold text-gray-800 text-lg leading-tight">${p.nombre}</p>
-                            ${p.detalle ? `<p class="text-xs text-gray-500 font-medium mt-1"><i class="fa-solid fa-tag text-gray-300"></i> ${p.detalle}</p>` : ''}
-                        </div>
-                        
-                        <div class="flex gap-4 pt-3 border-t border-gray-50">
-                            <div>
-                                <p class="text-[9px] text-gray-400 uppercase font-bold tracking-wider">Gasto Mensual</p>
-                                <p class="font-black text-red-500 text-sm">${formatearDinero(gastosMes)}</p>
-                            </div>
-                            <div>
-                                <p class="text-[9px] text-gray-400 uppercase font-bold tracking-wider">Gasto Anual</p>
-                                <p class="font-black text-red-500 text-sm">${formatearDinero(gastosAnio)}</p>
-                            </div>
-                        </div>
-
-                        ${p.telefono ? `
-                        <div class="mt-1">
-                            <a href="https://wa.me/${p.telefono.replace(/\D/g,'')}" target="_blank" class="w-full bg-green-50 text-green-600 rounded-lg py-2 flex items-center justify-center gap-2 font-bold text-sm hover:bg-green-100 transition-colors"><i class="fa-brands fa-whatsapp text-lg"></i> Contactar</a>
-                        </div>` : ''}
-                    </div>
-                `}).join('');
+                inputMonto.value = '';
             }
-
-            const selectGasto = document.getElementById('gasto-proveedor');
-            let opcionesHtml = `<option value="">Sin Especificar / Otro</option>`;
-            proveedoresData.forEach(p => { opcionesHtml += `<option value="${p.nombre}">${p.nombre}</option>`; });
-            selectGasto.innerHTML = opcionesHtml;
-        }
+        };
 
         function agruparDatosPorFecha() {
-            const dias = {}; 
-            const agrupar = (item, tipo) => {
-                if(!item.timestamp) return;
-                const dateObj = item.timestamp.toDate ? item.timestamp.toDate() : new Date(item.timestamp);
-                const fecha = dateObj.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }); 
-                
-                if(!dias[fecha]) dias[fecha] = { ventas: 0, gastos: 0, items: [], eliminados: [] };
-                
-                if (item.eliminado) {
-                    dias[fecha].eliminados.push({...item, tipo: tipo});
-                } else {
-                    dias[fecha][tipo] += Number(item.monto);
-                    dias[fecha].items.push({...item, tipo: tipo}); 
-                }
+            const dias = {};
+            const diaDe = (item) => {
+                if(!item.timestamp) return null;
+                const fecha = formatearFecha(item.timestamp);
+                if(!dias[fecha]) dias[fecha] = { minorista: 0, cantMinorista: 0, mayorista: 0, contactosMayorista: new Set(), unidadesMayorista: 0, gastos: 0 };
+                return dias[fecha];
             };
-            ventasData.forEach(v => agrupar(v, 'ventas'));
-            gastosData.forEach(g => agrupar(g, 'gastos'));
+            ventasData.forEach(v => {
+                const dia = diaDe(v);
+                if (!dia) return;
+                dia.minorista += Number(v.monto);
+                dia.cantMinorista += 1;
+            });
+            ventasMayoristasEntregadas().forEach(p => {
+                const dia = diaDe(p);
+                if (!dia) return;
+                dia.mayorista += Number(p.monto);
+                dia.contactosMayorista.add(claveContactoPedido(p));
+                dia.unidadesMayorista += Number(p.unidades) || 0;
+            });
+            gastosData.forEach(g => {
+                const dia = diaDe(g);
+                if (dia) dia.gastos += Number(g.monto);
+            });
             return dias;
         }
 
@@ -1044,7 +929,7 @@
                 const fechaCiclo = new Date(anioActual, mesActual, dia);
                 const fechaStr = fechaCiclo.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
                 
-                const tieneDatos = datosAgrupados[fechaStr] && (datosAgrupados[fechaStr].items.length > 0);
+                const tieneDatos = datosAgrupados[fechaStr];
                 const esHoyCalendario = fechaStr === hoyStr;
                 const estaSeleccionado = fechaStr === diaSeleccionadoFormat;
 
@@ -1053,9 +938,13 @@
                 else if (esHoyCalendario) clasesBtn += "bg-pipon-cream text-pipon-brown font-bold border border-pipon-yellow";
                 else clasesBtn += "text-gray-600 hover:bg-gray-50 active:bg-gray-100";
 
-                let indicadorHtml = '';
-                if (tieneDatos && !estaSeleccionado) indicadorHtml = `<div class="absolute bottom-1 w-1 h-1 rounded-full bg-pipon-orange"></div>`;
-                else if (tieneDatos && estaSeleccionado) indicadorHtml = `<div class="absolute bottom-1 w-1 h-1 rounded-full bg-white"></div>`;
+                const puntos = [];
+                if (tieneDatos?.cantMinorista) puntos.push('bg-pipon-orange');
+                if (tieneDatos?.contactosMayorista.size) puntos.push('bg-violet-500');
+                if (tieneDatos && !puntos.length && tieneDatos.gastos) puntos.push('bg-gray-300');
+                const indicadorHtml = puntos.length
+                    ? `<div class="absolute bottom-1 flex gap-0.5">${puntos.map(color => `<span class="w-1.5 h-1.5 rounded-full ${color} ${estaSeleccionado ? 'ring-1 ring-white' : ''}"></span>`).join('')}</div>`
+                    : '';
 
                 htmlCalendario += `<button onclick="seleccionarDiaHistorial('${fechaStr}')" class="${clasesBtn}"><span>${dia}</span>${indicadorHtml}</button>`;
             }
@@ -1066,92 +955,27 @@
 
         function actualizarCuadroDetalle(datosAgrupados) {
             const cuadroEl = document.getElementById('detalle-dia-seleccionado');
-            const papeleraEl = document.getElementById('papelera-dia-seleccionado');
-            
             if (!diaSeleccionadoFormat) {
                 cuadroEl.classList.add('hidden');
-                papeleraEl.classList.add('hidden');
                 return;
             }
             cuadroEl.classList.remove('hidden');
-            
-            const infoDia = datosAgrupados[diaSeleccionadoFormat] || { ventas: 0, gastos: 0, items: [], eliminados: [] };
-            const balanceDia = infoDia.ventas - infoDia.gastos;
+            const infoDia = datosAgrupados[diaSeleccionadoFormat] || { minorista: 0, cantMinorista: 0, mayorista: 0, contactosMayorista: new Set(), unidadesMayorista: 0, gastos: 0 };
+            const ingresosDia = infoDia.minorista + infoDia.mayorista;
+            const balanceDia = ingresosDia - infoDia.gastos;
 
             document.getElementById('detalle-fecha').innerHTML = `<i class="fa-regular fa-calendar-check text-pipon-orange"></i> ${diaSeleccionadoFormat}`;
-            document.getElementById('detalle-ventas').innerText = formatearDinero(infoDia.ventas);
+            document.getElementById('detalle-minorista-monto').innerText = formatearDinero(infoDia.minorista);
+            document.getElementById('detalle-minorista-cant').innerText = plural(infoDia.cantMinorista, 'venta', 'ventas');
+            document.getElementById('detalle-mayorista-monto').innerText = formatearDinero(infoDia.mayorista);
+            document.getElementById('detalle-mayorista-contactos').innerText = plural(infoDia.contactosMayorista.size, 'contacto', 'contactos');
+            document.getElementById('detalle-mayorista-unidades').innerText = plural(infoDia.unidadesMayorista, 'unidad', 'unidades');
+            document.getElementById('detalle-ventas').innerText = formatearDinero(ingresosDia);
             document.getElementById('detalle-gastos').innerText = formatearDinero(infoDia.gastos);
             
             const balEl = document.getElementById('detalle-balance');
             balEl.innerText = formatearDinero(balanceDia);
             balEl.className = `text-xl font-black ${balanceDia > 0 ? 'text-green-600' : (balanceDia < 0 ? 'text-red-600' : 'text-gray-800')}`;
-
-            const listaMovimientosEl = document.getElementById('detalle-movimientos-lista');
-            if (infoDia.items.length === 0) {
-                listaMovimientosEl.innerHTML = `<p class="text-center text-xs text-gray-400 py-2">No hubo movimientos este día.</p>`;
-            } else {
-                infoDia.items.sort((a,b) => (b.timestamp?.toMillis()||0) - (a.timestamp?.toMillis()||0));
-                listaMovimientosEl.innerHTML = infoDia.items.map(item => {
-                    const esVenta = item.tipo === 'ventas';
-                    const color = esVenta ? 'green' : 'red';
-                    const signo = esVenta ? '+' : '-';
-                    const icono = esVenta ? 'fa-arrow-down' : 'fa-arrow-up';
-                    
-                    let detalleExtra = '';
-                    if (!esVenta) {
-                        const huerfano = esHuerfano(item);
-                        const provName = huerfano ? 'Sin especificar' : item.proveedor;
-                        detalleExtra = `<span class="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold ml-2"><i class="fa-solid fa-truck"></i> ${provName}</span>`;
-                    }
-
-                    const onClickEdit = esVenta ? `abrirEditarVenta('${item.id}')` : `abrirEditarGasto('${item.id}')`;
-
-                    return `
-                    <div class="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
-                        <div class="flex items-center gap-2 overflow-hidden">
-                            <div class="w-6 h-6 rounded-full bg-${color}-100 text-${color}-600 flex items-center justify-center shrink-0"><i class="fa-solid ${icono} text-[9px]"></i></div>
-                            <div class="truncate">
-                                <p class="text-xs font-bold text-gray-800 truncate leading-tight">${item.descripcion || 'Venta General'}</p>
-                                <div class="flex items-center gap-1 mt-0.5">
-                                    <span class="text-[9px] text-gray-400"><i class="fa-regular fa-clock"></i> ${formatearHora(item.timestamp)}</span>
-                                    ${detalleExtra}
-                                </div>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2 shrink-0">
-                            <span class="font-black text-${color}-600 text-sm shrink-0">${signo}${formatearDinero(item.monto)}</span>
-                            <button onclick="${onClickEdit}" class="w-7 h-7 rounded-lg bg-gray-200 text-gray-600 flex items-center justify-center active:bg-gray-300 transition-colors"><i class="fa-solid fa-pen text-[10px]"></i></button>
-                        </div>
-                    </div>`;
-                }).join('');
-            }
-
-            document.getElementById('retro-fecha-label').innerText = diaSeleccionadoFormat;
-            
-            if (infoDia.eliminados.length > 0) {
-                papeleraEl.classList.remove('hidden');
-                const listaEliminadosEl = document.getElementById('detalle-eliminados-lista');
-                
-                infoDia.eliminados.sort((a,b) => (b.timestamp?.toMillis()||0) - (a.timestamp?.toMillis()||0));
-                listaEliminadosEl.innerHTML = infoDia.eliminados.map(item => {
-                    const esVenta = item.tipo === 'ventas';
-                    const signo = esVenta ? '+' : '-';
-                    const tipoLabel = esVenta ? 'VENTA' : 'GASTO';
-                    
-                    return `
-                    <div class="flex justify-between items-center bg-white/50 p-2 rounded-lg border border-red-100 opacity-75">
-                        <div class="flex items-center gap-2 overflow-hidden">
-                            <div class="truncate">
-                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">${tipoLabel}</p>
-                                <p class="text-xs font-bold text-gray-600 truncate leading-tight line-through">${item.descripcion || 'Venta General'} (${signo}${formatearDinero(item.monto)})</p>
-                            </div>
-                        </div>
-                        <button onclick="restaurarTransaccion('${item.id}', '${item.tipo}')" class="text-[10px] font-bold bg-white text-gray-600 px-3 py-1.5 rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center gap-1 shrink-0"><i class="fa-solid fa-rotate-left"></i> Restaurar</button>
-                    </div>`;
-                }).join('');
-            } else {
-                papeleraEl.classList.add('hidden');
-            }
         }
 
         window.renderGridBalances = function() {
@@ -1173,23 +997,27 @@
             actualizarDetalleBalances();
         };
 
-        window.cambiarAnioBalances = function(dir) { anioBalances += dir; renderGridBalances(); };
-        window.seleccionarMesBalances = function(mesIndex) { mesBalancesSelec = mesIndex; renderGridBalances(); };
+        window.cambiarAnioBalances = function(dir) { 
+            anioBalances += dir; 
+            renderGridBalances(); 
+        };
+        
+        window.seleccionarMesBalances = function(mesIndex) { 
+            mesBalancesSelec = mesIndex; 
+            renderGridBalances(); 
+        };
 
         function actualizarDetalleBalances() {
             const detalleEl = document.getElementById('detalle-balances');
             detalleEl.classList.remove('hidden');
             
-            const ventasActivas = ventasData.filter(activos);
-            const gastosActivos = gastosData.filter(activos);
-
-            const ventasMes = ventasActivas.filter(v => {
+            const ventasMes = todosLosIngresos().filter(v => {
                 if(!v.timestamp) return false;
                 const d = v.timestamp.toDate ? v.timestamp.toDate() : new Date(v.timestamp);
                 return d.getFullYear() === anioBalances && d.getMonth() === mesBalancesSelec;
             });
             
-            const gastosMes = gastosActivos.filter(g => {
+            const gastosMes = gastosData.filter(g => {
                 if(!g.timestamp) return false;
                 const d = g.timestamp.toDate ? g.timestamp.toDate() : new Date(g.timestamp);
                 return d.getFullYear() === anioBalances && d.getMonth() === mesBalancesSelec;
@@ -1200,6 +1028,10 @@
             const balanceNeta = totalVentas - totalGastos;
             
             document.getElementById('bal-ingresos').innerText = formatearDinero(totalVentas);
+            const totalMayorista = ventasMes.filter(v => v.tipo === 'mayorista').reduce((sum, v) => sum + Number(v.monto), 0);
+            document.getElementById('bal-ingresos-split').innerText = totalMayorista
+                ? `Minorista ${formatearDinero(totalVentas - totalMayorista)} · Mayorista ${formatearDinero(totalMayorista)}`
+                : '';
             document.getElementById('bal-gastos').innerText = formatearDinero(totalGastos);
             
             const balNetoEl = document.getElementById('bal-neto');
@@ -1207,64 +1039,45 @@
             balNetoEl.className = `text-2xl font-black ${balanceNeta > 0 ? 'text-green-600' : (balanceNeta < 0 ? 'text-red-600' : 'text-gray-800')}`;
             
             const estadisticasProd = {};
+            const statProd = (nombre) => estadisticasProd[nombre] ||= { cantidad: 0, unidadesMayorista: 0, recaudado: 0 };
             ventasMes.forEach(v => {
-                const nombreProd = v.descripcion || 'Venta General';
-                if(!estadisticasProd[nombreProd]) { estadisticasProd[nombreProd] = { cantidad: 0, recaudado: 0 }; }
-                estadisticasProd[nombreProd].cantidad += 1; 
-                estadisticasProd[nombreProd].recaudado += Number(v.monto); 
+                if (v.tipo === 'mayorista') {
+                    const factor = 1 - (Number(v.descuento) || 0) / 100;
+                    (v.items || []).forEach(it => {
+                        const stat = statProd(it.nombre);
+                        stat.unidadesMayorista += Number(it.cantidad);
+                        stat.recaudado += Number(it.cantidad) * Number(it.precio) * factor;
+                    });
+                    return;
+                }
+                const stat = statProd(v.descripcion || 'Venta General');
+                stat.cantidad += 1;
+                stat.recaudado += Number(v.monto);
             });
-            const rankingVentas = Object.keys(estadisticasProd).map(k => ({ nombre: k, ...estadisticasProd[k] })).sort((a, b) => b.recaudado - a.recaudado);
             
-            const listVentasEl = document.getElementById('balances-ranking');
-            if (rankingVentas.length === 0) {
-                listVentasEl.innerHTML = `<p class="text-center text-gray-400 py-4 text-sm font-medium border border-dashed border-gray-200 rounded-xl">No hay ventas este mes.</p>`;
+            const ranking = Object.keys(estadisticasProd)
+                .map(k => ({ nombre: k, ...estadisticasProd[k] }))
+                .sort((a, b) => b.recaudado - a.recaudado);
+                
+            const listEl = document.getElementById('balances-ranking');
+            if (ranking.length === 0) {
+                listEl.innerHTML = `<p class="text-center text-gray-400 py-4 text-sm font-medium border border-dashed border-gray-200 rounded-xl">No hay ventas registradas en este mes.</p>`;
             } else {
-                listVentasEl.innerHTML = rankingVentas.map((prod, index) => `
+                listEl.innerHTML = ranking.map((prod, index) => `
                     <div class="flex justify-between items-center bg-gray-50 rounded-xl p-3 border border-gray-100">
                         <div class="flex items-center gap-3">
                             <span class="w-6 h-6 rounded-full bg-pipon-cream text-pipon-orange flex items-center justify-center font-black text-xs shrink-0">${index + 1}</span>
                             <div>
                                 <p class="font-bold text-gray-800 text-sm leading-tight">${prod.nombre}</p>
-                                <p class="text-[11px] text-gray-500 font-medium">${prod.cantidad} ${prod.cantidad === 1 ? 'venta' : 'ventas'}</p>
+                                <p class="text-[11px] text-gray-500 font-medium">${[
+                                    prod.cantidad ? plural(prod.cantidad, 'venta registrada', 'ventas registradas') : '',
+                                    prod.unidadesMayorista ? `${prod.unidadesMayorista} u. mayorista` : ''
+                                ].filter(Boolean).join(' · ')}</p>
                             </div>
                         </div>
                         <span class="font-black text-pipon-brown shrink-0">${formatearDinero(prod.recaudado)}</span>
                     </div>
                 `).join('');
-            }
-
-            const estadisticasProv = {};
-            gastosMes.forEach(g => {
-                let nombreProv = g.proveedor;
-                if(esHuerfano(g)) { nombreProv = 'Sin especificar'; }
-
-                if(!estadisticasProv[nombreProv]) { estadisticasProv[nombreProv] = { cantidad: 0, gastado: 0 }; }
-                estadisticasProv[nombreProv].cantidad += 1; 
-                estadisticasProv[nombreProv].gastado += Number(g.monto); 
-            });
-            const rankingGastos = Object.keys(estadisticasProv).map(k => ({ nombre: k, ...estadisticasProv[k] })).sort((a, b) => b.gastado - a.gastado);
-            
-            const listProvEl = document.getElementById('balances-gastos-proveedores');
-            if (rankingGastos.length === 0) {
-                listProvEl.innerHTML = `<p class="text-center text-gray-400 py-4 text-sm font-medium border border-dashed border-gray-200 rounded-xl">No hay gastos este mes.</p>`;
-            } else {
-                listProvEl.innerHTML = rankingGastos.map((prov, index) => {
-                    const esSinEspecificar = prov.nombre === 'Sin especificar';
-                    const iconBg = esSinEspecificar ? 'bg-gray-200' : 'bg-blue-50';
-                    const iconColor = esSinEspecificar ? 'text-gray-500' : 'text-blue-500';
-                    const icon = esSinEspecificar ? 'fa-tag' : 'fa-truck';
-                    return `
-                    <div class="flex justify-between items-center bg-gray-50 rounded-xl p-3 border border-gray-100">
-                        <div class="flex items-center gap-3">
-                            <span class="w-6 h-6 rounded-full ${iconBg} ${iconColor} flex items-center justify-center font-black text-xs shrink-0"><i class="fa-solid ${icon} text-[9px]"></i></span>
-                            <div>
-                                <p class="font-bold text-gray-800 text-sm leading-tight">${prov.nombre}</p>
-                                <p class="text-[11px] text-gray-500 font-medium">${prov.cantidad} ${prov.cantidad === 1 ? 'movimiento' : 'movimientos'}</p>
-                            </div>
-                        </div>
-                        <span class="font-black text-red-600 shrink-0">-${formatearDinero(prov.gastado)}</span>
-                    </div>
-                `}).join('');
             }
         }
 
@@ -1274,6 +1087,7 @@
         window.switchTab = function(tabName) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById(`content-${tabName}`).classList.remove('hidden');
+            
             document.querySelectorAll('.nav-btn').forEach(btn => {
                 btn.classList.remove('text-pipon-orange');
                 btn.classList.add('text-gray-400');
@@ -1290,6 +1104,9 @@
             }
             if (tabName === 'balances') {
                 renderGridBalances();
+            }
+            if (tabName === 'mayorista') {
+                renderMayorista();
             }
         };
 
@@ -1313,36 +1130,17 @@
             }
         };
 
-        window.abrirRegistroRetroactivo = function(tipo) {
-            window.fechaTransaccionManual = diaSeleccionadoFormat;
-            const modalId = tipo === 'venta' ? 'modalVenta' : 'modalGasto';
-            const bannerId = tipo === 'venta' ? 'banner-retro-venta' : 'banner-retro-gasto';
-            const fechaLabelId = tipo === 'venta' ? 'banner-retro-venta-fecha' : 'banner-retro-gasto-fecha';
-            
-            document.getElementById(bannerId).classList.remove('hidden');
-            document.getElementById(fechaLabelId).innerText = diaSeleccionadoFormat;
-            
-            openModal(modalId);
-        };
-
-        function obtenerFechaTransaccion() {
-            if (!window.fechaTransaccionManual) return new Date(); 
-            const partes = window.fechaTransaccionManual.split('/'); 
-            const d = new Date();
-            return new Date(partes[2], partes[1] - 1, partes[0], d.getHours(), d.getMinutes(), d.getSeconds());
-        }
-
         window.openModal = function(modalId) {
             const modal = document.getElementById(modalId);
             const modalContent = modal.querySelector('div');
             modal.classList.remove('hidden');
             modalContent.classList.remove('modal-exit');
             modalContent.classList.add('modal-enter');
+            
             setTimeout(() => { 
                 if(modalId === 'modalVenta') document.getElementById('venta-monto').focus();
                 else if(modalId === 'modalGasto') document.getElementById('gasto-monto').focus();
                 else if(modalId === 'modalProducto') document.getElementById('producto-nombre').focus();
-                else if(modalId === 'modalProveedor') document.getElementById('prov-nombre').focus();
             }, 300);
         };
 
@@ -1360,8 +1158,6 @@
                 document.getElementById('venta-metodo').value = "Efectivo";
                 document.querySelectorAll('.metodo-btn-venta')[0].className = "metodo-btn-venta border-2 border-green-500 bg-green-50 text-green-700 font-bold py-3 rounded-xl transition-all";
                 document.querySelectorAll('.metodo-btn-venta')[1].className = "metodo-btn-venta border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-xl transition-all";
-                document.getElementById('banner-retro-venta').classList.add('hidden');
-                window.fechaTransaccionManual = null;
             }
             if(modalId === 'modalGasto') {
                 document.getElementById('form-gasto').reset();
@@ -1369,15 +1165,23 @@
                 document.getElementById('gasto-metodo').value = "Efectivo";
                 document.querySelectorAll('.metodo-btn-gasto')[0].className = "metodo-btn-gasto border-2 border-red-500 bg-red-50 text-red-700 font-bold py-3 rounded-xl transition-all";
                 document.querySelectorAll('.metodo-btn-gasto')[1].className = "metodo-btn-gasto border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-xl transition-all";
-                document.getElementById('banner-retro-gasto').classList.add('hidden');
-                window.fechaTransaccionManual = null;
             }
-            if(modalId === 'modalProducto') { document.getElementById('form-producto').reset(); limpiarImagen('producto'); }
-            if(modalId === 'modalEditarProducto') { document.getElementById('form-editar-producto').reset(); limpiarImagen('edit-producto'); }
-            if(modalId === 'modalProveedor') { document.getElementById('form-proveedor').reset(); }
-            if(modalId === 'modalEditarProveedor') { document.getElementById('form-editar-proveedor').reset(); }
-            if(modalId === 'modalEditarGasto') { document.getElementById('form-editar-gasto').reset(); }
-            if(modalId === 'modalEditarVenta') { document.getElementById('form-editar-venta').reset(); }
+            if(modalId === 'modalProducto') {
+                document.getElementById('form-producto').reset();
+                limpiarImagen('producto');
+            }
+            if(modalId === 'modalEditarProducto') {
+                document.getElementById('form-editar-producto').reset();
+                limpiarImagen('edit-producto');
+            }
+            if(modalId === 'modalVenta') {
+                document.getElementById('form-pedido').reset();
+                document.getElementById('pedido-edit-id').value = '';
+                cantidadesPedido = {};
+            }
+            if(modalId === 'modalContacto') document.getElementById('form-contacto').reset();
+            if(modalId === 'modalPedidoDetalle') pedidoDetalleAbierto = null;
+            if(modalId === 'modalHistorialContacto') historialContactoAbierto = null;
         };
 
         window.seleccionarMetodo = function(tipo, metodo, elementoBtn) {
@@ -1393,171 +1197,49 @@
             }
         };
 
-        window.seleccionarProductoVenta = function() {
-            const select = document.getElementById('venta-producto');
-            const productId = select.value;
-            const inputMonto = document.getElementById('venta-monto');
-            
-            if(productId) {
-                const producto = productosData.find(p => p.id === productId);
-                if(producto) inputMonto.value = producto.precio;
-            } else { inputMonto.value = ''; }
-        };
-
         window.guardarVenta = async function(e) {
             e.preventDefault();
             const monto = document.getElementById('venta-monto').value;
             const selectProd = document.getElementById('venta-producto');
             let desc = "Venta General";
-            if (selectProd.value) { desc = selectProd.options[selectProd.selectedIndex].text; }
-            
+            if (selectProd.value) {
+                desc = selectProd.options[selectProd.selectedIndex].text;
+            }
             const metodo = document.getElementById('venta-metodo').value;
             const comprobante = document.getElementById('venta-comprobante-base64').value;
-            const fechaDeGuardado = obtenerFechaTransaccion();
             
             try {
                 const ventasRef = collection(db, 'negocio', 'pipon', 'ventas');
-                const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: fechaDeGuardado, eliminado: false };
+                const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: new Date() };
                 if(comprobante) data.comprobante = comprobante;
-                await addDoc(ventasRef, data);
+                
+                await crearDoc(ventasRef, data);
                 closeModal('modalVenta');
                 showToast('¡Venta guardada con éxito!', 'success');
-            } catch (error) { console.error(error); showToast('Error al guardar.', 'error'); }
-        };
-
-        window.abrirEditarVenta = function(id) {
-            const venta = ventasData.find(v => v.id === id);
-            if(!venta) return;
-            
-            document.getElementById('edit-venta-id').value = id;
-            document.getElementById('edit-venta-monto').value = venta.monto;
-            document.getElementById('edit-venta-desc').value = venta.descripcion;
-            
-            openModal('modalEditarVenta');
-        };
-
-        window.actualizarVenta = async function(e) {
-            e.preventDefault();
-            const id = document.getElementById('edit-venta-id').value;
-            const monto = document.getElementById('edit-venta-monto').value;
-            const desc = document.getElementById('edit-venta-desc').value;
-            
-            try {
-                const ventaRef = doc(db, 'negocio', 'pipon', 'ventas', id);
-                await updateDoc(ventaRef, { monto: Number(monto), descripcion: desc });
-                closeModal('modalEditarVenta');
-                showToast('Venta actualizada.', 'success'); 
-            } catch (error) { console.error(error); showToast('Error al actualizar.', 'error'); }
+            } catch (error) { 
+                console.error(error); 
+                showToast('Error al guardar. Revisa permisos.', 'error'); 
+            }
         };
 
         window.guardarGasto = async function(e) {
             e.preventDefault();
             const monto = document.getElementById('gasto-monto').value;
             const desc = document.getElementById('gasto-desc').value;
-            const proveedorSeleccionado = document.getElementById('gasto-proveedor').value;
             const metodo = document.getElementById('gasto-metodo').value;
             const comprobante = document.getElementById('gasto-comprobante-base64').value;
-            const fechaDeGuardado = obtenerFechaTransaccion();
             
             try {
                 const gastosRef = collection(db, 'negocio', 'pipon', 'gastos');
-                const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: fechaDeGuardado, eliminado: false };
-                if(proveedorSeleccionado) data.proveedor = proveedorSeleccionado;
+                const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: new Date() };
                 if(comprobante) data.comprobante = comprobante;
                 
-                await addDoc(gastosRef, data);
+                await crearDoc(gastosRef, data);
                 closeModal('modalGasto');
                 showToast('Gasto registrado correctamente.', 'success'); 
-            } catch (error) { console.error(error); showToast('Error al guardar.', 'error'); }
-        };
-
-        window.abrirEditarGasto = function(id) {
-            const gasto = gastosData.find(g => g.id === id);
-            if(!gasto) return;
-            
-            document.getElementById('edit-gasto-id').value = id;
-            document.getElementById('edit-gasto-monto').value = gasto.monto;
-            document.getElementById('edit-gasto-desc').value = gasto.descripcion;
-            
-            const selectProv = document.getElementById('edit-gasto-proveedor');
-            let opcionesHtml = `<option value="">Sin Especificar / Otro</option>`;
-            proveedoresData.forEach(p => { 
-                const isSelected = (gasto.proveedor === p.nombre) ? 'selected' : '';
-                opcionesHtml += `<option value="${p.nombre}" ${isSelected}>${p.nombre}</option>`; 
-            });
-            selectProv.innerHTML = opcionesHtml;
-            
-            openModal('modalEditarGasto');
-        };
-
-        window.actualizarGasto = async function(e) {
-            e.preventDefault();
-            const id = document.getElementById('edit-gasto-id').value;
-            const monto = document.getElementById('edit-gasto-monto').value;
-            const desc = document.getElementById('edit-gasto-desc').value;
-            const prov = document.getElementById('edit-gasto-proveedor').value;
-            
-            try {
-                const gastoRef = doc(db, 'negocio', 'pipon', 'gastos', id);
-                const data = { monto: Number(monto), descripcion: desc };
-                if(prov) data.proveedor = prov; else data.proveedor = ""; 
-                
-                await updateDoc(gastoRef, data);
-                closeModal('modalEditarGasto');
-                showToast('Gasto actualizado.', 'success'); 
-            } catch (error) { console.error(error); showToast('Error al actualizar.', 'error'); }
-        };
-
-        window.confirmarEliminarTransaccion = function(tipo) {
-            const id = tipo === 'venta' ? document.getElementById('edit-venta-id').value : document.getElementById('edit-gasto-id').value;
-            transaccionAEliminar = { id: id, tipo: tipo };
-            
-            const modal = document.getElementById('modalConfirmDeleteTransaccion');
-            const content = document.getElementById('modalConfirmDeleteTransaccionContent');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            setTimeout(() => {
-                modal.classList.remove('opacity-0');
-                content.classList.remove('scale-95');
-            }, 10);
-        };
-
-        window.cerrarConfirmDeleteTransaccion = function() {
-            const modal = document.getElementById('modalConfirmDeleteTransaccion');
-            const content = document.getElementById('modalConfirmDeleteTransaccionContent');
-            modal.classList.add('opacity-0');
-            content.classList.add('scale-95');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-                transaccionAEliminar = { id: null, tipo: null };
-            }, 300);
-        };
-
-        document.getElementById('btn-confirm-delete-transaccion').addEventListener('click', async () => {
-            if(!transaccionAEliminar.id) return;
-            try {
-                const coleccion = transaccionAEliminar.tipo === 'venta' ? 'ventas' : 'gastos';
-                const docRef = doc(db, 'negocio', 'pipon', coleccion, transaccionAEliminar.id);
-                await updateDoc(docRef, { eliminado: true });
-                
-                cerrarConfirmDeleteTransaccion();
-                closeModal(transaccionAEliminar.tipo === 'venta' ? 'modalEditarVenta' : 'modalEditarGasto');
-                showToast('Movimiento movido a papelera.', 'info');
-            } catch (error) {
-                console.error(error);
-                showToast('Error al eliminar movimiento.', 'error');
-            }
-        });
-
-        window.restaurarTransaccion = async function(id, tipo) {
-             try {
-                const docRef = doc(db, 'negocio', 'pipon', tipo, id);
-                await updateDoc(docRef, { eliminado: false });
-                showToast('Movimiento restaurado con éxito.', 'success');
-            } catch (error) {
-                console.error(error);
-                showToast('Error al restaurar.', 'error');
+            } catch (error) { 
+                console.error(error); 
+                showToast('Error al guardar. Revisa permisos.', 'error'); 
             }
         };
 
@@ -1571,10 +1253,14 @@
                 const productosRef = collection(db, 'negocio', 'pipon', 'productos');
                 const data = { nombre: nombre, precio: Number(precio), timestamp: new Date() };
                 if(foto) data.foto = foto;
-                await addDoc(productosRef, data);
+                
+                await crearDoc(productosRef, data);
                 closeModal('modalProducto');
                 showToast('Producto agregado al catálogo.', 'success'); 
-            } catch (error) { console.error(error); showToast('Error al guardar.', 'error'); }
+            } catch (error) { 
+                console.error(error); 
+                showToast('Error al guardar. Revisa permisos.', 'error'); 
+            }
         };
 
         window.abrirEditarProducto = function(id) {
@@ -1588,9 +1274,12 @@
             if(prod.foto) {
                 document.getElementById('edit-producto-comprobante-base64').value = prod.foto;
                 document.getElementById('edit-producto-comprobante-label').innerText = "Foto guardada ✓";
-                document.getElementById('edit-producto-comprobante-label').parentElement.classList.add('border-pipon-orange', 'bg-pipon-yellow', 'text-pipon-brown');
+                const labelParent = document.getElementById('edit-producto-comprobante-label').parentElement;
+                labelParent.classList.add('border-pipon-orange', 'bg-pipon-yellow', 'text-pipon-brown');
                 document.getElementById('edit-producto-comprobante-clear').classList.remove('hidden');
-            } else { limpiarImagen('edit-producto'); }
+            } else {
+                limpiarImagen('edit-producto');
+            }
             
             openModal('modalEditarProducto');
         };
@@ -1605,100 +1294,18 @@
             try {
                 const prodRef = doc(db, 'negocio', 'pipon', 'productos', id);
                 const data = { nombre: nombre, precio: Number(precio) };
-                if(foto) data.foto = foto; else data.foto = ""; 
                 
-                await updateDoc(prodRef, data);
+                if(foto) data.foto = foto;
+                else data.foto = ""; 
+                
+                await actualizarDoc(prodRef, data);
                 closeModal('modalEditarProducto');
                 showToast('Producto actualizado.', 'success'); 
-            } catch (error) { console.error(error); showToast('Error al actualizar.', 'error'); }
-        };
-
-        window.guardarProveedor = async function(e) {
-            e.preventDefault();
-            const nombre = document.getElementById('prov-nombre').value;
-            const telefono = document.getElementById('prov-telefono').value;
-            const detalle = document.getElementById('prov-detalle').value;
-            
-            try {
-                const provRef = collection(db, 'negocio', 'pipon', 'proveedores');
-                const data = { nombre: nombre, timestamp: new Date() };
-                if(telefono) data.telefono = telefono;
-                if(detalle) data.detalle = detalle;
-                
-                await addDoc(provRef, data);
-                closeModal('modalProveedor');
-                showToast('Proveedor guardado.', 'info'); 
-            } catch (error) { console.error(error); showToast('Error al guardar.', 'error'); }
-        };
-
-        window.abrirEditarProveedor = function(id) {
-            const prov = proveedoresData.find(p => p.id === id);
-            if(!prov) return;
-            
-            document.getElementById('edit-prov-id').value = id;
-            document.getElementById('edit-prov-nombre').value = prov.nombre;
-            document.getElementById('edit-prov-telefono').value = prov.telefono || '';
-            document.getElementById('edit-prov-detalle').value = prov.detalle || '';
-            
-            openModal('modalEditarProveedor');
-        };
-
-        window.actualizarProveedor = async function(e) {
-            e.preventDefault();
-            const id = document.getElementById('edit-prov-id').value;
-            const nombre = document.getElementById('edit-prov-nombre').value;
-            const telefono = document.getElementById('edit-prov-telefono').value;
-            const detalle = document.getElementById('edit-prov-detalle').value;
-            
-            try {
-                const provRef = doc(db, 'negocio', 'pipon', 'proveedores', id);
-                const data = { nombre: nombre };
-                if(telefono) data.telefono = telefono; else data.telefono = "";
-                if(detalle) data.detalle = detalle; else data.detalle = "";
-                
-                await updateDoc(provRef, data);
-                closeModal('modalEditarProveedor');
-                showToast('Proveedor actualizado.', 'success'); 
-            } catch (error) { console.error(error); showToast('Error al actualizar.', 'error'); }
-        };
-
-        window.confirmarEliminarProveedor = function() {
-            proveedorAEliminar = document.getElementById('edit-prov-id').value;
-            const modal = document.getElementById('modalConfirmDelete');
-            const content = document.getElementById('modalConfirmDeleteContent');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            setTimeout(() => {
-                modal.classList.remove('opacity-0');
-                content.classList.remove('scale-95');
-            }, 10);
-        };
-
-        window.cerrarConfirmDelete = function() {
-            const modal = document.getElementById('modalConfirmDelete');
-            const content = document.getElementById('modalConfirmDeleteContent');
-            modal.classList.add('opacity-0');
-            content.classList.add('scale-95');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-                proveedorAEliminar = null;
-            }, 300);
-        };
-
-        document.getElementById('btn-confirm-delete').addEventListener('click', async () => {
-            if(!proveedorAEliminar) return;
-            try {
-                const provRef = doc(db, 'negocio', 'pipon', 'proveedores', proveedorAEliminar);
-                await deleteDoc(provRef);
-                cerrarConfirmDelete();
-                closeModal('modalEditarProveedor');
-                showToast('Proveedor eliminado con éxito.', 'success');
-            } catch (error) {
-                console.error(error);
-                showToast('Error al eliminar proveedor.', 'error');
+            } catch (error) { 
+                console.error(error); 
+                showToast('Error al actualizar. Revisa permisos.', 'error'); 
             }
-        });
+        };
 
         window.procesarImagen = function(tipo, inputElement) {
             const file = inputElement.files[0];
@@ -1709,9 +1316,13 @@
                 document.getElementById(`${tipo}-comprobante-base64`).value = e.target.result;
                 const labelStr = (tipo === 'producto' || tipo === 'edit-producto') ? 'Foto lista ✓' : 'Imagen adjunta ✓';
                 document.getElementById(`${tipo}-comprobante-label`).innerText = labelStr;
+                
                 const labelParent = document.getElementById(`${tipo}-comprobante-label`).parentElement;
-                if(tipo === 'producto' || tipo === 'edit-producto') labelParent.classList.add('border-pipon-orange', 'bg-pipon-yellow', 'text-pipon-brown');
-                else labelParent.classList.add('border-green-500', 'bg-green-50', 'text-green-600');
+                if(tipo === 'producto' || tipo === 'edit-producto') {
+                    labelParent.classList.add('border-pipon-orange', 'bg-pipon-yellow', 'text-pipon-brown');
+                } else {
+                    labelParent.classList.add('border-green-500', 'bg-green-50', 'text-green-600');
+                }
                 document.getElementById(`${tipo}-comprobante-clear`).classList.remove('hidden');
             };
             reader.readAsDataURL(file); 
@@ -1720,13 +1331,19 @@
         window.limpiarImagen = function(tipo) {
             document.getElementById(`${tipo}-comprobante`).value = ""; 
             document.getElementById(`${tipo}-comprobante-base64`).value = ""; 
+            
             let labelStr = 'Adjuntar foto/captura';
             if (tipo === 'producto') labelStr = 'Subir foto del producto';
             if (tipo === 'edit-producto') labelStr = 'Cambiar foto';
+            
             document.getElementById(`${tipo}-comprobante-label`).innerText = labelStr;
             const labelParent = document.getElementById(`${tipo}-comprobante-label`).parentElement;
-            if(tipo === 'producto' || tipo === 'edit-producto') labelParent.classList.remove('border-pipon-orange', 'bg-pipon-yellow', 'text-pipon-brown');
-            else labelParent.classList.remove('border-green-500', 'bg-green-50', 'text-green-600');
+            
+            if(tipo === 'producto' || tipo === 'edit-producto') {
+                labelParent.classList.remove('border-pipon-orange', 'bg-pipon-yellow', 'text-pipon-brown');
+            } else {
+                labelParent.classList.remove('border-green-500', 'bg-green-50', 'text-green-600');
+            }
             document.getElementById(`${tipo}-comprobante-clear`).classList.add('hidden');
         };
 
@@ -1748,44 +1365,885 @@
             setTimeout(() => { document.getElementById('imagen-comprobante-vista').src = ""; }, 300);
         };
 
-        async function inicializar() {
-            try {
-                await signInAnonymously(auth);
+        // ================= MAYORISTA =================
+        const ESTADOS_PEDIDO = {
+            pendiente:   { texto: 'Pendiente',      clases: 'bg-amber-100 text-amber-700', icono: 'fa-inbox' },
+            preparacion: { texto: 'En preparación', clases: 'bg-blue-100 text-blue-700',   icono: 'fa-fire-burner' },
+            listo:       { texto: 'Listo',          clases: 'bg-green-100 text-green-700', icono: 'fa-circle-check' },
+            entregado:   { texto: 'Entregado',      clases: 'bg-gray-100 text-gray-600',   icono: 'fa-handshake' },
+            cancelado:   { texto: 'Cancelado',      clases: 'bg-red-100 text-red-600',     icono: 'fa-ban' }
+        };
+        const ESTADOS_ACTIVOS = ['pendiente', 'preparacion', 'listo'];
+        const DESCUENTOS = [0, 5, 10, 15];
 
+        let subTabMayorista = 'pedidos';
+        let gruposHistorialMayorista = {};
+        let productosFormPedido = [];
+        let cantidadesPedido = {};
+        let pedidoDetalleAbierto = null;
+        let historialContactoAbierto = null;
+        let guardandoPedido = false;
+
+        const refMayoristas = () => collection(db, 'negocio', 'pipon', 'mayoristas');
+        const refPedidos = () => collection(db, 'negocio', 'pipon', 'pedidos');
+        const refPedido = (id) => doc(db, 'negocio', 'pipon', 'pedidos', id);
+
+        // Teléfonos de Argentina para wa.me: 549 + código de área + número (sin 0 ni 15)
+        const normalizarTelefono = (tel) => {
+            let n = String(tel || '').replace(/\D/g, '').replace(/^0+/, '');
+            if (!n) return '';
+            if (n.startsWith('549')) return n;
+            if (n.startsWith('54')) return '549' + n.slice(2);
+            return '549' + n;
+        };
+        const linkWhatsApp = (tel, texto = '') => {
+            const n = normalizarTelefono(tel);
+            if (!n) return '';
+            return `https://wa.me/${n}${texto ? '?text=' + encodeURIComponent(texto) : ''}`;
+        };
+        const linkPedido = (contactoId = null) => {
+            const url = new URL('pedido.html', location.href);
+            url.search = '';
+            if (contactoId) url.searchParams.set('c', contactoId);
+            if (MODO_PRUEBA) url.searchParams.set('prueba', '1');
+            return url.toString();
+        };
+
+        const calcularTotalesPedido = (items, descuento) => {
+            const unidades = items.reduce((s, it) => s + Number(it.cantidad), 0);
+            const subtotal = items.reduce((s, it) => s + Number(it.cantidad) * Number(it.precio), 0);
+            const pct = Number(descuento) || 0;
+            const montoDescuento = Math.round(subtotal * pct / 100);
+            return { unidades, subtotal, descuento: pct, montoDescuento, total: subtotal - montoDescuento };
+        };
+
+        // Un pedido se asocia a su contacto por ID o, si vino por el link general, por teléfono
+        const contactoDePedido = (p) => {
+            const porId = p.mayoristaId && mayoristasData.find(m => m.id === p.mayoristaId);
+            if (porId) return porId;
+            const tel = normalizarTelefono(p.mayoristaTelefono);
+            return tel ? mayoristasData.find(m => normalizarTelefono(m.telefono) === tel) || null : null;
+        };
+        const claveContactoPedido = (p) => contactoDePedido(p)?.id || `sin:${normalizarTelefono(p.mayoristaTelefono) || p.mayoristaNombre || p.id}`;
+        const nombrePedido = (p) => contactoDePedido(p)?.nombre || p.mayoristaNombre || 'Sin nombre';
+        const telefonoPedido = (p) => contactoDePedido(p)?.telefono || p.mayoristaTelefono || '';
+
+        const estadisticasContacto = (m) => {
+            const pedidos = pedidosData.filter(p => p.estado !== 'cancelado' && contactoDePedido(p)?.id === m.id);
+            const ultima = pedidos.reduce((max, p) => {
+                const f = aFecha(p.timestamp);
+                return f && (!max || f > max) ? f : max;
+            }, null);
+            const referencia = ultima || aFecha(m.creado);
+            const dias = referencia ? diasEntre(referencia, new Date()) : 0;
+            const alerta = Number(m.diasAviso) > 0 && dias >= Number(m.diasAviso);
+            return { compras: pedidos.length, ultima, dias, alerta };
+        };
+
+        const chipEstado = (estado) => {
+            const e = ESTADOS_PEDIDO[estado] || ESTADOS_PEDIDO.pendiente;
+            return `<span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${e.clases}"><i class="fa-solid ${e.icono} mr-1"></i>${e.texto}</span>`;
+        };
+        const resumenItemsCorto = (p) => (p.items || []).map(it => `${it.cantidad} ${it.nombre}`).join(' · ');
+        const resumenItemsTexto = (p) => (p.items || []).map(it => `• ${it.cantidad} x ${it.nombre}`).join('\n');
+
+        const mensajePedido = (tipo, p) => {
+            const nombre = nombrePedido(p);
+            if (tipo === 'preparacion') {
+                return `¡Hola ${nombre}! 🥪\nGracias por tu compra. Tu pedido se encuentra realizándose:\n\n${resumenItemsTexto(p)}\n\nTotal: ${formatearDinero(p.total)}\n\nTe avisamos apenas esté listo. ¡Gracias por elegir Pipón!`;
+            }
+            return `¡Hola ${nombre}! 🎉\n¡Tu pedido ya se encuentra listo!\n\n${resumenItemsTexto(p)}\n\nTotal: ${formatearDinero(p.total)}\n\n¡Gracias por elegir Pipón!`;
+        };
+        const mensajeRecordatorio = (m) => `¡Hola ${m.nombre}! 👋 ¿Cómo estás? Te escribimos de Pipón 🥪 para saber si querés hacer un pedido. Podés armarlo acá:\n${linkPedido(m.id)}`;
+        const mensajeLinkPedido = (m) => `¡Hola ${m.nombre}! 👋 Te compartimos tu link para hacer pedidos mayoristas en Pipón 🥪\n${linkPedido(m.id)}\n\nElegís los productos y cantidades, y el pedido nos llega directo.`;
+
+        // ---------- Pestaña Mayorista ----------
+        window.switchSubTabMayorista = function(sub) {
+            subTabMayorista = sub;
+            renderMayorista();
+        };
+
+        window.irAMayorista = function(sub) {
+            subTabMayorista = sub;
+            switchTab('mayorista');
+        };
+
+        function renderMayorista() {
+            const activos = pedidosData.filter(p => ESTADOS_ACTIVOS.includes(p.estado));
+            const alertas = mayoristasData.filter(m => estadisticasContacto(m).alerta).length;
+
+            const subtabs = [
+                { id: 'pedidos', texto: 'Pedidos', icono: 'fa-clipboard-list', badge: activos.length, color: 'bg-violet-600' },
+                { id: 'historial', texto: 'Historial', icono: 'fa-clock-rotate-left', badge: 0 },
+                { id: 'contactos', texto: 'Contactos', icono: 'fa-address-book', badge: alertas, color: 'bg-red-500' }
+            ];
+            document.getElementById('subtabs-mayorista').innerHTML = subtabs.map(s => {
+                const activa = subTabMayorista === s.id;
+                const badge = s.badge ? `<span class="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] flex items-center justify-center ${activa ? 'bg-white text-violet-700' : s.color + ' text-white'}">${s.badge}</span>` : '';
+                return `<button onclick="switchSubTabMayorista('${s.id}')" class="py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${activa ? 'bg-violet-600 text-white shadow-sm' : 'text-gray-500'}"><i class="fa-solid ${s.icono}"></i>${s.texto}${badge}</button>`;
+            }).join('');
+
+            document.querySelectorAll('.subtab-mayorista').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`mayorista-${subTabMayorista}`).classList.remove('hidden');
+
+            renderPedidosMayorista(activos);
+            renderHistorialMayorista();
+            renderContactosMayorista();
+        }
+
+        function renderPedidosMayorista(activos) {
+            const cont = document.getElementById('mayorista-pedidos');
+            if (!activos.length) {
+                cont.innerHTML = `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm"><i class="fa-solid fa-clipboard-check text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium">No hay pedidos por realizar.</p></div>`;
+                return;
+            }
+            const orden = { pendiente: 0, preparacion: 1, listo: 2 };
+            activos.sort((a, b) => orden[a.estado] - orden[b.estado] || (aFecha(a.timestamp)?.getTime() || 0) - (aFecha(b.timestamp)?.getTime() || 0));
+
+            const aPreparar = {};
+            activos.filter(p => p.estado !== 'listo').forEach(p => (p.items || []).forEach(it => {
+                aPreparar[it.nombre] = (aPreparar[it.nombre] || 0) + Number(it.cantidad);
+            }));
+            const filas = Object.entries(aPreparar).sort((a, b) => b[1] - a[1]);
+
+            let html = '';
+            if (filas.length) {
+                html += `
+                    <div class="bg-white rounded-2xl p-4 shadow-sm border border-violet-100 mb-4 relative overflow-hidden">
+                        <div class="absolute top-0 left-0 w-full h-1 bg-violet-500"></div>
+                        <h3 class="font-bold text-gray-800 text-sm mb-3 flex items-center gap-2"><i class="fa-solid fa-kitchen-set text-violet-500"></i> Total a preparar</h3>
+                        <div class="flex flex-col gap-1.5">
+                            ${filas.map(([nombre, cant]) => `<div class="flex justify-between text-sm"><span class="text-gray-600 font-medium">${escaparHtml(nombre)}</span><span class="font-black text-violet-700">${cant} u.</span></div>`).join('')}
+                        </div>
+                    </div>`;
+            }
+            html += `<div class="flex flex-col gap-3 pb-8">${activos.map(p => `
+                <button onclick="verDetallePedido('${p.id}')" class="w-full text-left bg-white rounded-xl p-4 shadow-sm border-l-4 border-l-violet-500 active:bg-gray-50 transition-colors">
+                    <div class="flex justify-between items-start gap-3">
+                        <div class="min-w-0">
+                            <p class="font-bold text-gray-800 truncate">${escaparHtml(nombrePedido(p))}</p>
+                            <p class="text-xs text-gray-400 mt-0.5"><i class="fa-regular fa-clock"></i> ${formatearFechaHora(p.timestamp)}${p.origen === 'link' ? ' · <i class="fa-solid fa-link"></i> vía link' : ''}</p>
+                            <p class="text-xs text-gray-500 mt-1 truncate">${escaparHtml(resumenItemsCorto(p))}</p>
+                        </div>
+                        <div class="text-right shrink-0">
+                            ${chipEstado(p.estado)}
+                            <p class="font-black text-violet-700 text-lg mt-1">${formatearDinero(p.total)}</p>
+                            <p class="text-[11px] text-gray-400 font-bold">${p.unidades} u.</p>
+                        </div>
+                    </div>
+                </button>`).join('')}</div>`;
+            cont.innerHTML = html;
+        }
+
+        function renderHistorialMayorista() {
+            const cont = document.getElementById('mayorista-historial');
+            const grupos = {};
+            pedidosData.filter(p => p.estado !== 'cancelado').forEach(p => {
+                const clave = claveContactoPedido(p);
+                (grupos[clave] ||= { clave, nombre: nombrePedido(p), pedidos: [] }).pedidos.push(p);
+            });
+            gruposHistorialMayorista = grupos;
+
+            const lista = Object.values(grupos).map(g => ({
+                ...g,
+                ultima: g.pedidos.reduce((max, p) => Math.max(max, aFecha(p.timestamp)?.getTime() || 0), 0),
+                unidades: g.pedidos.reduce((s, p) => s + (Number(p.unidades) || 0), 0),
+                total: g.pedidos.reduce((s, p) => s + (Number(p.total) || 0), 0)
+            })).sort((a, b) => b.ultima - a.ultima);
+
+            if (!lista.length) {
+                cont.innerHTML = `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm"><i class="fa-solid fa-clock-rotate-left text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium">Todavía no hay compras mayoristas.</p></div>`;
+                return;
+            }
+            cont.innerHTML = `<div class="flex flex-col gap-3 pb-8">${lista.map(g => `
+                <button data-clave="${escaparHtml(g.clave)}" onclick="verHistorialContacto(this.dataset.clave)" class="w-full text-left bg-white rounded-xl p-4 shadow-sm border border-gray-100 active:bg-gray-50 transition-colors flex justify-between items-center gap-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-10 h-10 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center font-black shrink-0">${escaparHtml(g.nombre.charAt(0).toUpperCase())}</div>
+                        <div class="min-w-0">
+                            <p class="font-bold text-gray-800 truncate">${escaparHtml(g.nombre)}</p>
+                            <p class="text-[11px] text-gray-500 font-medium">${plural(g.pedidos.length, 'compra', 'compras')} · ${g.unidades} u. · Última: ${formatearFecha(new Date(g.ultima))}</p>
+                        </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <p class="font-black text-violet-700">${formatearDinero(g.total)}</p>
+                        <i class="fa-solid fa-chevron-right text-gray-300 text-xs"></i>
+                    </div>
+                </button>`).join('')}</div>`;
+        }
+
+        function renderContactosMayorista() {
+            const cont = document.getElementById('mayorista-contactos');
+            const encabezado = `
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <button onclick="abrirContacto()" class="bg-violet-600 text-white font-bold py-3 rounded-xl text-sm shadow-sm active:scale-95 transition-all"><i class="fa-solid fa-user-plus mr-1.5"></i>Nuevo contacto</button>
+                    <button onclick="copiarLinkPedido()" class="bg-white border border-violet-200 text-violet-700 font-bold py-3 rounded-xl text-sm active:scale-95 transition-all"><i class="fa-solid fa-link mr-1.5"></i>Link general</button>
+                </div>`;
+
+            if (!mayoristasData.length) {
+                cont.innerHTML = encabezado + `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm"><i class="fa-solid fa-address-book text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium">Todavía no cargaste contactos mayoristas.</p></div>`;
+                return;
+            }
+
+            const lista = mayoristasData.map(m => ({ m, est: estadisticasContacto(m) }))
+                .sort((a, b) => (b.est.alerta - a.est.alerta) || a.m.nombre.localeCompare(b.m.nombre));
+
+            cont.innerHTML = encabezado + `<div class="flex flex-col gap-3 pb-8">${lista.map(({ m, est }) => {
+                const wa = linkWhatsApp(m.telefono);
+                return `
+                <div class="rounded-2xl p-4 shadow-sm border ${est.alerta ? 'border-red-300 bg-red-50/50' : 'border-gray-100 bg-white'}">
+                    <div class="flex justify-between items-start gap-3">
+                        <button onclick="abrirContacto('${m.id}')" class="text-left min-w-0">
+                            <p class="font-bold text-gray-800 truncate">${escaparHtml(m.nombre)} ${m.descuento ? `<span class="text-[10px] bg-violet-100 text-violet-700 font-black px-1.5 py-0.5 rounded align-middle">-${m.descuento}%</span>` : ''}</p>
+                            <p class="text-xs text-gray-400 font-medium">${escaparHtml(m.telefono || 'Sin WhatsApp')}</p>
+                        </button>
+                        ${wa ? `<a href="${wa}" target="_blank" class="w-10 h-10 bg-green-500 text-white rounded-full flex items-center justify-center text-xl shrink-0 shadow-sm active:scale-95 transition-transform"><i class="fa-brands fa-whatsapp"></i></a>` : ''}
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 mt-3 text-center">
+                        <div class="bg-gray-50 rounded-lg p-2">
+                            <p class="text-lg font-black text-gray-800">${est.compras}</p>
+                            <p class="text-[9px] uppercase font-bold text-gray-400 leading-tight">Compras</p>
+                        </div>
+                        <div class="${est.alerta ? 'bg-red-100' : 'bg-gray-50'} rounded-lg p-2">
+                            <p class="text-lg font-black ${est.alerta ? 'text-red-600' : 'text-gray-800'}">${est.dias}</p>
+                            <p class="text-[9px] uppercase font-bold ${est.alerta ? 'text-red-500' : 'text-gray-400'} leading-tight">${est.ultima ? 'Días sin comprar' : 'Días sin 1ª compra'}</p>
+                        </div>
+                        <button onclick="abrirContacto('${m.id}')" class="bg-gray-50 rounded-lg p-2">
+                            <p class="text-lg font-black text-gray-800">${m.diasAviso || '—'}</p>
+                            <p class="text-[9px] uppercase font-bold text-gray-400 leading-tight">Avisar a los (días)</p>
+                        </button>
+                    </div>
+                    ${est.alerta && wa ? `<a href="${linkWhatsApp(m.telefono, mensajeRecordatorio(m))}" target="_blank" class="mt-3 flex items-center justify-center gap-2 bg-red-500 text-white font-bold py-2.5 rounded-xl text-sm active:scale-95 transition-all"><i class="fa-brands fa-whatsapp"></i> Pasaron ${est.dias} días · Escribirle</a>` : ''}
+                    ${est.alerta && !wa ? `<p class="mt-3 text-center text-xs font-bold text-red-500">Pasaron ${est.dias} días sin comprar (cargale un WhatsApp para escribirle)</p>` : ''}
+                </div>`;
+            }).join('')}</div>`;
+        }
+
+        function renderAlertasInicio() {
+            const cont = document.getElementById('alertas-mayorista');
+            const nuevos = pedidosData.filter(p => p.estado === 'pendiente').length;
+            const inactivos = mayoristasData.filter(m => estadisticasContacto(m).alerta);
+            const totalAvisos = nuevos + inactivos.length;
+
+            const badge = document.getElementById('badge-mayorista');
+            badge.innerText = totalAvisos;
+            badge.classList.toggle('hidden', totalAvisos === 0);
+            badge.classList.toggle('flex', totalAvisos > 0);
+
+            let html = '';
+            if (nuevos) {
+                html += `<button onclick="irAMayorista('pedidos')" class="w-full text-left bg-violet-600 text-white rounded-2xl p-4 flex items-center gap-3 shadow-md active:scale-95 transition-all">
+                    <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><i class="fa-solid fa-inbox"></i></div>
+                    <div class="flex-1"><p class="font-bold">${plural(nuevos, 'pedido mayorista nuevo', 'pedidos mayoristas nuevos')}</p><p class="text-xs text-white/80">Tocá para verlos y empezar a prepararlos</p></div>
+                    <i class="fa-solid fa-chevron-right text-white/70"></i>
+                </button>`;
+            }
+            if (inactivos.length) {
+                html += `<button onclick="irAMayorista('contactos')" class="w-full text-left bg-red-500 text-white rounded-2xl p-4 flex items-center gap-3 shadow-md active:scale-95 transition-all">
+                    <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><i class="fa-solid fa-bell"></i></div>
+                    <div class="flex-1 min-w-0"><p class="font-bold">${plural(inactivos.length, 'mayorista sin comprar', 'mayoristas sin comprar')}</p><p class="text-xs text-white/80 truncate">${escaparHtml(inactivos.map(m => m.nombre).join(', '))}</p></div>
+                    <i class="fa-solid fa-chevron-right text-white/70"></i>
+                </button>`;
+            }
+            cont.innerHTML = html;
+            cont.classList.toggle('hidden', !html);
+            cont.classList.toggle('flex', !!html);
+        }
+
+        // ---------- Formulario de pedido (dentro de "Registrar Venta") ----------
+        window.elegirDescuento = function(prefijo, valor) {
+            document.getElementById(`${prefijo}-descuento`).value = valor;
+            document.querySelectorAll(`.desc-btn-${prefijo}`).forEach(btn => {
+                const activo = Number(btn.dataset.valor) === Number(valor);
+                btn.className = `desc-btn-${prefijo} border-2 font-bold py-2.5 rounded-xl text-sm transition-all ${activo ? 'border-violet-500 bg-violet-50 text-violet-700' : 'border-gray-200 text-gray-500'}`;
+            });
+            if (prefijo === 'pedido') renderResumenPedido();
+        };
+
+        function inicializarBotonesDescuento() {
+            ['pedido', 'contacto'].forEach(prefijo => {
+                document.getElementById(`${prefijo}-descuento-btns`).innerHTML = DESCUENTOS.map(d =>
+                    `<button type="button" data-valor="${d}" onclick="elegirDescuento('${prefijo}', ${d})" class="desc-btn-${prefijo}">${d ? d + '%' : 'Sin desc.'}</button>`
+                ).join('');
+                elegirDescuento(prefijo, 0);
+            });
+        }
+
+        window.abrirVenta = function(tipo = 'minorista') {
+            document.getElementById('pedido-edit-id').value = '';
+            seleccionarTipoVenta(tipo);
+            openModal('modalVenta');
+        };
+
+        window.seleccionarTipoVenta = function(tipo) {
+            const esMayorista = tipo === 'mayorista';
+            const editando = !!document.getElementById('pedido-edit-id').value;
+            document.getElementById('form-venta').classList.toggle('hidden', esMayorista);
+            document.getElementById('form-pedido').classList.toggle('hidden', !esMayorista);
+            document.getElementById('selector-tipo-venta').classList.toggle('hidden', editando);
+
+            const titulo = document.getElementById('titulo-modal-venta');
+            titulo.innerText = editando ? 'Editar Pedido' : (esMayorista ? 'Pedido Mayorista' : 'Registrar Venta');
+            titulo.className = `text-2xl font-black ${esMayorista ? 'text-violet-600' : 'text-green-600'}`;
+
+            const base = 'py-2.5 rounded-xl font-bold text-sm transition-all';
+            document.getElementById('tipo-btn-minorista').className = `${base} ${!esMayorista ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500'}`;
+            document.getElementById('tipo-btn-mayorista').className = `${base} ${esMayorista ? 'bg-white text-violet-600 shadow-sm' : 'text-gray-500'}`;
+            document.getElementById('pedido-submit').innerText = editando ? 'Guardar Cambios' : 'Crear Pedido';
+
+            if (esMayorista && !editando) prepararFormPedido(null);
+        };
+
+        function prepararFormPedido(pedido) {
+            cantidadesPedido = {};
+            productosFormPedido = productosData.map(p => ({ id: p.id, nombre: p.nombre, precio: Number(p.precio), foto: p.foto }));
+            if (pedido) {
+                (pedido.items || []).forEach(it => {
+                    const clave = it.productoId || `item:${it.nombre}`;
+                    const existente = productosFormPedido.find(p => p.id === clave);
+                    if (existente) existente.precio = Number(it.precio);
+                    else productosFormPedido.push({ id: clave, nombre: it.nombre, precio: Number(it.precio) });
+                    cantidadesPedido[clave] = Number(it.cantidad);
+                });
+            }
+
+            const contacto = pedido ? contactoDePedido(pedido) : null;
+            renderOpcionesContactoPedido(pedido ? (contacto ? contacto.id : '__nuevo__') : '');
+            document.getElementById('pedido-nuevo-nombre').value = pedido && !contacto ? (pedido.mayoristaNombre || '') : '';
+            document.getElementById('pedido-nuevo-telefono').value = pedido && !contacto ? (pedido.mayoristaTelefono || '') : '';
+            document.getElementById('pedido-notas').value = pedido?.notas || '';
+            elegirDescuento('pedido', pedido ? (pedido.descuento || 0) : 0);
+            renderProductosPedido();
+        }
+
+        function renderOpcionesContactoPedido(valor) {
+            const select = document.getElementById('pedido-contacto');
+            const ordenados = [...mayoristasData].sort((a, b) => a.nombre.localeCompare(b.nombre));
+            select.innerHTML = `<option value="">Elegí un contacto...</option>`
+                + ordenados.map(m => `<option value="${m.id}">${escaparHtml(m.nombre)}${m.descuento ? ` (-${m.descuento}%)` : ''}</option>`).join('')
+                + `<option value="__nuevo__">➕ Nuevo contacto</option>`;
+            select.value = valor || '';
+            mostrarNuevoContactoPedido();
+        }
+
+        function mostrarNuevoContactoPedido() {
+            const esNuevo = document.getElementById('pedido-contacto').value === '__nuevo__';
+            const box = document.getElementById('pedido-nuevo-contacto');
+            box.classList.toggle('hidden', !esNuevo);
+            box.classList.toggle('flex', esNuevo);
+        }
+
+        window.seleccionarContactoPedido = function() {
+            mostrarNuevoContactoPedido();
+            const m = mayoristasData.find(x => x.id === document.getElementById('pedido-contacto').value);
+            elegirDescuento('pedido', m ? (m.descuento || 0) : 0);
+        };
+
+        function renderProductosPedido() {
+            const cont = document.getElementById('pedido-productos');
+            if (!productosFormPedido.length) {
+                cont.innerHTML = `<p class="text-sm text-gray-400 text-center py-4 border border-dashed border-gray-200 rounded-xl">Primero cargá productos en el Catálogo.</p>`;
+            } else {
+                cont.innerHTML = productosFormPedido.map(p => {
+                    const cant = cantidadesPedido[p.id] || 0;
+                    return `
+                    <div class="flex items-center gap-3 rounded-xl p-2 pr-2.5 border transition-colors ${cant ? 'bg-violet-50 border-violet-300' : 'bg-gray-50 border-gray-100'}">
+                        <div class="w-10 h-10 rounded-full bg-white overflow-hidden flex items-center justify-center border border-gray-100 shrink-0">
+                            ${p.foto ? `<img src="${p.foto}" class="w-full h-full object-cover">` : `<i class="fa-solid fa-box text-gray-300"></i>`}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-bold text-gray-800 text-sm truncate">${escaparHtml(p.nombre)}</p>
+                            <p class="text-xs text-gray-400 font-medium">${formatearDinero(p.precio)} c/u</p>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button type="button" data-id="${escaparHtml(p.id)}" onclick="cambiarCantidadPedido(this.dataset.id, -1)" class="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-600 font-black active:scale-90 transition-transform"><i class="fa-solid fa-minus text-xs"></i></button>
+                            <input type="number" min="0" inputmode="numeric" value="${cant}" data-id="${escaparHtml(p.id)}" onchange="fijarCantidadPedido(this.dataset.id, this.value)" onfocus="this.select()" class="w-11 text-center font-black text-gray-800 bg-transparent outline-none">
+                            <button type="button" data-id="${escaparHtml(p.id)}" onclick="cambiarCantidadPedido(this.dataset.id, 1)" class="w-8 h-8 rounded-full bg-violet-600 text-white font-black active:scale-90 transition-transform"><i class="fa-solid fa-plus text-xs"></i></button>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+            renderResumenPedido();
+        }
+
+        window.cambiarCantidadPedido = function(id, delta) {
+            cantidadesPedido[id] = Math.max(0, (cantidadesPedido[id] || 0) + delta);
+            renderProductosPedido();
+        };
+
+        window.fijarCantidadPedido = function(id, valor) {
+            cantidadesPedido[id] = Math.max(0, parseInt(valor, 10) || 0);
+            renderProductosPedido();
+        };
+
+        const itemsFormPedido = () => productosFormPedido
+            .filter(p => cantidadesPedido[p.id] > 0)
+            .map(p => ({ productoId: p.id.startsWith('item:') ? null : p.id, nombre: p.nombre, cantidad: cantidadesPedido[p.id], precio: Number(p.precio) }));
+
+        function renderResumenPedido() {
+            const t = calcularTotalesPedido(itemsFormPedido(), document.getElementById('pedido-descuento').value);
+            document.getElementById('pedido-resumen').innerHTML = `
+                <div class="flex justify-between text-gray-600 mb-1"><span>Unidades</span><span class="font-bold">${t.unidades}</span></div>
+                <div class="flex justify-between text-gray-600 mb-1"><span>Subtotal</span><span class="font-bold">${formatearDinero(t.subtotal)}</span></div>
+                ${t.descuento ? `<div class="flex justify-between text-violet-600 mb-1"><span>Descuento ${t.descuento}%</span><span class="font-bold">-${formatearDinero(t.montoDescuento)}</span></div>` : ''}
+                <div class="flex justify-between items-center border-t border-violet-200 pt-2 mt-2"><span class="font-bold text-gray-800">Total</span><span class="text-2xl font-black text-violet-700">${formatearDinero(t.total)}</span></div>`;
+        }
+
+        window.guardarPedido = async function(e) {
+            e.preventDefault();
+            if (guardandoPedido) return;
+            const items = itemsFormPedido();
+            if (!items.length) { showToast('Agregá al menos un producto.', 'error'); return; }
+
+            const seleccion = document.getElementById('pedido-contacto').value;
+            if (!seleccion) { showToast('Elegí un contacto mayorista.', 'error'); return; }
+
+            const editId = document.getElementById('pedido-edit-id').value;
+            guardandoPedido = true;
+            try {
+                let contacto;
+                if (seleccion === '__nuevo__') {
+                    const nombre = document.getElementById('pedido-nuevo-nombre').value.trim();
+                    const telefono = document.getElementById('pedido-nuevo-telefono').value.trim();
+                    if (!nombre) { showToast('Escribí el nombre del contacto.', 'error'); return; }
+                    const existente = telefono && mayoristasData.find(m => normalizarTelefono(m.telefono) === normalizarTelefono(telefono));
+                    if (existente) {
+                        contacto = existente;
+                    } else {
+                        const nuevo = { nombre, telefono, descuento: Number(document.getElementById('pedido-descuento').value) || 0, diasAviso: null, notas: '', creado: new Date() };
+                        const ref = await crearDoc(refMayoristas(), nuevo);
+                        contacto = { id: ref.id, ...nuevo };
+                    }
+                } else {
+                    contacto = mayoristasData.find(m => m.id === seleccion);
+                }
+
+                const data = {
+                    mayoristaId: contacto.id,
+                    mayoristaNombre: contacto.nombre,
+                    mayoristaTelefono: contacto.telefono || '',
+                    items,
+                    ...calcularTotalesPedido(items, document.getElementById('pedido-descuento').value),
+                    notas: document.getElementById('pedido-notas').value.trim()
+                };
+
+                if (editId) {
+                    await actualizarDoc(refPedido(editId), data);
+                    showToast('Pedido actualizado.', 'success');
+                } else {
+                    await crearDoc(refPedidos(), { ...data, estado: 'pendiente', origen: 'sistema', timestamp: new Date() });
+                    showToast('Pedido creado. Lo ves en Mayorista.', 'success');
+                }
+                closeModal('modalVenta');
+            } catch (error) {
+                console.error(error);
+                showToast('Error al guardar. Revisa permisos.', 'error');
+            } finally {
+                guardandoPedido = false;
+            }
+        };
+
+        // ---------- Detalle y estados del pedido ----------
+        window.verDetallePedido = function(id) {
+            pedidoDetalleAbierto = id;
+            renderDetallePedido();
+            openModal('modalPedidoDetalle');
+        };
+
+        function renderDetallePedido() {
+            const cont = document.getElementById('pedido-detalle-contenido');
+            const p = pedidosData.find(x => x.id === pedidoDetalleAbierto);
+            if (!p) { cont.innerHTML = `<p class="text-center text-gray-400 py-8">Pedido no encontrado.</p>`; return; }
+
+            const contacto = contactoDePedido(p);
+            const tel = telefonoPedido(p);
+            const wa = linkWhatsApp(tel);
+            const pasos = [
+                ['Pedido recibido', p.timestamp],
+                ['En preparación', p.fechaPreparacion],
+                ['Listo', p.fechaListo],
+                [`Entregado y cobrado${p.metodo ? ' · ' + p.metodo : ''}`, p.fechaEntrega]
+            ];
+            if (p.estado === 'cancelado') pasos.push(['Cancelado', p.fechaCancelado]);
+
+            const btnSecundario = (onclick, icono, texto, color = 'text-gray-600') =>
+                `<button onclick="${onclick}" class="w-full bg-gray-50 border border-gray-100 ${color} font-bold py-3 rounded-xl text-sm active:bg-gray-100"><i class="fa-solid ${icono} mr-2"></i>${texto}</button>`;
+            const editarCancelar = `<div class="grid grid-cols-2 gap-2">${btnSecundario(`editarPedido('${p.id}')`, 'fa-pen', 'Editar')}${btnSecundario(`cancelarPedido('${p.id}')`, 'fa-ban', 'Cancelar', 'text-red-500')}</div>`;
+
+            let acciones = '';
+            if (p.estado === 'pendiente') {
+                acciones = `
+                    <button onclick="avanzarPedido('${p.id}', 'preparacion', true)" class="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-blue-200 active:scale-95 transition-all"><i class="fa-brands fa-whatsapp mr-2"></i>Avisar: pedido en preparación</button>
+                    <button onclick="avanzarPedido('${p.id}', 'preparacion', false)" class="w-full text-xs font-bold text-gray-400 py-1">Pasar a preparación sin enviar mensaje</button>
+                    ${editarCancelar}`;
+            } else if (p.estado === 'preparacion') {
+                acciones = `
+                    <button onclick="avanzarPedido('${p.id}', 'listo', true)" class="w-full bg-green-500 text-white font-black py-4 rounded-2xl shadow-lg shadow-green-200 active:scale-95 transition-all"><i class="fa-brands fa-whatsapp mr-2"></i>Confirmar: pedido listo</button>
+                    <button onclick="avanzarPedido('${p.id}', 'listo', false)" class="w-full text-xs font-bold text-gray-400 py-1">Marcar listo sin enviar mensaje</button>
+                    ${editarCancelar}`;
+            } else if (p.estado === 'listo') {
+                acciones = `
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Al entregarlo, ¿cómo se cobró?</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="entregarPedido('${p.id}', 'Efectivo')" class="bg-green-500 text-white font-bold py-3.5 rounded-xl active:scale-95 transition-all"><i class="fa-solid fa-money-bill-wave mr-1.5"></i>Efectivo</button>
+                        <button onclick="entregarPedido('${p.id}', 'Transferencia')" class="bg-green-500 text-white font-bold py-3.5 rounded-xl active:scale-95 transition-all"><i class="fa-solid fa-building-columns mr-1.5"></i>Transfer.</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">${btnSecundario(`enviarMensajePedido('${p.id}', 'listo')`, 'fa-rotate-right', 'Reenviar "listo"')}${btnSecundario(`cancelarPedido('${p.id}')`, 'fa-ban', 'Cancelar', 'text-red-500')}</div>`;
+            }
+
+            cont.innerHTML = `
+                <div class="flex justify-between items-start gap-3 mb-4">
+                    <div class="min-w-0">
+                        <p class="text-xl font-black text-gray-800 truncate">${escaparHtml(nombrePedido(p))}</p>
+                        <p class="text-xs text-gray-400 font-medium mt-0.5">${escaparHtml(tel || 'Sin WhatsApp')}${p.origen === 'link' ? ' · <i class="fa-solid fa-link"></i> vía link' : ''}</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        ${chipEstado(p.estado)}
+                        ${wa ? `<a href="${wa}" target="_blank" class="w-9 h-9 bg-green-500 text-white rounded-full flex items-center justify-center text-lg"><i class="fa-brands fa-whatsapp"></i></a>` : ''}
+                    </div>
+                </div>
+
+                ${!contacto ? `<button onclick="guardarContactoDesdePedido('${p.id}')" class="w-full mb-4 bg-violet-50 border border-dashed border-violet-300 text-violet-700 font-bold py-2.5 rounded-xl text-sm"><i class="fa-solid fa-user-plus mr-1.5"></i>Cliente nuevo · Guardar en contactos</button>` : ''}
+
+                <div class="bg-gray-50 rounded-xl border border-gray-100 p-4 mb-4">
+                    <div class="flex flex-col gap-2">
+                        ${(p.items || []).map(it => `
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-700"><span class="font-black text-violet-700">${it.cantidad} ×</span> ${escaparHtml(it.nombre)}</span>
+                                <span class="font-bold text-gray-600">${formatearDinero(it.cantidad * it.precio)}</span>
+                            </div>`).join('')}
+                    </div>
+                    <div class="border-t border-gray-200 mt-3 pt-3 text-sm">
+                        <div class="flex justify-between text-gray-500"><span>Unidades</span><span class="font-bold">${p.unidades}</span></div>
+                        <div class="flex justify-between text-gray-500"><span>Subtotal</span><span class="font-bold">${formatearDinero(p.subtotal)}</span></div>
+                        ${p.descuento ? `<div class="flex justify-between text-violet-600"><span>Descuento ${p.descuento}%</span><span class="font-bold">-${formatearDinero(p.montoDescuento)}</span></div>` : ''}
+                        <div class="flex justify-between items-center mt-1"><span class="font-bold text-gray-800">Total</span><span class="text-2xl font-black text-violet-700">${formatearDinero(p.total)}</span></div>
+                    </div>
+                </div>
+
+                ${p.notas ? `<div class="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-4 text-sm text-amber-900"><i class="fa-regular fa-note-sticky mr-1.5"></i>${escaparHtml(p.notas)}</div>` : ''}
+
+                <div class="flex flex-col gap-1.5 mb-5 px-1">
+                    ${pasos.map(([texto, fecha]) => `
+                        <div class="flex items-center gap-2 text-xs ${fecha ? 'text-gray-700' : 'text-gray-300'}">
+                            <i class="fa-solid ${fecha ? 'fa-circle-check text-violet-500' : 'fa-circle'} text-[10px]"></i>
+                            <span class="font-bold">${escaparHtml(texto)}</span>
+                            <span class="ml-auto font-medium">${fecha ? formatearFechaHora(fecha) : '—'}</span>
+                        </div>`).join('')}
+                </div>
+
+                <div class="flex flex-col gap-2">${acciones}</div>`;
+        }
+
+        window.enviarMensajePedido = function(id, tipo) {
+            const p = pedidosData.find(x => x.id === id);
+            if (!p) return false;
+            const url = linkWhatsApp(telefonoPedido(p), mensajePedido(tipo, p));
+            if (!url) { showToast('El contacto no tiene WhatsApp cargado.', 'error'); return false; }
+            window.open(url, '_blank');
+            return true;
+        };
+
+        window.avanzarPedido = async function(id, nuevoEstado, conMensaje) {
+            // El mensaje se abre antes del await para que el navegador no bloquee la ventana de WhatsApp
+            if (conMensaje) enviarMensajePedido(id, nuevoEstado);
+            const campos = { estado: nuevoEstado };
+            if (nuevoEstado === 'preparacion') campos.fechaPreparacion = new Date();
+            if (nuevoEstado === 'listo') campos.fechaListo = new Date();
+            try {
+                await actualizarDoc(refPedido(id), campos);
+                showToast(nuevoEstado === 'listo' ? '¡Pedido listo!' : 'Pedido en preparación.', 'success');
+            } catch (error) {
+                console.error(error);
+                showToast('Error al actualizar. Revisa permisos.', 'error');
+            }
+        };
+
+        window.entregarPedido = async function(id, metodo) {
+            const p = pedidosData.find(x => x.id === id);
+            if (!p || !confirm(`¿Confirmás que el pedido se entregó y se cobró ${formatearDinero(p.total)} por ${metodo}?\nSe va a sumar al balance de hoy.`)) return;
+            try {
+                await actualizarDoc(refPedido(id), { estado: 'entregado', fechaEntrega: new Date(), metodo });
+                closeModal('modalPedidoDetalle');
+                showToast('Pedido cobrado. Ya suma al balance.', 'success');
+            } catch (error) {
+                console.error(error);
+                showToast('Error al actualizar. Revisa permisos.', 'error');
+            }
+        };
+
+        window.cancelarPedido = async function(id) {
+            if (!confirm('¿Cancelar este pedido? No se va a contar en ningún balance.')) return;
+            try {
+                await actualizarDoc(refPedido(id), { estado: 'cancelado', fechaCancelado: new Date() });
+                closeModal('modalPedidoDetalle');
+                showToast('Pedido cancelado.', 'success');
+            } catch (error) {
+                console.error(error);
+                showToast('Error al actualizar. Revisa permisos.', 'error');
+            }
+        };
+
+        window.editarPedido = function(id) {
+            const p = pedidosData.find(x => x.id === id);
+            if (!p) return;
+            closeModal('modalPedidoDetalle');
+            document.getElementById('pedido-edit-id').value = id;
+            seleccionarTipoVenta('mayorista');
+            prepararFormPedido(p);
+            setTimeout(() => openModal('modalVenta'), 300);
+        };
+
+        window.guardarContactoDesdePedido = async function(id) {
+            const p = pedidosData.find(x => x.id === id);
+            if (!p) return;
+            try {
+                const ref = await crearDoc(refMayoristas(), { nombre: p.mayoristaNombre || 'Sin nombre', telefono: p.mayoristaTelefono || '', descuento: 0, diasAviso: null, notas: '', creado: new Date() });
+                await actualizarDoc(refPedido(id), { mayoristaId: ref.id });
+                showToast('Contacto guardado.', 'success');
+            } catch (error) {
+                console.error(error);
+                showToast('Error al guardar. Revisa permisos.', 'error');
+            }
+        };
+
+        // ---------- Historial de un contacto ----------
+        window.verHistorialContacto = function(clave) {
+            historialContactoAbierto = clave;
+            renderHistorialContacto();
+            openModal('modalHistorialContacto');
+        };
+
+        function renderHistorialContacto() {
+            const cont = document.getElementById('historial-contacto-contenido');
+            const grupo = gruposHistorialMayorista[historialContactoAbierto];
+            const contacto = mayoristasData.find(m => m.id === historialContactoAbierto);
+            const nombre = grupo?.nombre || contacto?.nombre || '';
+            const pedidos = [...(grupo?.pedidos || [])].sort((a, b) => (aFecha(b.timestamp)?.getTime() || 0) - (aFecha(a.timestamp)?.getTime() || 0));
+
+            if (!pedidos.length) {
+                cont.innerHTML = `<p class="font-black text-gray-800 text-lg mb-3">${escaparHtml(nombre)}</p><p class="text-center text-gray-400 py-8 border border-dashed border-gray-200 rounded-xl text-sm font-medium">Todavía no realizó compras.</p>`;
+                return;
+            }
+
+            const porProducto = {};
+            pedidos.forEach(p => (p.items || []).forEach(it => { porProducto[it.nombre] = (porProducto[it.nombre] || 0) + Number(it.cantidad); }));
+            const unidades = pedidos.reduce((s, p) => s + (Number(p.unidades) || 0), 0);
+            const total = pedidos.reduce((s, p) => s + (Number(p.total) || 0), 0);
+
+            cont.innerHTML = `
+                <p class="font-black text-gray-800 text-lg mb-3">${escaparHtml(nombre)}</p>
+                <div class="grid grid-cols-3 gap-2 mb-4 text-center">
+                    <div class="bg-violet-50 rounded-xl p-2 border border-violet-100"><p class="text-lg font-black text-violet-700">${pedidos.length}</p><p class="text-[9px] uppercase font-bold text-gray-400">Compras</p></div>
+                    <div class="bg-violet-50 rounded-xl p-2 border border-violet-100"><p class="text-lg font-black text-violet-700">${unidades}</p><p class="text-[9px] uppercase font-bold text-gray-400">Unidades</p></div>
+                    <div class="bg-violet-50 rounded-xl p-2 border border-violet-100"><p class="text-sm font-black text-violet-700 leading-7">${formatearDinero(total)}</p><p class="text-[9px] uppercase font-bold text-gray-400">Total</p></div>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3 border border-gray-100 mb-4">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Lo que más compra</p>
+                    ${Object.entries(porProducto).sort((a, b) => b[1] - a[1]).map(([n, c]) => `<div class="flex justify-between text-sm"><span class="text-gray-600">${escaparHtml(n)}</span><span class="font-black text-gray-800">${c} u.</span></div>`).join('')}
+                </div>
+                <div class="flex flex-col gap-2">
+                    ${pedidos.map(p => `
+                        <button onclick="verDetallePedido('${p.id}')" class="w-full text-left bg-white rounded-xl p-3 border border-gray-100 shadow-sm active:bg-gray-50">
+                            <div class="flex justify-between items-center mb-1.5">
+                                <span class="text-sm font-bold text-gray-800"><i class="fa-regular fa-calendar text-violet-500 mr-1"></i>${formatearFecha(p.timestamp)}</span>
+                                <span class="font-black text-violet-700">${formatearDinero(p.total)}</span>
+                            </div>
+                            <div class="flex justify-between items-end gap-2">
+                                <div class="text-xs text-gray-500 leading-relaxed">${(p.items || []).map(it => `${it.cantidad} × ${escaparHtml(it.nombre)}`).join('<br>')}</div>
+                                ${chipEstado(p.estado)}
+                            </div>
+                        </button>`).join('')}
+                </div>`;
+        }
+
+        // ---------- Contactos ----------
+        window.abrirContacto = function(id = null) {
+            const m = id ? mayoristasData.find(x => x.id === id) : null;
+            document.getElementById('titulo-modal-contacto').innerText = m ? 'Editar Contacto' : 'Nuevo Contacto';
+            document.getElementById('contacto-id').value = m?.id || '';
+            document.getElementById('contacto-nombre').value = m?.nombre || '';
+            document.getElementById('contacto-telefono').value = m?.telefono || '';
+            document.getElementById('contacto-dias-aviso').value = m?.diasAviso || '';
+            document.getElementById('contacto-notas').value = m?.notas || '';
+            elegirDescuento('contacto', m?.descuento || 0);
+
+            const acciones = document.getElementById('contacto-acciones');
+            acciones.classList.toggle('hidden', !m);
+            acciones.classList.toggle('flex', !!m);
+            if (m) {
+                document.getElementById('contacto-enviar-link').onclick = () => enviarLinkPedido(m.id);
+                document.getElementById('contacto-copiar-link').onclick = () => copiarLinkPedido(m.id);
+                document.getElementById('contacto-ver-historial').onclick = () => { closeModal('modalContacto'); setTimeout(() => verHistorialContacto(m.id), 300); };
+            }
+            openModal('modalContacto');
+        };
+
+        window.guardarContacto = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('contacto-id').value;
+            const telefono = document.getElementById('contacto-telefono').value.trim();
+            const diasAviso = parseInt(document.getElementById('contacto-dias-aviso').value, 10);
+            const data = {
+                nombre: document.getElementById('contacto-nombre').value.trim(),
+                telefono,
+                descuento: Number(document.getElementById('contacto-descuento').value) || 0,
+                diasAviso: diasAviso > 0 ? diasAviso : null,
+                notas: document.getElementById('contacto-notas').value.trim()
+            };
+            const duplicado = telefono && mayoristasData.find(m => m.id !== id && normalizarTelefono(m.telefono) === normalizarTelefono(telefono));
+            if (duplicado) { showToast(`Ese número ya es de ${duplicado.nombre}.`, 'error'); return; }
+
+            try {
+                if (id) await actualizarDoc(doc(db, 'negocio', 'pipon', 'mayoristas', id), data);
+                else await crearDoc(refMayoristas(), { ...data, creado: new Date() });
+                closeModal('modalContacto');
+                showToast(id ? 'Contacto actualizado.' : 'Contacto creado.', 'success');
+            } catch (error) {
+                console.error(error);
+                showToast('Error al guardar. Revisa permisos.', 'error');
+            }
+        };
+
+        window.enviarLinkPedido = function(id) {
+            const m = mayoristasData.find(x => x.id === id);
+            const url = m && linkWhatsApp(m.telefono, mensajeLinkPedido(m));
+            if (!url) { showToast('El contacto no tiene WhatsApp cargado.', 'error'); return; }
+            window.open(url, '_blank');
+        };
+
+        window.copiarLinkPedido = async function(id = null) {
+            const link = linkPedido(id);
+            try {
+                await navigator.clipboard.writeText(link);
+                showToast(id ? 'Link del contacto copiado.' : 'Link general copiado.', 'success');
+            } catch {
+                prompt('Copiá el link de pedidos:', link);
+            }
+        };
+
+        function refrescarTodo() {
+            renderBalanceYResumen();
+            renderVentas();
+            renderGastos();
+            renderHistorial();
+            renderMayorista();
+            renderAlertasInicio();
+            if (!document.getElementById('content-balances').classList.contains('hidden')) renderGridBalances();
+            if (pedidoDetalleAbierto) renderDetallePedido();
+            if (historialContactoAbierto) renderHistorialContacto();
+        }
+
+        // ================= LOGIN =================
+        // El usuario se crea en Firebase Authentication como <usuario>@<DOMINIO_LOGIN>.
+        // La contraseña NO está en el código: la valida Firebase.
+        const DOMINIO_LOGIN = 'sistema-pipon.firebaseapp.com';
+        const usuarioAEmail = (usuario) => {
+            const u = usuario.trim().toLowerCase();
+            return u.includes('@') ? u : `${u}@${DOMINIO_LOGIN}`;
+        };
+
+        const MENSAJES_ERROR_LOGIN = {
+            'auth/invalid-credential': 'Usuario o contraseña incorrectos.',
+            'auth/wrong-password': 'Usuario o contraseña incorrectos.',
+            'auth/user-not-found': 'Usuario o contraseña incorrectos.',
+            'auth/invalid-email': 'Usuario o contraseña incorrectos.',
+            'auth/too-many-requests': 'Demasiados intentos. Esperá unos minutos y probá de nuevo.',
+            'auth/network-request-failed': 'Sin conexión a internet. Revisá tu conexión.',
+            'auth/operation-not-allowed': 'El inicio de sesión no está activado en Firebase.'
+        };
+
+        window.iniciarSesion = async function(e) {
+            e.preventDefault();
+            const boton = document.getElementById('login-boton');
+            const errorEl = document.getElementById('login-error');
+            errorEl.classList.add('hidden');
+            boton.disabled = true;
+            boton.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Ingresando...';
+            try {
+                await signInWithEmailAndPassword(auth, usuarioAEmail(document.getElementById('login-usuario').value), document.getElementById('login-clave').value);
+            } catch (error) {
+                console.error(error);
+                errorEl.innerText = MENSAJES_ERROR_LOGIN[error.code] || 'No se pudo iniciar sesión. Intentá de nuevo.';
+                errorEl.classList.remove('hidden');
+                document.getElementById('login-clave').value = '';
+            } finally {
+                boton.disabled = false;
+                boton.innerText = 'Ingresar';
+            }
+        };
+
+        window.cerrarSesion = async function() {
+            if (!confirm('¿Cerrar sesión en este dispositivo?')) return;
+            await signOut(auth);
+            location.reload();
+        };
+
+        window.alternarVerClave = function() {
+            const input = document.getElementById('login-clave');
+            const mostrar = input.type === 'password';
+            input.type = mostrar ? 'text' : 'password';
+            document.getElementById('login-ojo').className = `fa-solid ${mostrar ? 'fa-eye-slash' : 'fa-eye'}`;
+        };
+
+        function mostrarLogin(visible) {
+            document.getElementById('login-cargando').classList.add('hidden');
+            document.getElementById('form-login').classList.toggle('hidden', !visible);
+            document.getElementById('pantalla-login').classList.toggle('hidden', visible === false);
+        }
+
+        let datosIniciados = false;
+
+        function inicializar() {
+            inicializarBotonesDescuento();
+            // Las sesiones anónimas (de la versión anterior o de la página de pedidos) no dan acceso al sistema
+            onAuthStateChanged(auth, (user) => {
+                if (user && !user.isAnonymous) {
+                    mostrarLogin(false);
+                    if (!datosIniciados) {
+                        datosIniciados = true;
+                        cargarDatos();
+                    }
+                } else {
+                    if (datosIniciados) { location.reload(); return; }
+                    mostrarLogin(true);
+                }
+            });
+        }
+
+        function cargarDatos() {
+            try {
                 const ventasRef = collection(db, 'negocio', 'pipon', 'ventas');
                 const gastosRef = collection(db, 'negocio', 'pipon', 'gastos');
                 const productosRef = collection(db, 'negocio', 'pipon', 'productos');
-                const proveedoresRef = collection(db, 'negocio', 'pipon', 'proveedores');
 
-                onSnapshot(productosRef, (snapshot) => {
+                escuchar(productosRef, (snapshot) => {
                     productosData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     productosData.sort((a, b) => a.nombre.localeCompare(b.nombre));
                     renderProductos();
                 });
 
-                onSnapshot(proveedoresRef, (snapshot) => {
-                    proveedoresData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    proveedoresData.sort((a, b) => a.nombre.localeCompare(b.nombre));
-                    renderProveedores();
-                    if(document.getElementById('content-balances').classList.contains('block')) renderGridBalances();
-                });
-
-                onSnapshot(ventasRef, (snapshot) => {
+                escuchar(ventasRef, (snapshot) => {
                     ventasData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    renderBalanceYResumen(); 
-                    renderVentas(); 
-                    renderHistorial();
-                    if(document.getElementById('content-balances').classList.contains('block')) renderGridBalances();
+                    refrescarTodo();
                 });
 
-                onSnapshot(gastosRef, (snapshot) => {
+                escuchar(gastosRef, (snapshot) => {
                     gastosData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    renderBalanceYResumen(); 
-                    renderHistorial();
-                    if(document.getElementById('content-proveedores').classList.contains('block')) renderProveedores();
-                    if(document.getElementById('content-balances').classList.contains('block')) renderGridBalances();
+                    refrescarTodo();
                 });
-            } catch (error) { console.error("Error inicializando Firebase:", error); }
+
+                escuchar(refMayoristas(), (snapshot) => {
+                    mayoristasData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    refrescarTodo();
+                });
+
+                escuchar(refPedidos(), (snapshot) => {
+                    pedidosData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    refrescarTodo();
+                });
+            } catch (error) {
+                console.error("Error inicializando Firebase:", error);
+            }
         }
         
         inicializar();
