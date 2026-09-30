@@ -1,0 +1,29 @@
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #FFF2D4;
+    color: #5C260E;
+    -webkit-tap-highlight-color: transparent;
+}
+::-webkit-scrollbar { display: none; }
+
+#toast-container { z-index: 9999; }
+.toast { animation: bajarAviso 0.3s ease-out forwards; }
+@keyframes bajarAviso { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.modal-enter { animation: subirModal 0.3s ease-out forwards; }
+.modal-exit { animation: bajarModal 0.3s ease-in forwards; }
+@keyframes subirModal { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes bajarModal { from { transform: translateY(0); opacity: 1; } to { transform: translateY(100%); opacity: 0; } }
+
+.fab-menu {
+    transition: all 0.3s ease;
+    transform-origin: bottom right;
+    transform: scale(0);
+    opacity: 0;
+    pointer-events: none;
+}
+.fab-menu.active {
+    transform: scale(1);
+    opacity: 1;
+    pointer-events: auto;
+}
