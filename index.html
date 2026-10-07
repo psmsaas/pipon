@@ -60,8 +60,9 @@
                 <img src="img/pipon.jpeg" alt="Logo Pipón" class="w-full h-full object-cover">
             </div>
             <h1 class="text-xl font-black tracking-wide uppercase">Pipón</h1>
+            <span id="chip-admin" class="hidden text-[9px] font-black bg-pipon-orange text-white px-1.5 py-0.5 rounded tracking-widest">ADMIN</span>
 
-            <a href="https://psmsaas.github.io/psm/" target="_blank" class="absolute right-0 top-1/2 -translate-y-1/2 text-[9px] font-bold text-white/30 hover:text-white/80 transition-colors tracking-widest no-underline">
+            <a href="https://www.psmsaas.com.ar" target="_blank" class="absolute right-0 top-1/2 -translate-y-1/2 text-[9px] font-bold text-white/30 hover:text-white/80 transition-colors tracking-widest no-underline">
                 BY: PSMsaas
             </a>
         </div>
@@ -71,9 +72,15 @@
         <div id="content-inicio" class="tab-content block">
             <div class="bg-white rounded-3xl shadow-sm p-6 text-center border border-pipon-yellow/30 mb-4 relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-2 bg-pipon-orange"></div>
-                <h2 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 mt-2">Balance del Día (Hoy)</h2>
+                <div class="flex justify-center mb-3 relative z-10">
+                    <div class="bg-pipon-cream p-1 rounded-full flex gap-1 border border-pipon-yellow/50">
+                        <button id="btn-vista-mes" onclick="cambiarVistaBalance('mes')">Este Mes</button>
+                        <button id="btn-vista-dia" onclick="cambiarVistaBalance('dia')">Hoy</button>
+                    </div>
+                </div>
+                <h2 id="lbl-balance-titulo" class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 mt-2">Balance del Mes</h2>
                 <div class="text-5xl font-black text-pipon-brown mb-1" id="balance-total">$0</div>
-                <p id="balance-ayer" class="text-sm font-semibold text-gray-400">Ayer: Cargando...</p>
+                <p id="balance-anterior" class="text-sm font-semibold text-gray-400">Mes pasado: Cargando...</p>
             </div>
 
             <div class="grid grid-cols-2 gap-4 mb-6">
@@ -115,6 +122,19 @@
             </div>
             <div id="lista-gastos" class="flex flex-col gap-3 pb-8">
                 <p class="text-center text-gray-500 mt-10">Cargando gastos...</p>
+            </div>
+        </div>
+
+        <div id="content-proveedores" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-4 px-1">
+                <h2 class="text-xl font-bold text-pipon-brown">Proveedores</h2>
+                <button onclick="abrirModal('modalProveedor')" class="text-sm font-bold text-blue-600 bg-blue-100 px-4 py-1.5 rounded-full flex items-center gap-1 active:bg-blue-200 transition-colors shadow-sm">
+                    <i class="fa-solid fa-plus"></i> Añadir
+                </button>
+            </div>
+            <div id="gasto-sin-especificar-container" class="mb-4"></div>
+            <div id="lista-proveedores" class="flex flex-col gap-3 pb-8">
+                <p class="text-center text-gray-500 mt-10">Cargando proveedores...</p>
             </div>
         </div>
 
@@ -181,6 +201,24 @@
                         <p id="detalle-gastos" class="font-bold text-red-700 text-lg">$0</p>
                     </div>
                 </div>
+
+                <div class="border-t border-gray-100 pt-3 mt-4">
+                    <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Movimientos del Día</h4>
+                    <div id="detalle-movimientos-lista" class="flex flex-col gap-2 max-h-56 overflow-y-auto pr-1"></div>
+                </div>
+
+                <div class="mt-4 pt-4 border-t border-dashed border-gray-200">
+                    <p class="text-[10px] text-center text-gray-400 font-bold uppercase tracking-wider mb-2">¿Olvidaste anotar algo el <span id="retro-fecha-label"></span>?</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="abrirRegistroRetroactivo('venta')" class="bg-green-50 text-green-600 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-green-100 hover:bg-green-100 active:scale-95 transition-all"><i class="fa-solid fa-plus-circle"></i> Venta Pasada</button>
+                        <button onclick="abrirRegistroRetroactivo('gasto')" class="bg-red-50 text-red-600 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-red-100 hover:bg-red-100 active:scale-95 transition-all"><i class="fa-solid fa-minus-circle"></i> Gasto Pasado</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="papelera-dia-seleccionado" class="hidden bg-red-50 rounded-2xl shadow-sm p-4 border border-red-200 mt-4 mb-8 transition-all">
+                <h4 class="text-xs font-bold text-red-600 uppercase mb-3 flex items-center gap-2"><i class="fa-solid fa-trash-can"></i> Papelera (este día)</h4>
+                <div id="detalle-eliminados-lista" class="flex flex-col gap-2 max-h-40 overflow-y-auto pr-1"></div>
             </div>
         </div>
 
@@ -221,8 +259,11 @@
                 </div>
 
                 <h3 class="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2"><i class="fa-solid fa-ranking-star text-pipon-orange"></i> Ranking de Ventas</h3>
-                <div id="balances-ranking" class="flex flex-col gap-2">
+                <div id="balances-ranking" class="flex flex-col gap-2 mb-6">
                 </div>
+
+                <h3 class="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2"><i class="fa-solid fa-truck text-blue-500"></i> Gastos por Proveedor</h3>
+                <div id="balances-gastos-proveedores" class="flex flex-col gap-2"></div>
             </div>
         </div>
 
@@ -239,14 +280,15 @@
     </main>
 
     <nav class="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 z-30 pb-safe">
-        <div class="max-w-md mx-auto grid grid-cols-7 px-1 py-2 gap-0.5">
-            <button onclick="cambiarPestana('inicio')" id="nav-inicio" class="nav-btn flex flex-col items-center justify-center py-2 text-pipon-orange transition-colors rounded-xl"><i class="fa-solid fa-house text-lg mb-1"></i><span class="text-[9px] font-bold">Inicio</span></button>
-            <button onclick="cambiarPestana('ventas')" id="nav-ventas" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-cash-register text-lg mb-1"></i><span class="text-[9px] font-bold">Ventas</span></button>
-            <button onclick="cambiarPestana('mayorista')" id="nav-mayorista" class="nav-btn relative flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-boxes-stacked text-lg mb-1"></i><span class="text-[9px] font-bold">Mayorista</span><span id="badge-mayorista" class="hidden absolute top-0 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black items-center justify-center"></span></button>
-            <button onclick="cambiarPestana('catalogo')" id="nav-catalogo" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-book-open text-lg mb-1"></i><span class="text-[9px] font-bold">Catálogo</span></button>
-            <button onclick="cambiarPestana('gastos')" id="nav-gastos" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-receipt text-lg mb-1"></i><span class="text-[9px] font-bold">Gastos</span></button>
-            <button onclick="cambiarPestana('historial')" id="nav-historial" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-calendar-days text-lg mb-1"></i><span class="text-[9px] font-bold">Historial</span></button>
-            <button onclick="cambiarPestana('balances')" id="nav-balances" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-chart-line text-lg mb-1"></i><span class="text-[9px] font-bold">Balances</span></button>
+        <div class="max-w-md mx-auto grid grid-cols-8 px-1 py-2 gap-0.5">
+            <button onclick="cambiarPestana('inicio')" id="nav-inicio" class="nav-btn flex flex-col items-center justify-center py-2 text-pipon-orange transition-colors rounded-xl"><i class="fa-solid fa-house text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Inicio</span></button>
+            <button onclick="cambiarPestana('ventas')" id="nav-ventas" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-cash-register text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Ventas</span></button>
+            <button onclick="cambiarPestana('mayorista')" id="nav-mayorista" class="nav-btn relative flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-boxes-stacked text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Mayorista</span><span id="badge-mayorista" class="hidden absolute top-0 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black items-center justify-center"></span></button>
+            <button onclick="cambiarPestana('catalogo')" id="nav-catalogo" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-book-open text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Catálogo</span></button>
+            <button onclick="cambiarPestana('gastos')" id="nav-gastos" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-receipt text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Gastos</span></button>
+            <button onclick="cambiarPestana('proveedores')" id="nav-proveedores" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-address-book text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Agenda</span></button>
+            <button onclick="cambiarPestana('historial')" id="nav-historial" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-calendar-days text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Historial</span></button>
+            <button onclick="cambiarPestana('balances')" id="nav-balances" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-chart-line text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Balances</span></button>
         </div>
     </nav>
 
@@ -267,6 +309,10 @@
             <div class="flex justify-between items-center mb-5">
                 <h2 id="titulo-modal-venta" class="text-2xl font-black text-green-600">Registrar Venta</h2>
                 <button onclick="cerrarModal('modalVenta')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div id="banner-retro-venta" class="hidden bg-pipon-yellow/30 text-pipon-brown text-xs font-bold p-3 rounded-xl flex items-center justify-center gap-2 mb-4 border border-pipon-yellow/50">
+                <i class="fa-solid fa-clock-rotate-left"></i> <span>Registrando con fecha pasada (<span id="banner-retro-venta-fecha"></span>)</span>
             </div>
 
             <div id="selector-tipo-venta" class="grid grid-cols-2 gap-1 bg-gray-100 p-1 rounded-2xl mb-6">
@@ -352,11 +398,15 @@
     </div>
 
     <div id="modalGasto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
-        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
             <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-black text-red-600">Registrar Gasto</h2>
                 <button onclick="cerrarModal('modalGasto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div id="banner-retro-gasto" class="hidden bg-pipon-yellow/30 text-pipon-brown text-xs font-bold p-3 rounded-xl flex items-center justify-center gap-2 mb-4 border border-pipon-yellow/50">
+                <i class="fa-solid fa-clock-rotate-left"></i> <span>Registrando con fecha pasada (<span id="banner-retro-gasto-fecha"></span>)</span>
             </div>
 
             <form id="form-gasto" onsubmit="guardarGasto(event)">
@@ -371,6 +421,13 @@
                 <div class="mb-5">
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿En qué se gastó?</label>
                     <input type="text" id="gasto-desc" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-red-500 focus:bg-white transition-all font-medium" placeholder="Ej: Harina, Envases..." required>
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Proveedor (Opcional)</label>
+                    <select id="gasto-proveedor" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-red-500 focus:bg-white transition-all font-bold text-gray-700 appearance-none">
+                        <option value="">Sin Especificar / Otro</option>
+                    </select>
                 </div>
 
                 <div class="mb-8">
@@ -552,6 +609,155 @@
                 <button onclick="cerrarModal('modalPedidoDetalle')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div id="pedido-detalle-contenido"></div>
+        </div>
+    </div>
+
+    <div id="modalEditarVenta" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-green-600">Editar Venta</h2>
+                <button type="button" onclick="cerrarModal('modalEditarVenta')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="form-editar-venta" onsubmit="actualizarVenta(event)">
+                <input type="hidden" id="edit-venta-id">
+
+                <div class="mb-5 text-center">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Monto Total</label>
+                    <div class="flex justify-center items-center gap-1 text-5xl font-black text-gray-800">
+                        <span class="text-3xl text-gray-400">$</span>
+                        <input type="number" id="edit-venta-monto" class="w-40 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-green-500 transition-colors" required min="1" step="0.01" inputmode="decimal">
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Descripción</label>
+                    <input type="text" id="edit-venta-desc" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:bg-white transition-all font-medium" required>
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="button" onclick="confirmarEliminarTransaccion('venta')" class="solo-admin hidden w-14 bg-red-50 text-red-500 rounded-2xl items-center justify-center text-lg active:bg-red-100 transition-colors" aria-label="Eliminar venta"><i class="fa-solid fa-trash"></i></button>
+                    <button type="submit" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-green-200 active:scale-95 transition-all">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalEditarGasto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-red-600">Editar Gasto</h2>
+                <button type="button" onclick="cerrarModal('modalEditarGasto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="form-editar-gasto" onsubmit="actualizarGasto(event)">
+                <input type="hidden" id="edit-gasto-id">
+
+                <div class="mb-5 text-center">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Monto del Gasto</label>
+                    <div class="flex justify-center items-center gap-1 text-5xl font-black text-gray-800">
+                        <span class="text-3xl text-gray-400">$</span>
+                        <input type="number" id="edit-gasto-monto" class="w-40 bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-red-500 transition-colors" required min="1" step="0.01" inputmode="decimal">
+                    </div>
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿En qué se gastó?</label>
+                    <input type="text" id="edit-gasto-desc" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-red-500 focus:bg-white transition-all font-medium" required>
+                </div>
+
+                <div class="mb-8">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Asignar Proveedor</label>
+                    <select id="edit-gasto-proveedor" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-red-500 focus:bg-white transition-all font-bold text-gray-700 appearance-none"></select>
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="button" onclick="confirmarEliminarTransaccion('gasto')" class="solo-admin hidden w-14 bg-red-50 text-red-500 rounded-2xl items-center justify-center text-lg active:bg-red-100 transition-colors" aria-label="Eliminar gasto"><i class="fa-solid fa-trash"></i></button>
+                    <button type="submit" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-red-200 active:scale-95 transition-all">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalProveedor" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-blue-600">Nuevo Proveedor</h2>
+                <button type="button" onclick="cerrarModal('modalProveedor')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="form-proveedor" onsubmit="guardarProveedor(event)">
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Nombre o Empresa</label>
+                    <input type="text" id="prov-nombre" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-bold text-gray-800" placeholder="Ej: Panadería San José" required>
+                </div>
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Teléfono / WhatsApp (Opcional)</label>
+                    <input type="tel" id="prov-telefono" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-medium text-gray-800" placeholder="Ej: 3451234567">
+                </div>
+                <div class="mb-8">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿Qué nos vende? (Opcional)</label>
+                    <input type="text" id="prov-detalle" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-medium text-gray-800" placeholder="Ej: Pan, fiambres, envases...">
+                </div>
+                <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-blue-200 active:scale-95 transition-all">Guardar Proveedor</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalEditarProveedor" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-blue-600">Editar Proveedor</h2>
+                <button type="button" onclick="cerrarModal('modalEditarProveedor')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="form-editar-proveedor" onsubmit="actualizarProveedor(event)">
+                <input type="hidden" id="edit-prov-id">
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Nombre o Empresa</label>
+                    <input type="text" id="edit-prov-nombre" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-bold text-gray-800" required>
+                </div>
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Teléfono / WhatsApp (Opcional)</label>
+                    <input type="tel" id="edit-prov-telefono" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-medium text-gray-800">
+                </div>
+                <div class="mb-8">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿Qué nos vende? (Opcional)</label>
+                    <input type="text" id="edit-prov-detalle" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white transition-all font-medium text-gray-800">
+                </div>
+                <div class="flex gap-3">
+                    <button type="button" onclick="confirmarEliminarProveedor()" class="solo-admin hidden w-14 bg-red-50 text-red-500 rounded-2xl items-center justify-center text-lg active:bg-red-100 transition-colors" aria-label="Eliminar proveedor"><i class="fa-solid fa-trash"></i></button>
+                    <button type="submit" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-blue-200 active:scale-95 transition-all">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalConfirmDelete" class="fixed inset-0 z-[70] hidden flex-col justify-center items-center bg-black/60 backdrop-blur-sm p-4 opacity-0 transition-opacity">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform scale-95 transition-transform" id="modalConfirmDeleteContent">
+            <div class="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-3xl"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <h3 class="text-xl font-black text-center text-gray-800 mb-2">¿Eliminar proveedor?</h3>
+            <p class="text-center text-sm text-gray-500 font-medium mb-6">Los gastos asociados a este proveedor pasarán a la lista de "Falta asignar proveedor". Esta acción no se puede deshacer.</p>
+            <div class="flex gap-3">
+                <button onclick="cerrarConfirmDelete()" class="flex-1 bg-gray-100 text-gray-600 font-bold py-3 rounded-xl active:bg-gray-200 transition-colors">Cancelar</button>
+                <button id="btn-confirm-delete" onclick="eliminarProveedor()" class="flex-1 bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-red-200 active:scale-95 transition-all">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalConfirmDeleteTransaccion" class="fixed inset-0 z-[70] hidden flex-col justify-center items-center bg-black/60 backdrop-blur-sm p-4 opacity-0 transition-opacity">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform scale-95 transition-transform" id="modalConfirmDeleteTransaccionContent">
+            <div class="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-3xl"><i class="fa-solid fa-trash-can"></i></div>
+            <h3 class="text-xl font-black text-center text-gray-800 mb-2">¿Eliminar movimiento?</h3>
+            <p class="text-center text-sm text-gray-500 font-medium mb-6">Este movimiento se moverá a la papelera y dejará de contar en los balances. Podés restaurarlo desde el Historial.</p>
+            <div class="flex gap-3">
+                <button onclick="cerrarConfirmDeleteTransaccion()" class="flex-1 bg-gray-100 text-gray-600 font-bold py-3 rounded-xl active:bg-gray-200 transition-colors">Cancelar</button>
+                <button id="btn-confirm-delete-transaccion" onclick="eliminarTransaccion()" class="flex-1 bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-red-200 active:scale-95 transition-all">Mover a Papelera</button>
+            </div>
         </div>
     </div>
 

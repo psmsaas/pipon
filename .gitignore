@@ -1,0 +1,10 @@
+# Archivos que quedan solo en la computadora y nunca se suben a GitHub
+.claude/
+respaldo/
+para-subir-github/
+*.zip
+reglas-viejas.txt
+
+# Material de marca que no usa la web
+logo pipon fondo naranja.jpeg
+pipon marca.jpeg

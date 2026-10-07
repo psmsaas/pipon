@@ -1,5 +1,5 @@
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { addDoc, onSnapshot, updateDoc, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { addDoc, onSnapshot, updateDoc, deleteDoc, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { auth, dominioAuth, coleccion, documento } from './firebase.js';
 import { formatearDinero, escaparHtml, modoPrueba, mostrarAviso, bannerPrueba } from './utils.js';
 
@@ -7,6 +7,7 @@ import { formatearDinero, escaparHtml, modoPrueba, mostrarAviso, bannerPrueba } 
 const MODO_PRUEBA = modoPrueba();
 let crearDoc = addDoc;
 let actualizarDoc = updateDoc;
+let borrarDoc = deleteDoc;
 let escuchar = onSnapshot;
 
 if (MODO_PRUEBA) {
@@ -39,14 +40,30 @@ if (MODO_PRUEBA) {
         memoria[refDoc.parent.path].set(refDoc.id, { ...actual, ...convertirFechas(datos) });
         emitir(refDoc.parent.path);
     };
+    borrarDoc = async (refDoc) => {
+        await asegurar(refDoc.parent);
+        memoria[refDoc.parent.path].delete(refDoc.id);
+        emitir(refDoc.parent.path);
+    };
     bannerPrueba('Nada de lo que cargues se guarda');
 }
 
+// ventasData y gastosData tienen solo lo vigente; lo eliminado queda aparte para la papelera
 let ventasData = [];
 let gastosData = [];
+let ventasEliminadas = [];
+let gastosEliminados = [];
 let productosData = [];
 let mayoristasData = [];
 let pedidosData = [];
+let proveedoresData = [];
+
+// solo la cuenta "admin" puede mandar a la papelera, restaurar y borrar proveedores
+let esAdmin = false;
+let vistaBalance = 'mes';
+let fechaManual = null;
+let proveedorAEliminar = null;
+let transaccionAEliminar = { id: null, tipo: null };
 
 let fechaCalendario = new Date();
 let diaSeleccionadoFormat = null;
@@ -80,6 +97,49 @@ const formatearFecha = (timestamp) => {
 const formatearFechaHora = (timestamp) => timestamp ? `${formatearFecha(timestamp)} ${formatearHora(timestamp)}` : '';
 const diasEntre = (desde, hasta) => Math.round((new Date(hasta.getFullYear(), hasta.getMonth(), hasta.getDate()) - new Date(desde.getFullYear(), desde.getMonth(), desde.getDate())) / 86400000);
 const plural = (n, singular, pluralTxt) => `${n} ${n === 1 ? singular : pluralTxt}`;
+const esDelMes = (timestamp, anio, mes) => {
+    const d = aFecha(timestamp);
+    return !!d && d.getFullYear() === anio && d.getMonth() === mes;
+};
+const esEsteMes = (timestamp) => esDelMes(timestamp, new Date().getFullYear(), new Date().getMonth());
+const esMesPasado = (timestamp) => {
+    const ref = new Date();
+    ref.setDate(1);
+    ref.setMonth(ref.getMonth() - 1);
+    return esDelMes(timestamp, ref.getFullYear(), ref.getMonth());
+};
+
+// los gastos se asocian al proveedor por nombre; si no tiene o el proveedor ya no existe, queda "sin especificar"
+const esHuerfano = (g) => !g.proveedor || !proveedoresData.some(p => p.nombre === g.proveedor);
+
+// bloquea el botón mientras se guarda, así un doble toque no duplica el registro
+async function conBotonBloqueado(e, tarea) {
+    const boton = e.target.querySelector('[type="submit"]');
+    if (boton.disabled) return;
+    const textoOriginal = boton.innerHTML;
+    boton.disabled = true;
+    boton.classList.add('opacity-60');
+    boton.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Guardando...';
+    try {
+        await tarea();
+    } finally {
+        // se libera cuando el modal ya terminó de cerrarse
+        setTimeout(() => {
+            boton.disabled = false;
+            boton.classList.remove('opacity-60');
+            boton.innerHTML = textoOriginal;
+        }, 400);
+    }
+}
+
+async function conBotonBloqueadoClick(boton, tarea) {
+    if (boton.disabled) return;
+    boton.disabled = true;
+    boton.classList.add('opacity-60');
+    try { await tarea(); } finally {
+        setTimeout(() => { boton.disabled = false; boton.classList.remove('opacity-60'); }, 400);
+    }
+}
 
 // un pedido mayorista entra como ingreso el día que se entrega
 const ventasMayoristasEntregadas = () => pedidosData
@@ -87,39 +147,49 @@ const ventasMayoristasEntregadas = () => pedidosData
     .map(p => ({ ...p, monto: p.total, timestamp: p.fechaEntrega, tipo: 'mayorista' }));
 const todosLosIngresos = () => [...ventasData, ...ventasMayoristasEntregadas()];
 
+window.cambiarVistaBalance = function(vista) {
+    vistaBalance = vista;
+    const activo = 'px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-pipon-orange text-white shadow-sm transition-all';
+    const inactivo = 'px-5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-pipon-brown hover:bg-white/50 transition-all';
+    document.getElementById('btn-vista-mes').className = vista === 'mes' ? activo : inactivo;
+    document.getElementById('btn-vista-dia').className = vista === 'dia' ? activo : inactivo;
+    document.getElementById('lbl-balance-titulo').innerText = vista === 'mes' ? 'Balance del Mes' : 'Balance del Día (Hoy)';
+    renderBalanceYResumen();
+};
+
 function renderBalanceYResumen() {
     const ingresos = todosLosIngresos();
-    const ventasHoy = ingresos.filter(v => esHoy(v.timestamp));
-    const gastosHoy = gastosData.filter(g => esHoy(g.timestamp));
+    const [esActual, esAnterior, textoAnterior] = vistaBalance === 'dia'
+        ? [esHoy, esAyer, 'Ayer:']
+        : [esEsteMes, esMesPasado, 'Mes pasado:'];
+    const sumar = (lista, filtro) => lista.filter(x => filtro(x.timestamp)).reduce((sum, x) => sum + Number(x.monto), 0);
 
-    const totalVentasHoy = ventasHoy.reduce((sum, v) => sum + Number(v.monto), 0);
-    const totalGastosHoy = gastosHoy.reduce((sum, g) => sum + Number(g.monto), 0);
-    const balanceTotalHoy = totalVentasHoy - totalGastosHoy;
+    const totalVentas = sumar(ingresos, esActual);
+    const totalGastos = sumar(gastosData, esActual);
+    const balanceTotal = totalVentas - totalGastos;
 
-    document.getElementById('resumen-ingresos').innerText = formatearDinero(totalVentasHoy);
-    document.getElementById('resumen-gastos').innerText = formatearDinero(totalGastosHoy);
+    document.getElementById('resumen-ingresos').innerText = formatearDinero(totalVentas);
+    document.getElementById('resumen-gastos').innerText = formatearDinero(totalGastos);
 
     const balEl = document.getElementById('balance-total');
-    balEl.innerText = formatearDinero(balanceTotalHoy);
-    if (balanceTotalHoy > 0) balEl.className = 'text-5xl font-black text-green-600 mb-1';
-    else if (balanceTotalHoy < 0) balEl.className = 'text-5xl font-black text-red-600 mb-1';
+    balEl.innerText = formatearDinero(balanceTotal);
+    if (balanceTotal > 0) balEl.className = 'text-5xl font-black text-green-600 mb-1';
+    else if (balanceTotal < 0) balEl.className = 'text-5xl font-black text-red-600 mb-1';
     else balEl.className = 'text-5xl font-black text-pipon-brown mb-1';
 
-    const ventasAyer = ingresos.filter(v => esAyer(v.timestamp));
-    const gastosAyer = gastosData.filter(g => esAyer(g.timestamp));
-    const totalVentasAyer = ventasAyer.reduce((sum, v) => sum + Number(v.monto), 0);
-    const totalGastosAyer = gastosAyer.reduce((sum, g) => sum + Number(g.monto), 0);
-    const balanceTotalAyer = totalVentasAyer - totalGastosAyer;
+    const totalVentasAnt = sumar(ingresos, esAnterior);
+    const totalGastosAnt = sumar(gastosData, esAnterior);
+    const balanceAnt = totalVentasAnt - totalGastosAnt;
 
-    const balAyerEl = document.getElementById('balance-ayer');
-    if (totalVentasAyer === 0 && totalGastosAyer === 0) {
-        balAyerEl.innerText = `Ayer: Sin movimientos`;
-        balAyerEl.className = 'text-sm font-semibold text-gray-400';
+    const balAntEl = document.getElementById('balance-anterior');
+    if (totalVentasAnt === 0 && totalGastosAnt === 0) {
+        balAntEl.innerText = `${textoAnterior} Sin movimientos`;
+        balAntEl.className = 'text-sm font-semibold text-gray-400';
     } else {
-        balAyerEl.innerText = `Ayer: ${formatearDinero(balanceTotalAyer)}`;
-        if (balanceTotalAyer > 0) balAyerEl.className = 'text-sm font-bold text-green-500';
-        else if (balanceTotalAyer < 0) balAyerEl.className = 'text-sm font-bold text-red-500';
-        else balAyerEl.className = 'text-sm font-bold text-gray-500';
+        balAntEl.innerText = `${textoAnterior} ${formatearDinero(balanceAnt)}`;
+        if (balanceAnt > 0) balAntEl.className = 'text-sm font-bold text-green-500';
+        else if (balanceAnt < 0) balAntEl.className = 'text-sm font-bold text-red-500';
+        else balAntEl.className = 'text-sm font-bold text-gray-500';
     }
 }
 
@@ -156,7 +226,10 @@ function renderVentas() {
                     ${v.comprobante ? `<button onclick="verComprobante('${v.id}', 'ventas')" class="text-[10px] bg-blue-50 text-blue-500 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-blue-100"><i class="fa-solid fa-paperclip"></i> Ver</button>` : ''}
                 </div>
             </div>
-            <span class="font-black text-green-600 text-lg">+${formatearDinero(v.monto)}</span>
+            <div class="flex items-center gap-2 shrink-0">
+                <span class="font-black text-green-600 text-lg">+${formatearDinero(v.monto)}</span>
+                <button onclick="abrirEditarVenta('${v.id}')" class="w-7 h-7 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center active:bg-gray-200 transition-colors" aria-label="Editar venta"><i class="fa-solid fa-pen text-[10px]"></i></button>
+            </div>
         </div>
     `).join('');
 }
@@ -176,15 +249,109 @@ function renderGastos() {
         <div class="bg-white rounded-xl p-4 flex justify-between items-center shadow-sm border-l-4 border-l-red-500">
             <div>
                 <p class="font-bold text-gray-800">${g.descripcion}</p>
-                <div class="flex items-center gap-2 mt-1">
-                    <span class="text-xs text-gray-400"><i class="fa-regular fa-clock"></i> ${formatearHora(g.timestamp)}</span>
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                    <span class="text-xs text-gray-400 whitespace-nowrap"><i class="fa-regular fa-clock"></i> ${formatearHora(g.timestamp)}</span>
                     <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">${g.metodo}</span>
+                    ${chipProveedor(g)}
                     ${g.comprobante ? `<button onclick="verComprobante('${g.id}', 'gastos')" class="text-[10px] bg-blue-50 text-blue-500 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-blue-100"><i class="fa-solid fa-paperclip"></i> Ver</button>` : ''}
                 </div>
             </div>
-            <span class="font-black text-red-600 text-lg">-${formatearDinero(g.monto)}</span>
+            <div class="flex items-center gap-2 shrink-0">
+                <span class="font-black text-red-600 text-lg">-${formatearDinero(g.monto)}</span>
+                <button onclick="abrirEditarGasto('${g.id}')" class="w-7 h-7 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center active:bg-gray-200 transition-colors" aria-label="Editar gasto"><i class="fa-solid fa-pen text-[10px]"></i></button>
+            </div>
         </div>
     `).join('');
+}
+
+const chipProveedor = (g) => `<span class="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold whitespace-nowrap"><i class="fa-solid fa-truck"></i> ${escaparHtml(esHuerfano(g) ? 'Sin especificar' : g.proveedor)}</span>`;
+
+function renderProveedores() {
+    const listEl = document.getElementById('lista-proveedores');
+    const hoy = new Date();
+    const anioActual = hoy.getFullYear();
+    const mesActual = hoy.getMonth();
+    const resumir = (gastos) => ({
+        mes: gastos.filter(g => esDelMes(g.timestamp, anioActual, mesActual)).reduce((s, g) => s + Number(g.monto), 0),
+        anio: gastos.filter(g => aFecha(g.timestamp)?.getFullYear() === anioActual).reduce((s, g) => s + Number(g.monto), 0),
+        total: gastos.reduce((s, g) => s + Number(g.monto), 0),
+        compras: gastos.length
+    });
+    const filaTotales = (r, borde) => `
+        <div class="grid grid-cols-3 gap-2 pt-3 border-t ${borde}">
+            <div>
+                <p class="text-[9px] text-gray-400 uppercase font-bold tracking-wider">Gasto Mensual</p>
+                <p class="font-black text-red-500 text-sm">${formatearDinero(r.mes)}</p>
+            </div>
+            <div>
+                <p class="text-[9px] text-gray-400 uppercase font-bold tracking-wider">Gasto Anual</p>
+                <p class="font-black text-red-500 text-sm">${formatearDinero(r.anio)}</p>
+            </div>
+            <div>
+                <p class="text-[9px] text-gray-400 uppercase font-bold tracking-wider">Transacciones</p>
+                <p class="font-black text-gray-700 text-sm">${r.compras} <span class="text-[10px] text-gray-400 font-bold">· ${formatearDinero(r.total)}</span></p>
+            </div>
+        </div>`;
+
+    const sinAsignar = gastosData.filter(esHuerfano).sort((a, b) => (aFecha(b.timestamp)?.getTime() || 0) - (aFecha(a.timestamp)?.getTime() || 0));
+    const listaSinAsignarHtml = !sinAsignar.length ? '' : `
+        <div class="mt-4 bg-white p-3 rounded-xl border border-red-100 shadow-sm">
+            <h4 class="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center justify-between">
+                <span class="flex items-center gap-1"><i class="fa-solid fa-circle-exclamation text-pipon-orange"></i> Falta asignar proveedor</span>
+                <span class="bg-gray-100 text-gray-500 px-2 rounded-full">${sinAsignar.length}</span>
+            </h4>
+            <div class="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+                ${sinAsignar.map(g => `
+                    <div class="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                        <div class="flex items-center gap-2 overflow-hidden">
+                            <div class="w-6 h-6 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0"><i class="fa-solid fa-arrow-up text-[9px]"></i></div>
+                            <div class="truncate">
+                                <p class="text-xs font-bold text-gray-800 truncate leading-tight">${escaparHtml(g.descripcion)}</p>
+                                <p class="text-[9px] text-gray-400 mt-0.5"><i class="fa-regular fa-clock"></i> ${formatearFechaHora(g.timestamp)}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="font-black text-red-600 text-sm">-${formatearDinero(g.monto)}</span>
+                            <button onclick="abrirEditarGasto('${g.id}')" class="w-7 h-7 rounded-lg bg-gray-200 text-gray-600 flex items-center justify-center active:bg-gray-300 transition-colors" aria-label="Asignar proveedor"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                        </div>
+                    </div>`).join('')}
+            </div>
+        </div>`;
+
+    document.getElementById('gasto-sin-especificar-container').innerHTML = `
+        <div class="bg-gray-50 rounded-xl p-4 border border-gray-200 shadow-sm flex flex-col gap-3">
+            <div>
+                <p class="font-bold text-gray-700 text-lg leading-tight">Gastos sin Especificar</p>
+                <p class="text-xs text-gray-500 font-medium mt-1"><i class="fa-solid fa-tag text-gray-400"></i> Gastos varios o proveedores eliminados</p>
+            </div>
+            ${filaTotales(resumir(sinAsignar), 'border-gray-200')}
+        </div>
+        ${listaSinAsignarHtml}`;
+
+    if (!proveedoresData.length) {
+        listEl.innerHTML = `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm mt-4"><i class="fa-solid fa-truck text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium">No hay proveedores registrados.</p></div>`;
+    } else {
+        listEl.innerHTML = proveedoresData.map(p => {
+            const wa = linkWhatsApp(p.telefono);
+            return `
+            <div class="bg-white rounded-xl p-4 shadow-sm border-l-4 border-l-blue-500 relative flex flex-col gap-3">
+                <button onclick="abrirEditarProveedor('${p.id}')" class="absolute top-4 right-4 w-8 h-8 bg-gray-50 text-gray-400 rounded-full flex items-center justify-center hover:bg-gray-100 active:bg-gray-200 transition-colors shadow-sm" aria-label="Editar proveedor"><i class="fa-solid fa-pen text-[11px]"></i></button>
+                <div class="pr-10">
+                    <p class="font-bold text-gray-800 text-lg leading-tight">${escaparHtml(p.nombre)}</p>
+                    ${p.detalle ? `<p class="text-xs text-gray-500 font-medium mt-1"><i class="fa-solid fa-tag text-gray-300"></i> ${escaparHtml(p.detalle)}</p>` : ''}
+                    ${p.telefono ? `<p class="text-xs text-gray-400 font-medium mt-0.5"><i class="fa-solid fa-phone text-gray-300"></i> ${escaparHtml(p.telefono)}</p>` : ''}
+                </div>
+                ${filaTotales(resumir(gastosData.filter(g => g.proveedor === p.nombre)), 'border-gray-50')}
+                ${wa ? `<a href="${wa}" target="_blank" class="w-full bg-green-50 text-green-600 rounded-lg py-2 flex items-center justify-center gap-2 font-bold text-sm hover:bg-green-100 transition-colors"><i class="fa-brands fa-whatsapp text-lg"></i> Contactar</a>` : ''}
+            </div>`;
+        }).join('');
+    }
+
+    const opciones = `<option value="">Sin Especificar / Otro</option>` + proveedoresData.map(p => `<option value="${escaparHtml(p.nombre)}">${escaparHtml(p.nombre)}</option>`).join('');
+    const selectGasto = document.getElementById('gasto-proveedor');
+    const elegido = selectGasto.value;
+    selectGasto.innerHTML = opciones;
+    selectGasto.value = elegido;
 }
 
 function renderProductos() {
@@ -230,7 +397,7 @@ function agruparDatosPorFecha() {
     const diaDe = (item) => {
         if(!item.timestamp) return null;
         const fecha = formatearFecha(item.timestamp);
-        if(!dias[fecha]) dias[fecha] = { minorista: 0, cantMinorista: 0, mayorista: 0, contactosMayorista: new Set(), unidadesMayorista: 0, gastos: 0 };
+        if(!dias[fecha]) dias[fecha] = { minorista: 0, cantMinorista: 0, mayorista: 0, contactosMayorista: new Set(), unidadesMayorista: 0, gastos: 0, movimientos: [], eliminados: [] };
         return dias[fecha];
     };
     ventasData.forEach(v => {
@@ -238,6 +405,7 @@ function agruparDatosPorFecha() {
         if (!dia) return;
         dia.minorista += Number(v.monto);
         dia.cantMinorista += 1;
+        dia.movimientos.push({ ...v, tipo: 'venta' });
     });
     ventasMayoristasEntregadas().forEach(p => {
         const dia = diaDe(p);
@@ -245,13 +413,41 @@ function agruparDatosPorFecha() {
         dia.mayorista += Number(p.monto);
         dia.contactosMayorista.add(claveContactoPedido(p));
         dia.unidadesMayorista += Number(p.unidades) || 0;
+        dia.movimientos.push(p);
     });
     gastosData.forEach(g => {
         const dia = diaDe(g);
-        if (dia) dia.gastos += Number(g.monto);
+        if (!dia) return;
+        dia.gastos += Number(g.monto);
+        dia.movimientos.push({ ...g, tipo: 'gasto' });
     });
+    ventasEliminadas.forEach(v => diaDe(v)?.eliminados.push({ ...v, tipo: 'venta' }));
+    gastosEliminados.forEach(g => diaDe(g)?.eliminados.push({ ...g, tipo: 'gasto' }));
     return dias;
 }
+
+const filaMovimiento = (item) => {
+    const estilos = { venta: ['green', '+', 'fa-arrow-down', `abrirEditarVenta('${item.id}')`], gasto: ['red', '-', 'fa-arrow-up', `abrirEditarGasto('${item.id}')`], mayorista: ['violet', '+', 'fa-boxes-stacked', `verDetallePedido('${item.id}')`] };
+    const [color, signo, icono, accion] = estilos[item.tipo];
+    const titulo = item.tipo === 'mayorista' ? `Mayorista · ${nombrePedido(item)}` : (item.descripcion || 'Venta General');
+    return `
+    <div class="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+        <div class="flex items-center gap-2 overflow-hidden">
+            <div class="w-6 h-6 rounded-full bg-${color}-100 text-${color}-600 flex items-center justify-center shrink-0"><i class="fa-solid ${icono} text-[9px]"></i></div>
+            <div class="truncate">
+                <p class="text-xs font-bold text-gray-800 truncate leading-tight">${escaparHtml(titulo)}</p>
+                <div class="flex items-center gap-1 mt-0.5">
+                    <span class="text-[9px] text-gray-400"><i class="fa-regular fa-clock"></i> ${formatearHora(item.timestamp)}</span>
+                    ${item.tipo === 'gasto' ? chipProveedor(item) : ''}
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+            <span class="font-black text-${color}-600 text-sm">${signo}${formatearDinero(item.monto)}</span>
+            <button onclick="${accion}" class="w-7 h-7 rounded-lg bg-gray-200 text-gray-600 flex items-center justify-center active:bg-gray-300 transition-colors" aria-label="Ver o editar"><i class="fa-solid ${item.tipo === 'mayorista' ? 'fa-eye' : 'fa-pen'} text-[10px]"></i></button>
+        </div>
+    </div>`;
+};
 
 function renderHistorial() {
     const datosAgrupados = agruparDatosPorFecha();
@@ -300,12 +496,34 @@ function renderHistorial() {
 
 function actualizarCuadroDetalle(datosAgrupados) {
     const cuadroEl = document.getElementById('detalle-dia-seleccionado');
+    const papeleraEl = document.getElementById('papelera-dia-seleccionado');
     if (!diaSeleccionadoFormat) {
         cuadroEl.classList.add('hidden');
+        papeleraEl.classList.add('hidden');
         return;
     }
     cuadroEl.classList.remove('hidden');
-    const infoDia = datosAgrupados[diaSeleccionadoFormat] || { minorista: 0, cantMinorista: 0, mayorista: 0, contactosMayorista: new Set(), unidadesMayorista: 0, gastos: 0 };
+    const infoDia = datosAgrupados[diaSeleccionadoFormat] || { minorista: 0, cantMinorista: 0, mayorista: 0, contactosMayorista: new Set(), unidadesMayorista: 0, gastos: 0, movimientos: [], eliminados: [] };
+    const porHora = (a, b) => (aFecha(b.timestamp)?.getTime() || 0) - (aFecha(a.timestamp)?.getTime() || 0);
+
+    document.getElementById('detalle-movimientos-lista').innerHTML = infoDia.movimientos.length
+        ? infoDia.movimientos.sort(porHora).map(filaMovimiento).join('')
+        : `<p class="text-center text-xs text-gray-400 py-2">No hubo movimientos este día.</p>`;
+    document.getElementById('retro-fecha-label').innerText = diaSeleccionadoFormat;
+
+    // la papelera solo la ve la cuenta admin
+    const mostrarPapelera = esAdmin && infoDia.eliminados.length > 0;
+    papeleraEl.classList.toggle('hidden', !mostrarPapelera);
+    if (mostrarPapelera) {
+        document.getElementById('detalle-eliminados-lista').innerHTML = infoDia.eliminados.sort(porHora).map(item => `
+            <div class="flex justify-between items-center bg-white/50 p-2 rounded-lg border border-red-100">
+                <div class="truncate opacity-75">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">${item.tipo === 'venta' ? 'Venta' : 'Gasto'} · ${formatearHora(item.timestamp)}</p>
+                    <p class="text-xs font-bold text-gray-600 truncate leading-tight line-through">${escaparHtml(item.descripcion || 'Venta General')} (${item.tipo === 'venta' ? '+' : '-'}${formatearDinero(item.monto)})</p>
+                </div>
+                <button onclick="restaurarTransaccion(this, '${item.id}', '${item.tipo}')" class="text-[10px] font-bold bg-white text-gray-600 px-3 py-1.5 rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center gap-1 shrink-0"><i class="fa-solid fa-rotate-left"></i> Restaurar</button>
+            </div>`).join('');
+    }
     const ingresosDia = infoDia.minorista + infoDia.mayorista;
     const balanceDia = ingresosDia - infoDia.gastos;
 
@@ -424,6 +642,37 @@ function actualizarDetalleBalances() {
             </div>
         `).join('');
     }
+
+    const estadisticasProv = {};
+    gastosMes.forEach(g => {
+        const nombre = esHuerfano(g) ? 'Sin especificar' : g.proveedor;
+        const stat = estadisticasProv[nombre] ||= { cantidad: 0, gastado: 0 };
+        stat.cantidad += 1;
+        stat.gastado += Number(g.monto);
+    });
+    const rankingGastos = Object.entries(estadisticasProv)
+        .map(([nombre, stat]) => ({ nombre, ...stat }))
+        .sort((a, b) => b.gastado - a.gastado);
+
+    const listProvEl = document.getElementById('balances-gastos-proveedores');
+    if (rankingGastos.length === 0) {
+        listProvEl.innerHTML = `<p class="text-center text-gray-400 py-4 text-sm font-medium border border-dashed border-gray-200 rounded-xl">No hay gastos registrados en este mes.</p>`;
+    } else {
+        listProvEl.innerHTML = rankingGastos.map(prov => {
+            const sinEspecificar = prov.nombre === 'Sin especificar';
+            return `
+            <div class="flex justify-between items-center bg-gray-50 rounded-xl p-3 border border-gray-100">
+                <div class="flex items-center gap-3">
+                    <span class="w-6 h-6 rounded-full ${sinEspecificar ? 'bg-gray-200 text-gray-500' : 'bg-blue-50 text-blue-500'} flex items-center justify-center shrink-0"><i class="fa-solid ${sinEspecificar ? 'fa-tag' : 'fa-truck'} text-[9px]"></i></span>
+                    <div>
+                        <p class="font-bold text-gray-800 text-sm leading-tight">${escaparHtml(prov.nombre)}</p>
+                        <p class="text-[11px] text-gray-500 font-medium">${plural(prov.cantidad, 'movimiento', 'movimientos')}</p>
+                    </div>
+                </div>
+                <span class="font-black text-red-600 shrink-0">-${formatearDinero(prov.gastado)}</span>
+            </div>`;
+        }).join('');
+    }
 }
 
 window.cambiarMes = function(cambio) { fechaCalendario.setMonth(fechaCalendario.getMonth() + cambio); renderHistorial(); }
@@ -452,6 +701,9 @@ window.cambiarPestana = function(pestana) {
     }
     if (pestana === 'mayorista') {
         renderMayorista();
+    }
+    if (pestana === 'proveedores') {
+        renderProveedores();
     }
 };
 
@@ -486,6 +738,7 @@ window.abrirModal = function(modalId) {
         if(modalId === 'modalVenta') document.getElementById('venta-monto').focus();
         else if(modalId === 'modalGasto') document.getElementById('gasto-monto').focus();
         else if(modalId === 'modalProducto') document.getElementById('producto-nombre').focus();
+        else if(modalId === 'modalProveedor') document.getElementById('prov-nombre').focus();
     }, 300);
 };
 
@@ -503,6 +756,8 @@ window.cerrarModal = function(modalId) {
         document.getElementById('venta-metodo').value = "Efectivo";
         document.querySelectorAll('.metodo-btn-venta')[0].className = "metodo-btn-venta border-2 border-green-500 bg-green-50 text-green-700 font-bold py-3 rounded-xl transition-all";
         document.querySelectorAll('.metodo-btn-venta')[1].className = "metodo-btn-venta border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-xl transition-all";
+        document.getElementById('banner-retro-venta').classList.add('hidden');
+        fechaManual = null;
     }
     if(modalId === 'modalGasto') {
         document.getElementById('form-gasto').reset();
@@ -510,7 +765,13 @@ window.cerrarModal = function(modalId) {
         document.getElementById('gasto-metodo').value = "Efectivo";
         document.querySelectorAll('.metodo-btn-gasto')[0].className = "metodo-btn-gasto border-2 border-red-500 bg-red-50 text-red-700 font-bold py-3 rounded-xl transition-all";
         document.querySelectorAll('.metodo-btn-gasto')[1].className = "metodo-btn-gasto border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-xl transition-all";
+        document.getElementById('banner-retro-gasto').classList.add('hidden');
+        fechaManual = null;
     }
+    if(modalId === 'modalEditarVenta') document.getElementById('form-editar-venta').reset();
+    if(modalId === 'modalEditarGasto') document.getElementById('form-editar-gasto').reset();
+    if(modalId === 'modalProveedor') document.getElementById('form-proveedor').reset();
+    if(modalId === 'modalEditarProveedor') document.getElementById('form-editar-proveedor').reset();
     if(modalId === 'modalProducto') {
         document.getElementById('form-producto').reset();
         limpiarImagen('producto');
@@ -542,70 +803,298 @@ window.seleccionarMetodo = function(tipo, metodo, elementoBtn) {
     }
 };
 
+// "Venta pasada" / "Gasto pasado" desde el Historial: se guarda en ese día con la hora actual
+window.abrirRegistroRetroactivo = function(tipo) {
+    const fecha = diaSeleccionadoFormat;
+    if (tipo === 'venta') abrirVenta('minorista');
+    else abrirModal('modalGasto');
+    fechaManual = fecha;
+    if (tipo === 'venta') document.getElementById('selector-tipo-venta').classList.add('hidden');
+    document.getElementById(`banner-retro-${tipo}`).classList.remove('hidden');
+    document.getElementById(`banner-retro-${tipo}-fecha`).innerText = fecha;
+};
+
+function obtenerFechaTransaccion() {
+    if (!fechaManual) return new Date();
+    const [dia, mes, anio] = fechaManual.split('/').map(Number);
+    const ahora = new Date();
+    return new Date(anio, mes - 1, dia, ahora.getHours(), ahora.getMinutes(), ahora.getSeconds());
+}
+
 window.guardarVenta = async function(e) {
     e.preventDefault();
-    const monto = document.getElementById('venta-monto').value;
-    const selectProd = document.getElementById('venta-producto');
-    let desc = "Venta General";
-    if (selectProd.value) {
-        desc = selectProd.options[selectProd.selectedIndex].text;
-    }
-    const metodo = document.getElementById('venta-metodo').value;
-    const comprobante = document.getElementById('venta-comprobante-base64').value;
+    await conBotonBloqueado(e, async () => {
+        const monto = document.getElementById('venta-monto').value;
+        const selectProd = document.getElementById('venta-producto');
+        let desc = "Venta General";
+        if (selectProd.value) {
+            desc = selectProd.options[selectProd.selectedIndex].text;
+        }
+        const metodo = document.getElementById('venta-metodo').value;
+        const comprobante = document.getElementById('venta-comprobante-base64').value;
 
-    try {
-        const ventasRef = coleccion('ventas');
-        const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: new Date() };
-        if(comprobante) data.comprobante = comprobante;
+        try {
+            const ventasRef = coleccion('ventas');
+            const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: obtenerFechaTransaccion() };
+            if(comprobante) data.comprobante = comprobante;
 
-        await crearDoc(ventasRef, data);
-        cerrarModal('modalVenta');
-        mostrarAviso('Venta guardada.', 'ok');
-    } catch (error) {
-        console.error(error);
-        mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
-    }
+            await crearDoc(ventasRef, data);
+            cerrarModal('modalVenta');
+            mostrarAviso('Venta guardada.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
+        }
+    });
 };
 
 window.guardarGasto = async function(e) {
     e.preventDefault();
-    const monto = document.getElementById('gasto-monto').value;
-    const desc = document.getElementById('gasto-desc').value;
-    const metodo = document.getElementById('gasto-metodo').value;
-    const comprobante = document.getElementById('gasto-comprobante-base64').value;
+    await conBotonBloqueado(e, async () => {
+        const monto = document.getElementById('gasto-monto').value;
+        const desc = document.getElementById('gasto-desc').value;
+        const proveedor = document.getElementById('gasto-proveedor').value;
+        const metodo = document.getElementById('gasto-metodo').value;
+        const comprobante = document.getElementById('gasto-comprobante-base64').value;
 
-    try {
-        const gastosRef = coleccion('gastos');
-        const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: new Date() };
-        if(comprobante) data.comprobante = comprobante;
+        try {
+            const gastosRef = coleccion('gastos');
+            const data = { monto: Number(monto), descripcion: desc, metodo: metodo, timestamp: obtenerFechaTransaccion() };
+            if(proveedor) data.proveedor = proveedor;
+            if(comprobante) data.comprobante = comprobante;
 
-        await crearDoc(gastosRef, data);
-        cerrarModal('modalGasto');
-        mostrarAviso('Gasto registrado correctamente.', 'ok');
-    } catch (error) {
-        console.error(error);
-        mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
-    }
+            await crearDoc(gastosRef, data);
+            cerrarModal('modalGasto');
+            mostrarAviso('Gasto registrado correctamente.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
+        }
+    });
+};
+
+window.abrirEditarVenta = function(id) {
+    const venta = ventasData.find(v => v.id === id);
+    if(!venta) return;
+    document.getElementById('edit-venta-id').value = id;
+    document.getElementById('edit-venta-monto').value = venta.monto;
+    document.getElementById('edit-venta-desc').value = venta.descripcion || 'Venta General';
+    abrirModal('modalEditarVenta');
+};
+
+window.actualizarVenta = async function(e) {
+    e.preventDefault();
+    await conBotonBloqueado(e, async () => {
+        const id = document.getElementById('edit-venta-id').value;
+        try {
+            await actualizarDoc(documento('ventas', id), {
+                monto: Number(document.getElementById('edit-venta-monto').value),
+                descripcion: document.getElementById('edit-venta-desc').value.trim()
+            });
+            cerrarModal('modalEditarVenta');
+            mostrarAviso('Venta actualizada.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo actualizar. Probá de nuevo.', 'error');
+        }
+    });
+};
+
+window.abrirEditarGasto = function(id) {
+    const gasto = gastosData.find(g => g.id === id);
+    if(!gasto) return;
+    document.getElementById('edit-gasto-id').value = id;
+    document.getElementById('edit-gasto-monto').value = gasto.monto;
+    document.getElementById('edit-gasto-desc').value = gasto.descripcion;
+    const select = document.getElementById('edit-gasto-proveedor');
+    select.innerHTML = `<option value="">Sin Especificar / Otro</option>` + proveedoresData.map(p => `<option value="${escaparHtml(p.nombre)}">${escaparHtml(p.nombre)}</option>`).join('');
+    select.value = esHuerfano(gasto) ? '' : gasto.proveedor;
+    abrirModal('modalEditarGasto');
+};
+
+window.actualizarGasto = async function(e) {
+    e.preventDefault();
+    await conBotonBloqueado(e, async () => {
+        const id = document.getElementById('edit-gasto-id').value;
+        try {
+            await actualizarDoc(documento('gastos', id), {
+                monto: Number(document.getElementById('edit-gasto-monto').value),
+                descripcion: document.getElementById('edit-gasto-desc').value.trim(),
+                proveedor: document.getElementById('edit-gasto-proveedor').value
+            });
+            cerrarModal('modalEditarGasto');
+            mostrarAviso('Gasto actualizado.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo actualizar. Probá de nuevo.', 'error');
+        }
+    });
+};
+
+// ---------- Papelera (solo admin) ----------
+const abrirConfirmacion = (modalId) => {
+    const modal = document.getElementById(modalId);
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        document.getElementById(`${modalId}Content`).classList.remove('scale-95');
+    }, 10);
+};
+const cerrarConfirmacion = (modalId, alTerminar) => {
+    const modal = document.getElementById(modalId);
+    modal.classList.add('opacity-0');
+    document.getElementById(`${modalId}Content`).classList.add('scale-95');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        alTerminar();
+    }, 300);
+};
+
+window.confirmarEliminarTransaccion = function(tipo) {
+    if (!esAdmin) return;
+    transaccionAEliminar = { id: document.getElementById(`edit-${tipo}-id`).value, tipo };
+    abrirConfirmacion('modalConfirmDeleteTransaccion');
+};
+
+window.cerrarConfirmDeleteTransaccion = function() {
+    cerrarConfirmacion('modalConfirmDeleteTransaccion', () => { transaccionAEliminar = { id: null, tipo: null }; });
+};
+
+window.eliminarTransaccion = async function() {
+    const { id, tipo } = transaccionAEliminar;
+    if (!esAdmin || !id) return;
+    await conBotonBloqueadoClick(document.getElementById('btn-confirm-delete-transaccion'), async () => {
+        try {
+            await actualizarDoc(documento(tipo === 'venta' ? 'ventas' : 'gastos', id), { eliminado: true });
+            cerrarConfirmDeleteTransaccion();
+            cerrarModal(tipo === 'venta' ? 'modalEditarVenta' : 'modalEditarGasto');
+            mostrarAviso('Movido a la papelera. Lo podés restaurar desde el Historial.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo eliminar. Probá de nuevo.', 'error');
+        }
+    });
+};
+
+window.restaurarTransaccion = async function(boton, id, tipo) {
+    if (!esAdmin) return;
+    await conBotonBloqueadoClick(boton, async () => {
+        try {
+            await actualizarDoc(documento(tipo === 'venta' ? 'ventas' : 'gastos', id), { eliminado: false });
+            mostrarAviso('Movimiento restaurado.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo restaurar. Probá de nuevo.', 'error');
+        }
+    });
+};
+
+// ---------- Proveedores ----------
+window.guardarProveedor = async function(e) {
+    e.preventDefault();
+    await conBotonBloqueado(e, async () => {
+        const nombre = document.getElementById('prov-nombre').value.trim();
+        if (proveedoresData.some(p => p.nombre.toLowerCase() === nombre.toLowerCase())) { mostrarAviso('Ya existe un proveedor con ese nombre.', 'error'); return; }
+        const telefono = document.getElementById('prov-telefono').value.trim();
+        const detalle = document.getElementById('prov-detalle').value.trim();
+        try {
+            const data = { nombre, timestamp: new Date() };
+            if(telefono) data.telefono = telefono;
+            if(detalle) data.detalle = detalle;
+            await crearDoc(coleccion('proveedores'), data);
+            cerrarModal('modalProveedor');
+            mostrarAviso('Proveedor guardado.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
+        }
+    });
+};
+
+window.abrirEditarProveedor = function(id) {
+    const prov = proveedoresData.find(p => p.id === id);
+    if(!prov) return;
+    document.getElementById('edit-prov-id').value = id;
+    document.getElementById('edit-prov-nombre').value = prov.nombre;
+    document.getElementById('edit-prov-telefono').value = prov.telefono || '';
+    document.getElementById('edit-prov-detalle').value = prov.detalle || '';
+    abrirModal('modalEditarProveedor');
+};
+
+window.actualizarProveedor = async function(e) {
+    e.preventDefault();
+    await conBotonBloqueado(e, async () => {
+        const id = document.getElementById('edit-prov-id').value;
+        const anterior = proveedoresData.find(p => p.id === id);
+        const nombre = document.getElementById('edit-prov-nombre').value.trim();
+        if (proveedoresData.some(p => p.id !== id && p.nombre.toLowerCase() === nombre.toLowerCase())) { mostrarAviso('Ya existe un proveedor con ese nombre.', 'error'); return; }
+        try {
+            await actualizarDoc(documento('proveedores', id), {
+                nombre,
+                telefono: document.getElementById('edit-prov-telefono').value.trim(),
+                detalle: document.getElementById('edit-prov-detalle').value.trim()
+            });
+            // si cambió el nombre, sus gastos lo siguen (se vinculan por nombre)
+            if (anterior && anterior.nombre !== nombre) {
+                const suyos = [...gastosData, ...gastosEliminados].filter(g => g.proveedor === anterior.nombre);
+                await Promise.all(suyos.map(g => actualizarDoc(documento('gastos', g.id), { proveedor: nombre })));
+            }
+            cerrarModal('modalEditarProveedor');
+            mostrarAviso('Proveedor actualizado.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo actualizar. Probá de nuevo.', 'error');
+        }
+    });
+};
+
+window.confirmarEliminarProveedor = function() {
+    if (!esAdmin) return;
+    proveedorAEliminar = document.getElementById('edit-prov-id').value;
+    abrirConfirmacion('modalConfirmDelete');
+};
+
+window.cerrarConfirmDelete = function() {
+    cerrarConfirmacion('modalConfirmDelete', () => { proveedorAEliminar = null; });
+};
+
+window.eliminarProveedor = async function() {
+    if (!esAdmin || !proveedorAEliminar) return;
+    await conBotonBloqueadoClick(document.getElementById('btn-confirm-delete'), async () => {
+        try {
+            await borrarDoc(documento('proveedores', proveedorAEliminar));
+            cerrarConfirmDelete();
+            cerrarModal('modalEditarProveedor');
+            mostrarAviso('Proveedor eliminado.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo eliminar. Probá de nuevo.', 'error');
+        }
+    });
 };
 
 window.guardarProducto = async function(e) {
     e.preventDefault();
-    const nombre = document.getElementById('producto-nombre').value;
-    const precio = document.getElementById('producto-precio').value;
-    const foto = document.getElementById('producto-comprobante-base64').value;
+    await conBotonBloqueado(e, async () => {
+        const nombre = document.getElementById('producto-nombre').value;
+        const precio = document.getElementById('producto-precio').value;
+        const foto = document.getElementById('producto-comprobante-base64').value;
 
-    try {
-        const productosRef = coleccion('productos');
-        const data = { nombre: nombre, precio: Number(precio), timestamp: new Date() };
-        if(foto) data.foto = foto;
+        try {
+            const productosRef = coleccion('productos');
+            const data = { nombre: nombre, precio: Number(precio), timestamp: new Date() };
+            if(foto) data.foto = foto;
 
-        await crearDoc(productosRef, data);
-        cerrarModal('modalProducto');
-        mostrarAviso('Producto agregado al catálogo.', 'ok');
-    } catch (error) {
-        console.error(error);
-        mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
-    }
+            await crearDoc(productosRef, data);
+            cerrarModal('modalProducto');
+            mostrarAviso('Producto agregado al catálogo.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
+        }
+    });
 };
 
 window.abrirEditarProducto = function(id) {
@@ -631,25 +1120,27 @@ window.abrirEditarProducto = function(id) {
 
 window.actualizarProducto = async function(e) {
     e.preventDefault();
-    const id = document.getElementById('edit-producto-id').value;
-    const nombre = document.getElementById('edit-producto-nombre').value;
-    const precio = document.getElementById('edit-producto-precio').value;
-    const foto = document.getElementById('edit-producto-comprobante-base64').value;
+    await conBotonBloqueado(e, async () => {
+        const id = document.getElementById('edit-producto-id').value;
+        const nombre = document.getElementById('edit-producto-nombre').value;
+        const precio = document.getElementById('edit-producto-precio').value;
+        const foto = document.getElementById('edit-producto-comprobante-base64').value;
 
-    try {
-        const prodRef = documento('productos', id);
-        const data = { nombre: nombre, precio: Number(precio) };
+        try {
+            const prodRef = documento('productos', id);
+            const data = { nombre: nombre, precio: Number(precio) };
 
-        if(foto) data.foto = foto;
-        else data.foto = "";
+            if(foto) data.foto = foto;
+            else data.foto = "";
 
-        await actualizarDoc(prodRef, data);
-        cerrarModal('modalEditarProducto');
-        mostrarAviso('Producto actualizado.', 'ok');
-    } catch (error) {
-        console.error(error);
-        mostrarAviso('No se pudo actualizar. Probá de nuevo.', 'error');
-    }
+            await actualizarDoc(prodRef, data);
+            cerrarModal('modalEditarProducto');
+            mostrarAviso('Producto actualizado.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo actualizar. Probá de nuevo.', 'error');
+        }
+    });
 };
 
 window.procesarImagen = function(tipo, inputElement) {
@@ -1416,28 +1907,30 @@ window.abrirContacto = function(id = null) {
 
 window.guardarContacto = async function(e) {
     e.preventDefault();
-    const id = document.getElementById('contacto-id').value;
-    const telefono = document.getElementById('contacto-telefono').value.trim();
-    const diasAviso = parseInt(document.getElementById('contacto-dias-aviso').value, 10);
-    const data = {
-        nombre: document.getElementById('contacto-nombre').value.trim(),
-        telefono,
-        descuento: Number(document.getElementById('contacto-descuento').value) || 0,
-        diasAviso: diasAviso > 0 ? diasAviso : null,
-        notas: document.getElementById('contacto-notas').value.trim()
-    };
-    const duplicado = telefono && mayoristasData.find(m => m.id !== id && normalizarTelefono(m.telefono) === normalizarTelefono(telefono));
-    if (duplicado) { mostrarAviso(`Ese número ya es de ${duplicado.nombre}.`, 'error'); return; }
+    await conBotonBloqueado(e, async () => {
+        const id = document.getElementById('contacto-id').value;
+        const telefono = document.getElementById('contacto-telefono').value.trim();
+        const diasAviso = parseInt(document.getElementById('contacto-dias-aviso').value, 10);
+        const data = {
+            nombre: document.getElementById('contacto-nombre').value.trim(),
+            telefono,
+            descuento: Number(document.getElementById('contacto-descuento').value) || 0,
+            diasAviso: diasAviso > 0 ? diasAviso : null,
+            notas: document.getElementById('contacto-notas').value.trim()
+        };
+        const duplicado = telefono && mayoristasData.find(m => m.id !== id && normalizarTelefono(m.telefono) === normalizarTelefono(telefono));
+        if (duplicado) { mostrarAviso(`Ese número ya es de ${duplicado.nombre}.`, 'error'); return; }
 
-    try {
-        if (id) await actualizarDoc(documento('mayoristas', id), data);
-        else await crearDoc(coleccion('mayoristas'), { ...data, creado: new Date() });
-        cerrarModal('modalContacto');
-        mostrarAviso(id ? 'Contacto actualizado.' : 'Contacto creado.', 'ok');
-    } catch (error) {
-        console.error(error);
-        mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
-    }
+        try {
+            if (id) await actualizarDoc(documento('mayoristas', id), data);
+            else await crearDoc(coleccion('mayoristas'), { ...data, creado: new Date() });
+            cerrarModal('modalContacto');
+            mostrarAviso(id ? 'Contacto actualizado.' : 'Contacto creado.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
+        }
+    });
 };
 
 window.enviarLinkPedido = function(id) {
@@ -1461,6 +1954,7 @@ function refrescarTodo() {
     renderBalanceYResumen();
     renderVentas();
     renderGastos();
+    renderProveedores();
     renderHistorial();
     renderMayorista();
     renderAlertasInicio();
@@ -1525,11 +2019,25 @@ function mostrarLogin(visible) {
 
 let datosIniciados = false;
 
+// en modo prueba, ?prueba&admin muestra la vista de admin (los cambios igual quedan en memoria)
+const esCuentaAdmin = (user) => user.email === `admin@${dominioAuth}` || (MODO_PRUEBA && new URLSearchParams(location.search).has('admin'));
+
+function aplicarPermisos() {
+    document.getElementById('chip-admin').classList.toggle('hidden', !esAdmin);
+    document.querySelectorAll('.solo-admin').forEach(el => {
+        el.classList.toggle('hidden', !esAdmin);
+        el.classList.toggle('flex', esAdmin);
+    });
+}
+
 function inicializar() {
     inicializarBotonesDescuento();
+    cambiarVistaBalance('mes');
     // la sesión anónima de pedido.html no sirve para entrar acá
     onAuthStateChanged(auth, (user) => {
         if (user && !user.isAnonymous) {
+            esAdmin = esCuentaAdmin(user);
+            aplicarPermisos();
             mostrarLogin(false);
             if (!datosIniciados) {
                 datosIniciados = true;
@@ -1555,12 +2063,22 @@ function cargarDatos() {
         });
 
         escuchar(ventasRef, (snapshot) => {
-            ventasData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const todas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            ventasData = todas.filter(v => !v.eliminado);
+            ventasEliminadas = todas.filter(v => v.eliminado);
             refrescarTodo();
         });
 
         escuchar(gastosRef, (snapshot) => {
-            gastosData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const todos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            gastosData = todos.filter(g => !g.eliminado);
+            gastosEliminados = todos.filter(g => g.eliminado);
+            refrescarTodo();
+        });
+
+        escuchar(coleccion('proveedores'), (snapshot) => {
+            proveedoresData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            proveedoresData.sort((a, b) => a.nombre.localeCompare(b.nombre));
             refrescarTodo();
         });
 
