@@ -660,6 +660,27 @@
         </div>
     </div>
 
+    <div id="modalWhatsappPipon" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-1">
+                <h2 class="text-2xl font-black text-green-600">WhatsApp de Pipón</h2>
+                <button type="button" onclick="cerrarModal('modalWhatsappPipon')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="text-xs text-gray-500 font-medium mb-5">Cuando un mayorista envía un pedido desde su link, le aparece un botón para avisarte a este número con el detalle del pedido.</p>
+
+            <form id="form-whatsapp-pipon" onsubmit="guardarWhatsappPipon(event)">
+                <div class="mb-3">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Número de WhatsApp</label>
+                    <input type="tel" id="whatsapp-pipon-numero" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:bg-white transition-all font-bold text-gray-800" placeholder="11 2345 6789 (sin 0 ni 15)">
+                </div>
+                <button type="button" onclick="probarWhatsappPipon()" class="w-full mb-3 bg-green-50 text-green-700 font-bold py-2.5 rounded-xl text-sm active:bg-green-100"><i class="fa-brands fa-whatsapp mr-1.5"></i>Probar número</button>
+                <p class="text-[11px] text-gray-400 font-medium mb-6">Si lo dejás vacío y guardás, el botón deja de aparecer en la página de pedidos.</p>
+                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-green-200 active:scale-95 transition-all">Guardar</button>
+            </form>
+        </div>
+    </div>
+
     <div id="modalHistorialContacto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
         <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
             <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>

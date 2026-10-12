@@ -1,5 +1,5 @@
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { addDoc, onSnapshot, updateDoc, deleteDoc, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { addDoc, onSnapshot, updateDoc, deleteDoc, getDocs, setDoc, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { auth, dominioAuth, coleccion, documento } from './firebase.js';
 import { formatearDinero, escaparHtml, modoPrueba, mostrarAviso, bannerPrueba } from './utils.js';
 
@@ -9,6 +9,8 @@ let crearDoc = addDoc;
 let actualizarDoc = updateDoc;
 let borrarDoc = deleteDoc;
 let escuchar = onSnapshot;
+// guarda un documento con id fijo, creándolo si todavía no existe
+let guardarDoc = (refDoc, datos) => setDoc(refDoc, datos, { merge: true });
 
 if (MODO_PRUEBA) {
     const memoria = {};
@@ -40,6 +42,7 @@ if (MODO_PRUEBA) {
         memoria[refDoc.parent.path].set(refDoc.id, { ...actual, ...convertirFechas(datos) });
         emitir(refDoc.parent.path);
     };
+    guardarDoc = actualizarDoc;
     borrarDoc = async (refDoc) => {
         await asegurar(refDoc.parent);
         memoria[refDoc.parent.path].delete(refDoc.id);
@@ -1407,10 +1410,15 @@ function renderHistorialMayorista() {
 
 function renderContactosMayorista() {
     const cont = document.getElementById('mayorista-contactos');
+    const numeroPipon = ajustesPublicos.whatsappVisible || ajustesPublicos.whatsapp;
+    const botonWhatsappPipon = esAdmin ? `
+            <button onclick="abrirWhatsappPipon()" class="w-full bg-white border border-green-200 text-green-700 font-bold py-2.5 rounded-xl text-sm active:scale-95 transition-all flex items-center justify-center gap-2"><i class="fa-brands fa-whatsapp text-base"></i>WhatsApp de Pipón: <span class="${numeroPipon ? '' : 'text-gray-400'}">${numeroPipon ? escaparHtml(numeroPipon) : 'sin cargar'}</span></button>` : '';
     const encabezado = `
-        <div class="grid grid-cols-2 gap-2 mb-4">
-            <button onclick="abrirContacto()" class="bg-violet-600 text-white font-bold py-3 rounded-xl text-sm shadow-sm active:scale-95 transition-all"><i class="fa-solid fa-user-plus mr-1.5"></i>Nuevo contacto</button>
-            <button onclick="copiarLinkPedido()" class="bg-white border border-violet-200 text-violet-700 font-bold py-3 rounded-xl text-sm active:scale-95 transition-all"><i class="fa-solid fa-link mr-1.5"></i>Link general</button>
+        <div class="flex flex-col gap-2 mb-4">
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="abrirContacto()" class="bg-violet-600 text-white font-bold py-3 rounded-xl text-sm shadow-sm active:scale-95 transition-all"><i class="fa-solid fa-user-plus mr-1.5"></i>Nuevo contacto</button>
+                <button onclick="copiarLinkPedido()" class="bg-white border border-violet-200 text-violet-700 font-bold py-3 rounded-xl text-sm active:scale-95 transition-all"><i class="fa-solid fa-link mr-1.5"></i>Link general</button>
+            </div>${botonWhatsappPipon}
         </div>`;
 
     if (!mayoristasData.length) {
@@ -1956,6 +1964,41 @@ window.copiarLinkPedido = async function(id = null) {
     } catch {
         prompt('Copiá el link de pedidos:', link);
     }
+};
+
+// ---------- WhatsApp de Pipón (solo admin) ----------
+// la página de pedidos lo lee de ajustes/publico para mostrar el botón "Avisar por WhatsApp"
+let ajustesPublicos = {};
+
+window.abrirWhatsappPipon = function() {
+    if (!esAdmin) return;
+    document.getElementById('whatsapp-pipon-numero').value = ajustesPublicos.whatsappVisible || ajustesPublicos.whatsapp || '';
+    abrirModal('modalWhatsappPipon');
+};
+
+window.probarWhatsappPipon = function() {
+    const url = linkWhatsApp(document.getElementById('whatsapp-pipon-numero').value, 'Prueba del número para avisos de pedidos de Pipón');
+    if (!url) { mostrarAviso('Escribí un número primero.', 'error'); return; }
+    window.open(url, '_blank');
+};
+
+window.guardarWhatsappPipon = async function(e) {
+    e.preventDefault();
+    if (!esAdmin) return;
+    await conBotonBloqueado(e, async () => {
+        const visible = document.getElementById('whatsapp-pipon-numero').value.trim();
+        const numero = normalizarTelefono(visible);
+        // un celular argentino completo queda en 13 dígitos: 549 + característica + número
+        if (visible && numero.length !== 13) { mostrarAviso('Revisá el número: con característica y sin 0 ni 15, ej. 11 2345 6789.', 'error'); return; }
+        try {
+            await guardarDoc(documento('ajustes', 'publico'), { whatsapp: numero, whatsappVisible: visible });
+            cerrarModal('modalWhatsappPipon');
+            mostrarAviso(numero ? 'Número guardado. Ya aparece en la página de pedidos.' : 'Número borrado. El botón ya no aparece.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
+        }
+    });
 };
 
 // ---------- CRM comercial (solo admin) ----------
@@ -3088,8 +3131,13 @@ function cargarDatos() {
             refrescarTodo();
         });
 
-        // el CRM solo lo lee la cuenta admin
+        // el CRM y los ajustes solo los lee la cuenta admin
         if (esAdmin) {
+            escuchar(coleccion('ajustes'), (snapshot) => {
+                ajustesPublicos = snapshot.docs.find(doc => doc.id === 'publico')?.data() || {};
+                refrescarTodo();
+            }, (error) => console.error(error));
+
             escuchar(coleccion('prospectos'), (snapshot) => {
                 prospectosData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 estadoCrm = 'listo';
