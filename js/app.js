@@ -1913,11 +1913,15 @@ window.abrirContacto = function(id = null) {
         document.getElementById('contacto-copiar-link').onclick = () => copiarLinkPedido(m.id);
         document.getElementById('contacto-ver-historial').onclick = () => { cerrarModal('modalContacto'); setTimeout(() => verHistorialContacto(m.id), 300); };
     }
-    // si el cliente vino del CRM, el admin puede ver su recorrido comercial
+    // el admin ve la ficha comercial del cliente, o puede creársela si todavía no tiene
     const ficha = m && esAdmin ? prospectosData.find(p => p.mayoristaId === m.id) : null;
     const btnFicha = document.getElementById('contacto-ver-ficha');
     btnFicha.classList.toggle('hidden', !ficha);
     if (ficha) btnFicha.onclick = () => { cerrarModal('modalContacto'); setTimeout(() => abrirFichaProspecto(ficha.id), 300); };
+    const puedeCrearFicha = !!m && esAdmin && estadoCrm === 'listo' && !ficha;
+    const btnCrearFicha = document.getElementById('contacto-crear-ficha');
+    btnCrearFicha.classList.toggle('hidden', !puedeCrearFicha);
+    if (puedeCrearFicha) btnCrearFicha.onclick = () => { cerrarModal('modalContacto'); setTimeout(() => crearFichaCliente(m.id), 300); };
     abrirModal('modalContacto');
 };
 
@@ -2034,15 +2038,33 @@ const OPCIONES_ETAPA = [
 ];
 const OPCIONES_ETAPA_EN_CURSO = OPCIONES_ETAPA.filter(([valor]) => ETAPAS_EN_CURSO.includes(valor.split(':')[0]) && valor !== 'evaluacion:no_interesado');
 const RUBROS_SUGERIDOS = ['Cancha de fútbol', 'Kiosco', 'Drugstore', 'Gastronómico'];
+// días que se sugieren para el próximo seguimiento según la etapa elegida
+const SUGERENCIA_SEGUIMIENTO = { nuevo: 2, contactado: 3, 'evaluacion:interesado': 3, 'evaluacion:seguimiento': 7, negociacion: 2, pausa: 30 };
+// valores de fábrica; se pueden cambiar en Ajustes del CRM (ajustes/crm)
+const AVISOS_CRM_BASE = { diasFrio: 15, diasNuevoSinContactar: 3, diasSinPrimerPedido: 7 };
+const PLANTILLAS_CRM = {
+    presentacion: { titulo: 'Presentación', icono: 'fa-hand', para: 'prospecto', texto: '¡Hola {nombre}! 👋 Te escribo de Pipón 🥪. Estamos sumando negocios que vendan nuestros productos y me gustaría contarte cómo trabajamos por mayor. ¿Te paso el catálogo con precios?' },
+    catalogo: { titulo: 'Catálogo', icono: 'fa-book-open', para: 'prospecto', texto: '¡Hola {nombre}! Te paso el catálogo mayorista de Pipón 🥪 con los precios actualizados. Desde acá podés ver todo y armar el pedido: {link}' },
+    seguimiento: { titulo: 'Seguimiento', icono: 'fa-clock-rotate-left', para: 'prospecto', texto: '¡Hola {nombre}! ¿Cómo estás? Te escribo de Pipón 🥪 para saber si pudiste ver el catálogo. ¿Te gustaría hacer un primer pedido de prueba?' },
+    postventa: { titulo: '¿Cómo te fue?', icono: 'fa-face-smile', para: 'cliente', texto: '¡Hola {nombre}! ¿Cómo te fue con la mercadería de Pipón 🥪? ¿Cómo la recibieron tus clientes? Cuando quieras reponer, tu link es: {link}' }
+};
+const PERIODOS_CRM = { mes: 'Este mes', pasado: 'Mes pasado', trimestre: '3 meses', todo: 'Todo' };
+const DIMENSIONES_CRM = { canal: 'Canal', rubro: 'Rubro', zona: 'Zona' };
+const ORDEN_EMBUDO = ['nuevo', 'contactado', 'evaluacion', 'negociacion', 'cliente'];
 
 let prospectosData = [];
 let estadoCrm = 'cargando';
 let subPestanaCrm = 'prospectos';
 let prospectoAbierto = null;
-let movimientoCrm = { id: null, modo: 'contacto', noInteresado: false };
+let movimientoCrm = { id: null, modo: 'contacto', noInteresado: false, fechaTocada: false };
 let variedadesForm = [];
 let conversionCrm = { id: null, destino: null, forzarNuevo: false };
 let prospectoAEliminar = null;
+let ajustesCrm = {};
+let mensajeCrm = { id: null, plantilla: null };
+let periodoResultados = 'mes';
+let dimensionResultados = 'canal';
+let creandoFicha = false;
 
 const normalizarTexto = (texto) => String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 const fechaAInput = (fecha) => {
@@ -2119,18 +2141,57 @@ const valoresUnicosCrm = (campo) => {
     return [...mapa.entries()].sort((a, b) => a[1].localeCompare(b[1]));
 };
 
+// ----- Avisos automáticos -----
+const diasAvisoCrm = (clave) => {
+    const n = Number(ajustesCrm.avisos?.[clave]);
+    return n > 0 ? n : AVISOS_CRM_BASE[clave];
+};
+const diasSinContacto = (p) => {
+    const ref = ultimoContacto(p) || aFecha(p.creado);
+    return ref ? diasEntre(ref, new Date()) : 0;
+};
+// en curso, sin seguimiento agendado y sin contacto hace rato: se está olvidando
+const estaFrio = (p) => {
+    if (!ETAPAS_EN_CURSO.includes(p.etapa) || p.proximoSeguimiento) return false;
+    const limite = p.etapa === 'nuevo' && !ultimoContacto(p) ? diasAvisoCrm('diasNuevoSinContactar') : diasAvisoCrm('diasFrio');
+    return diasSinContacto(p) >= limite;
+};
+// pedidos que llegaron con el WhatsApp de un negocio que todavía no pasó a cliente
+const pedidosDeProspecto = (p) => {
+    if (p.mayoristaId || p.etapa === 'cliente') return [];
+    const tel = normalizarTelefono(p.telefono);
+    if (!tel) return [];
+    return pedidosData.filter(x => x.estado !== 'cancelado' && (normalizarTelefono(x.mayoristaTelefono) === tel || normalizarTelefono(telefonoPedido(x)) === tel))
+        .sort((a, b) => (aFecha(b.timestamp)?.getTime() || 0) - (aFecha(a.timestamp)?.getTime() || 0));
+};
+// cliente que llegó por el CRM y todavía no compró; registrarle un contacto posterga el aviso
+const sinPrimerPedido = (p) => {
+    if (p.etapa !== 'cliente' || p.yaEraCliente || !p.fechaConversion) return false;
+    const m = clienteDeProspecto(p);
+    if (!m || estadisticasContacto(m).compras) return false;
+    const conversion = aFecha(p.fechaConversion);
+    const u = ultimoContacto(p);
+    return diasEntre(u && u > conversion ? u : conversion, new Date()) >= diasAvisoCrm('diasSinPrimerPedido');
+};
+
 function resumenSeguimientos() {
-    const r = { atrasados: [], hoy: [], proximos: [], sinFecha: [] };
+    const r = { atrasados: [], hoy: [], proximos: [], frios: [], sinFecha: [], conPedido: [], sinPrimerPedido: [] };
     prospectosData.map(datosProspecto).forEach(p => {
         const estado = estadoSeguimiento(p);
         if (estado === 'atrasado') r.atrasados.push(p);
         else if (estado === 'hoy') r.hoy.push(p);
         else if (estado === 'proximo') r.proximos.push(p);
+        else if (estaFrio(p)) r.frios.push(p);
         else if (ETAPAS_EN_CURSO.includes(p.etapa)) r.sinFecha.push(p);
+        if (pedidosDeProspecto(p).length) r.conPedido.push(p);
+        if (sinPrimerPedido(p)) r.sinPrimerPedido.push(p);
     });
     const porFecha = (a, b) => aFecha(a.proximoSeguimiento) - aFecha(b.proximoSeguimiento);
     [r.atrasados, r.hoy, r.proximos].forEach(lista => lista.sort(porFecha));
+    r.frios.sort((a, b) => diasSinContacto(b) - diasSinContacto(a));
     r.sinFecha.sort((a, b) => (aFecha(a.creado)?.getTime() || 0) - (aFecha(b.creado)?.getTime() || 0));
+    // los fríos se muestran pero no suman al número rojo, para que no se vuelva ruido
+    r.urgentes = r.atrasados.length + r.hoy.length + r.conPedido.length + r.sinPrimerPedido.length;
     return r;
 }
 
@@ -2151,7 +2212,7 @@ window.irACrm = function(sub) {
 function renderCrm() {
     if (!esAdmin) return;
     const r = resumenSeguimientos();
-    const pendientes = r.atrasados.length + r.hoy.length;
+    const pendientes = r.urgentes;
 
     const badge = document.getElementById('badge-crm');
     badge.innerText = pendientes;
@@ -2161,12 +2222,14 @@ function renderCrm() {
     const subtabs = [
         { id: 'prospectos', texto: 'Prospectos', icono: 'fa-store', badge: 0 },
         { id: 'seguimientos', texto: 'Seguimientos', icono: 'fa-bell', badge: pendientes },
-        { id: 'clientes', texto: 'Clientes', icono: 'fa-handshake', badge: 0 }
+        { id: 'clientes', texto: 'Clientes', icono: 'fa-handshake', badge: 0 },
+        { id: 'resultados', texto: 'Resultados', icono: 'fa-chart-simple', badge: 0 }
     ];
     document.getElementById('subtabs-crm').innerHTML = subtabs.map(s => {
         const activa = subPestanaCrm === s.id;
         const badgeHtml = s.badge ? `<span class="absolute -top-1.5 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] flex items-center justify-center bg-red-500 text-white shadow-sm">${s.badge}</span>` : '';
-        return `<button onclick="cambiarSubPestanaCrm('${s.id}')" class="relative py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${activa ? 'bg-teal-600 text-white shadow-sm' : 'text-gray-500'}"><i class="fa-solid ${s.icono} hidden min-[400px]:inline"></i>${s.texto}${badgeHtml}</button>`;
+        // son 4 sub-pestañas: en celulares angostos la letra se achica un poco para que entre "Seguimientos"
+        return `<button onclick="cambiarSubPestanaCrm('${s.id}')" class="relative py-2.5 rounded-xl text-[11px] tracking-tight min-[400px]:text-xs min-[400px]:tracking-normal font-bold flex items-center justify-center gap-1.5 transition-all ${activa ? 'bg-teal-600 text-white shadow-sm' : 'text-gray-500'}"><i class="fa-solid ${s.icono} hidden min-[480px]:inline"></i>${s.texto}${badgeHtml}</button>`;
     }).join('');
 
     document.querySelectorAll('.subtab-crm').forEach(el => el.classList.add('hidden'));
@@ -2178,6 +2241,7 @@ function renderCrm() {
     renderListaCrm();
     renderSeguimientosCrm(r);
     renderClientesCrm();
+    if (subPestanaCrm === 'resultados') renderResultadosCrm();
 }
 
 function renderSugerenciasCrm() {
@@ -2261,6 +2325,7 @@ function prospectosFiltrados() {
         if (proximo) {
             const estado = estadoSeguimiento(p);
             if (proximo === 'sin' && p.proximoSeguimiento) return false;
+            if (proximo === 'frio' && !estaFrio(p)) return false;
             if (proximo === 'atrasado' && estado !== 'atrasado') return false;
             if (proximo === 'hoy' && estado !== 'hoy') return false;
             if (proximo === 'semana' && !(estado === 'hoy' || (estado === 'proximo' && diasEntre(new Date(), aFecha(p.proximoSeguimiento)) <= 7))) return false;
@@ -2278,11 +2343,14 @@ const tarjetaProspecto = (p) => {
     const estado = estadoSeguimiento(p);
     const u = ultimoContacto(p);
     const wa = linkWhatsApp(p.telefono);
-    const borde = { atrasado: 'border-l-red-500', hoy: 'border-l-orange-400' }[estado] || 'border-l-teal-500';
+    const frio = !estado && estaFrio(p);
+    const conPedido = pedidosDeProspecto(p).length > 0;
+    const borde = conPedido ? 'border-l-green-500' : { atrasado: 'border-l-red-500', hoy: 'border-l-orange-400' }[estado] || (frio ? 'border-l-sky-400' : 'border-l-teal-500');
     const colorSeg = { atrasado: 'bg-red-50 text-red-600', hoy: 'bg-orange-50 text-orange-600', proximo: 'bg-gray-100 text-gray-600' }[estado];
     const lugar = [p.rubro, p.zona].filter(Boolean).map(escaparHtml).join(' · ');
     const seguimiento = estado
         ? `<span class="px-2 py-0.5 rounded ${colorSeg}"><i class="fa-regular fa-calendar mr-1"></i>${textoSeguimiento(p)}</span>`
+        : frio ? `<span class="px-2 py-0.5 rounded bg-sky-50 text-sky-600"><i class="fa-solid fa-snowflake mr-1"></i>Frío</span>`
         : ETAPAS_EN_CURSO.includes(p.etapa) ? `<span class="text-gray-400"><i class="fa-regular fa-calendar-xmark mr-1"></i>Sin seguimiento</span>` : '';
     return `
     <div class="bg-white rounded-xl shadow-sm border-l-4 ${borde} flex">
@@ -2290,12 +2358,13 @@ const tarjetaProspecto = (p) => {
             <p class="font-bold text-gray-800 truncate">${escaparHtml(p.nombre)}</p>
             <div class="flex items-center gap-2 mt-1 min-w-0">${chipEtapa(p)}${lugar ? `<span class="text-xs text-gray-500 font-medium truncate">${lugar}</span>` : ''}</div>
             <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px] font-bold">
+                ${conPedido ? `<span class="px-2 py-0.5 rounded bg-green-50 text-green-700"><i class="fa-solid fa-cart-shopping mr-1"></i>Hizo un pedido</span>` : ''}
                 ${seguimiento}
                 <span class="text-gray-400"><i class="fa-regular fa-comments mr-1"></i>${u ? 'Último contacto ' + haceDias(u) : 'Sin contactar'}</span>
             </div>
             ${estado && p.proximoPaso ? `<p class="text-xs text-gray-600 mt-1.5 truncate"><i class="fa-solid fa-arrow-right text-teal-500 mr-1"></i>${escaparHtml(p.proximoPaso)}</p>` : ''}
         </button>
-        ${wa ? `<a href="${wa}" target="_blank" class="w-12 shrink-0 flex items-center justify-center text-green-500 text-2xl border-l border-gray-100 active:bg-green-50 rounded-r-xl" aria-label="Escribir por WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>` : ''}
+        ${wa ? `<button onclick="abrirMensajeCrm('${p.id}')" class="w-12 shrink-0 flex items-center justify-center text-green-500 text-2xl border-l border-gray-100 active:bg-green-50 rounded-r-xl" aria-label="Escribir por WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>` : ''}
     </div>`;
 };
 
@@ -2331,19 +2400,56 @@ function renderListaCrm() {
     cont.innerHTML = html;
 }
 
-const filaSeguimiento = (p, color) => {
+const filaSeguimiento = (p, color, etiqueta = textoSeguimiento(p) || 'Sin fecha') => {
     const wa = linkWhatsApp(p.telefono);
     return `
     <div class="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
         <button onclick="abrirFichaProspecto('${p.id}')" class="w-full text-left">
             <div class="flex justify-between items-start gap-2">
                 <p class="font-bold text-gray-800 truncate min-w-0">${escaparHtml(p.nombre)}</p>
-                <span class="text-[11px] font-black shrink-0 ${color}">${textoSeguimiento(p) || 'Sin fecha'}</span>
+                <span class="text-[11px] font-black shrink-0 ${color}">${etiqueta}</span>
             </div>
             <div class="flex items-center gap-2 mt-1 min-w-0">${chipEtapa(p)}${p.proximoPaso ? `<span class="text-xs text-gray-500 truncate">${escaparHtml(p.proximoPaso)}</span>` : ''}</div>
         </button>
         <div class="grid ${wa ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mt-2.5">
-            ${wa ? `<a href="${wa}" target="_blank" class="bg-green-50 text-green-600 font-bold py-2 rounded-lg text-xs text-center active:bg-green-100"><i class="fa-brands fa-whatsapp mr-1"></i>WhatsApp</a>` : ''}
+            ${wa ? `<button onclick="abrirMensajeCrm('${p.id}')" class="bg-green-50 text-green-600 font-bold py-2 rounded-lg text-xs text-center active:bg-green-100"><i class="fa-brands fa-whatsapp mr-1"></i>WhatsApp</button>` : ''}
+            <button onclick="abrirMovimientoCrm('${p.id}', 'contacto')" class="bg-teal-50 text-teal-700 font-bold py-2 rounded-lg text-xs active:bg-teal-100"><i class="fa-solid fa-pen-to-square mr-1"></i>Registrar contacto</button>
+        </div>
+    </div>`;
+};
+
+const filaFrio = (p, color) => filaSeguimiento(p, color, `${plural(diasSinContacto(p), 'día', 'días')} ${ultimoContacto(p) ? 'sin contacto' : 'sin contactar'}`);
+
+const filaPedidoProspecto = (p) => {
+    const pedidos = pedidosDeProspecto(p);
+    const ultimo = pedidos[0];
+    return `
+    <div class="bg-white rounded-xl p-3 shadow-sm border border-green-200">
+        <button onclick="abrirFichaProspecto('${p.id}')" class="w-full text-left">
+            <div class="flex justify-between items-start gap-2">
+                <p class="font-bold text-gray-800 truncate min-w-0">${escaparHtml(p.nombre)}</p>
+                <span class="text-[11px] font-black shrink-0 text-green-700">${formatearDinero(Number(ultimo.total) || 0)}</span>
+            </div>
+            <p class="text-xs text-gray-500 font-medium mt-0.5">${pedidos.length === 1 ? 'Hizo un pedido' : `Hizo ${pedidos.length} pedidos`} · el último el ${formatearFecha(ultimo.timestamp)}</p>
+        </button>
+        <button onclick="abrirConvertirProspecto('${p.id}')" class="w-full mt-2.5 bg-green-600 text-white font-bold py-2 rounded-lg text-xs active:bg-green-700"><i class="fa-solid fa-store mr-1"></i>Pasar a cliente mayorista</button>
+    </div>`;
+};
+
+const filaSinPrimerPedido = (p) => {
+    const m = clienteDeProspecto(p);
+    const dias = diasEntre(aFecha(p.fechaConversion), new Date());
+    return `
+    <div class="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+        <button onclick="abrirFichaProspecto('${p.id}')" class="w-full text-left">
+            <div class="flex justify-between items-start gap-2">
+                <p class="font-bold text-gray-800 truncate min-w-0">${escaparHtml(p.nombre)}</p>
+                <span class="text-[11px] font-black shrink-0 text-violet-600">Cliente hace ${plural(dias, 'día', 'días')}</span>
+            </div>
+            <p class="text-xs text-gray-500 font-medium mt-0.5">Todavía no hizo su primer pedido</p>
+        </button>
+        <div class="grid grid-cols-2 gap-2 mt-2.5">
+            <button onclick="enviarLinkPedido('${m.id}')" class="bg-green-50 text-green-600 font-bold py-2 rounded-lg text-xs active:bg-green-100"><i class="fa-solid fa-link mr-1"></i>Enviarle su link</button>
             <button onclick="abrirMovimientoCrm('${p.id}', 'contacto')" class="bg-teal-50 text-teal-700 font-bold py-2 rounded-lg text-xs active:bg-teal-100"><i class="fa-solid fa-pen-to-square mr-1"></i>Registrar contacto</button>
         </div>
     </div>`;
@@ -2352,14 +2458,17 @@ const filaSeguimiento = (p, color) => {
 function renderSeguimientosCrm(r) {
     const cont = document.getElementById('crm-seguimientos');
     if (estadoCrm !== 'listo') { cont.innerHTML = avisoEstadoCrm(); return; }
-    const grupo = (titulo, icono, color, lista) => !lista.length ? '' : `
+    const grupo = (titulo, icono, color, lista, fila = filaSeguimiento) => !lista.length ? '' : `
         <div class="mb-5">
             <h3 class="text-xs font-black uppercase tracking-widest ${color} mb-2 px-1 flex items-center gap-2"><i class="fa-solid ${icono}"></i>${titulo}<span class="ml-auto bg-white border border-gray-100 text-gray-500 px-2 rounded-full">${lista.length}</span></h3>
-            <div class="flex flex-col gap-2">${lista.map(p => filaSeguimiento(p, color)).join('')}</div>
+            <div class="flex flex-col gap-2">${lista.map(p => fila(p, color)).join('')}</div>
         </div>`;
-    const html = grupo('Atrasados', 'fa-triangle-exclamation', 'text-red-600', r.atrasados)
+    const html = grupo('Hicieron un pedido', 'fa-cart-shopping', 'text-green-700', r.conPedido, filaPedidoProspecto)
+        + grupo('Atrasados', 'fa-triangle-exclamation', 'text-red-600', r.atrasados)
         + grupo('Para hoy', 'fa-bell', 'text-orange-600', r.hoy)
+        + grupo('Clientes sin primer pedido', 'fa-hourglass-half', 'text-violet-600', r.sinPrimerPedido, filaSinPrimerPedido)
         + grupo('Próximos', 'fa-calendar-days', 'text-teal-700', r.proximos)
+        + grupo('Se están enfriando', 'fa-snowflake', 'text-sky-600', r.frios, filaFrio)
         + grupo('Sin seguimiento definido', 'fa-calendar-xmark', 'text-gray-500', r.sinFecha);
     cont.innerHTML = html
         ? `<div class="pb-8">${html}</div>`
@@ -2369,36 +2478,68 @@ function renderSeguimientosCrm(r) {
 function renderClientesCrm() {
     const cont = document.getElementById('crm-clientes');
     if (estadoCrm !== 'listo') { cont.innerHTML = avisoEstadoCrm(); return; }
-    const clientes = prospectosData.filter(p => p.etapa === 'cliente')
+    const clientes = prospectosData.filter(p => p.etapa === 'cliente');
+    const delCrm = clientes.filter(p => !p.yaEraCliente)
         .sort((a, b) => (aFecha(b.fechaConversion)?.getTime() || 0) - (aFecha(a.fechaConversion)?.getTime() || 0));
-    const nota = `<p class="text-xs text-gray-500 font-medium mb-3 px-1"><i class="fa-solid fa-circle-info text-teal-500 mr-1"></i>Negocios que llegaron desde el CRM. Sus pedidos, descuentos y links se manejan en Mayorista.</p>`;
-    if (!clientes.length) {
-        cont.innerHTML = nota + `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm"><i class="fa-solid fa-handshake text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium px-6">Todavía ningún negocio del CRM pasó a cliente.</p></div>`;
-        return;
+    const yaEran = clientes.filter(p => p.yaEraCliente)
+        .sort((a, b) => String(datosProspecto(a).nombre || '').localeCompare(String(datosProspecto(b).nombre || '')));
+    const sinFicha = mayoristasSinFicha();
+    const titulo = (texto, icono, color, n) => `<h3 class="text-xs font-black uppercase tracking-widest ${color} mb-2 px-1 flex items-center gap-2"><i class="fa-solid ${icono}"></i>${texto}<span class="ml-auto bg-white border border-gray-100 text-gray-500 px-2 rounded-full">${n}</span></h3>`;
+
+    let html = `<p class="text-xs text-gray-500 font-medium mb-4 px-1"><i class="fa-solid fa-circle-info text-teal-500 mr-1"></i>Clientes con ficha comercial. Sus pedidos, descuentos y links se manejan en Mayorista.</p>`;
+    html += `<div class="mb-5">${titulo('Llegaron por el CRM', 'fa-handshake', 'text-green-700', delCrm.length)}`
+        + (delCrm.length
+            ? `<div class="flex flex-col gap-3">${delCrm.map(tarjetaClienteCrm).join('')}</div>`
+            : `<p class="text-center text-sm text-gray-400 font-medium py-6 bg-white rounded-xl border border-dashed border-gray-200 px-6">Todavía ningún negocio del CRM pasó a cliente.</p>`)
+        + `</div>`;
+    if (yaEran.length) {
+        html += `<div class="mb-5">${titulo('Ya eran clientes', 'fa-store', 'text-sky-700', yaEran.length)}<div class="flex flex-col gap-3">${yaEran.map(tarjetaClienteCrm).join('')}</div></div>`;
     }
-    cont.innerHTML = nota + `<div class="flex flex-col gap-3 pb-8">${clientes.map(original => {
-        const m = clienteDeProspecto(original);
-        const p = datosProspecto(original);
-        const est = m ? estadisticasContacto(m) : null;
-        const demora = p.fechaConversion && p.creado ? diasEntre(aFecha(p.creado), aFecha(p.fechaConversion)) : null;
-        const textoDemora = demora === null ? '' : demora <= 0 ? ' · se cerró el mismo día' : ` · se cerró en ${plural(demora, 'día', 'días')}`;
-        return `
-        <div class="bg-white rounded-xl p-4 shadow-sm border-l-4 border-l-green-500">
-            <button onclick="abrirFichaProspecto('${p.id}')" class="w-full text-left">
-                <p class="font-bold text-gray-800 truncate">${escaparHtml(p.nombre)}</p>
-                <p class="text-xs text-gray-500 font-medium mt-0.5">Cliente desde ${formatearFecha(p.fechaConversion)}${textoDemora}</p>
-            </button>
-            ${m ? `
-            <div class="grid grid-cols-2 gap-2 mt-3 text-center">
-                <div class="bg-gray-50 rounded-lg p-2"><p class="text-lg font-black text-gray-800">${est.compras}</p><p class="text-[9px] uppercase font-bold text-gray-400 leading-tight">Compras</p></div>
-                <div class="bg-gray-50 rounded-lg p-2"><p class="text-sm font-black text-gray-800 leading-7">${est.ultima ? formatearFecha(est.ultima) : '—'}</p><p class="text-[9px] uppercase font-bold text-gray-400 leading-tight">Última compra</p></div>
-            </div>` : `<p class="mt-3 text-xs font-bold text-red-500"><i class="fa-solid fa-triangle-exclamation mr-1"></i>No se encontró en Mayorista → Contactos.</p>`}
-            <div class="grid grid-cols-2 gap-2 mt-3">
-                <button onclick="abrirFichaProspecto('${p.id}')" class="bg-teal-50 text-teal-700 font-bold py-2 rounded-lg text-xs active:bg-teal-100"><i class="fa-solid fa-briefcase mr-1"></i>Ficha comercial</button>
-                <button onclick="verClienteEnMayorista('${p.id}')" class="bg-violet-50 text-violet-700 font-bold py-2 rounded-lg text-xs active:bg-violet-100"><i class="fa-solid fa-boxes-stacked mr-1"></i>Ver en Mayorista</button>
-            </div>
-        </div>`;
-    }).join('')}</div>`;
+    if (sinFicha.length) {
+        html += `<div class="mb-5">${titulo('Mayoristas sin ficha', 'fa-address-book', 'text-gray-500', sinFicha.length)}
+            <p class="text-[11px] text-gray-500 font-medium mb-2 px-1">Clientes de Mayorista que todavía no tienen ficha comercial. Creásela para anotarles contactos y seguimientos.</p>
+            <div class="flex flex-col gap-2">${sinFicha.map(filaSinFicha).join('')}</div></div>`;
+    }
+    cont.innerHTML = `<div class="pb-8">${html}</div>`;
+}
+
+const filaSinFicha = (m) => {
+    const pendiente = prospectoMismoTelefono(m);
+    const est = estadisticasContacto(m);
+    return `
+    <div class="bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex items-center gap-3">
+        <div class="flex-1 min-w-0">
+            <p class="font-bold text-gray-800 truncate">${escaparHtml(m.nombre)}</p>
+            <p class="text-[11px] text-gray-500 font-medium truncate">${plural(est.compras, 'compra', 'compras')}${est.ultima ? ` · última ${formatearFecha(est.ultima)}` : ''}</p>
+            ${pendiente ? `<p class="text-[11px] text-amber-700 font-bold truncate"><i class="fa-solid fa-link mr-1"></i>En el CRM como ${escaparHtml(pendiente.nombre)}</p>` : ''}
+        </div>
+        <button onclick="crearFichaCliente('${m.id}')" class="shrink-0 ${pendiente ? 'bg-amber-50 text-amber-700' : 'bg-teal-50 text-teal-700'} font-bold px-3 py-2 rounded-lg text-xs active:scale-95 transition-all">${pendiente ? '<i class="fa-solid fa-link mr-1"></i>Vincular' : '<i class="fa-solid fa-plus mr-1"></i>Crear ficha'}</button>
+    </div>`;
+};
+
+function tarjetaClienteCrm(original) {
+    const m = clienteDeProspecto(original);
+    const p = datosProspecto(original);
+    const est = m ? estadisticasContacto(m) : null;
+    const demora = p.fechaConversion && p.creado ? diasEntre(aFecha(p.creado), aFecha(p.fechaConversion)) : null;
+    const textoDemora = demora === null ? '' : demora <= 0 ? ' · se cerró el mismo día' : ` · se cerró en ${plural(demora, 'día', 'días')}`;
+    const subtitulo = p.yaEraCliente ? `Ya era cliente · ficha desde ${formatearFecha(p.creado)}` : `Cliente desde ${formatearFecha(p.fechaConversion)}${textoDemora}`;
+    return `
+    <div class="bg-white rounded-xl p-4 shadow-sm border-l-4 ${p.yaEraCliente ? 'border-l-sky-400' : 'border-l-green-500'}">
+        <button onclick="abrirFichaProspecto('${p.id}')" class="w-full text-left">
+            <p class="font-bold text-gray-800 truncate">${escaparHtml(p.nombre)}</p>
+            <p class="text-xs text-gray-500 font-medium mt-0.5">${subtitulo}</p>
+        </button>
+        ${m ? `
+        <div class="grid grid-cols-2 gap-2 mt-3 text-center">
+            <div class="bg-gray-50 rounded-lg p-2"><p class="text-lg font-black text-gray-800">${est.compras}</p><p class="text-[9px] uppercase font-bold text-gray-400 leading-tight">Compras</p></div>
+            <div class="bg-gray-50 rounded-lg p-2"><p class="text-sm font-black text-gray-800 leading-7">${est.ultima ? formatearFecha(est.ultima) : '—'}</p><p class="text-[9px] uppercase font-bold text-gray-400 leading-tight">Última compra</p></div>
+        </div>` : `<p class="mt-3 text-xs font-bold text-red-500"><i class="fa-solid fa-triangle-exclamation mr-1"></i>No se encontró en Mayorista → Contactos.</p>`}
+        <div class="grid grid-cols-2 gap-2 mt-3">
+            <button onclick="abrirFichaProspecto('${p.id}')" class="bg-teal-50 text-teal-700 font-bold py-2 rounded-lg text-xs active:bg-teal-100"><i class="fa-solid fa-briefcase mr-1"></i>Ficha comercial</button>
+            <button onclick="verClienteEnMayorista('${p.id}')" class="bg-violet-50 text-violet-700 font-bold py-2 rounded-lg text-xs active:bg-violet-100"><i class="fa-solid fa-boxes-stacked mr-1"></i>Ver en Mayorista</button>
+        </div>
+    </div>`;
 }
 
 function renderAlertaCrm() {
@@ -2406,14 +2547,25 @@ function renderAlertaCrm() {
     let html = '';
     if (esAdmin && estadoCrm === 'listo') {
         const r = resumenSeguimientos();
-        const total = r.atrasados.length + r.hoy.length;
-        if (total) {
-            const partes = [];
-            if (r.atrasados.length) partes.push(plural(r.atrasados.length, 'atrasado', 'atrasados'));
-            if (r.hoy.length) partes.push(`${r.hoy.length} para hoy`);
-            html = `<button onclick="irACrm('seguimientos')" class="w-full text-left bg-teal-600 text-white rounded-2xl p-4 flex items-center gap-3 shadow-md active:scale-95 transition-all">
+        // un negocio del CRM que compró por el link es lo más importante: va primero y aparte
+        if (r.conPedido.length) {
+            html += `<button onclick="irACrm('seguimientos')" class="w-full text-left bg-green-600 text-white rounded-2xl p-4 flex items-center gap-3 shadow-md active:scale-95 transition-all">
+                <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><i class="fa-solid fa-cart-shopping"></i></div>
+                <div class="flex-1 min-w-0"><p class="font-bold">${r.conPedido.length === 1 ? 'Un negocio del CRM hizo un pedido' : `${r.conPedido.length} negocios del CRM hicieron un pedido`}</p><p class="text-xs text-white/80 truncate"><span class="font-bold text-white">${escaparHtml(r.conPedido.map(p => p.nombre).join(', '))}</span> · Tocá para pasarlo a cliente</p></div>
+                <i class="fa-solid fa-chevron-right text-white/70"></i>
+            </button>`;
+        }
+        const pendientes = r.atrasados.length + r.hoy.length;
+        const partes = [];
+        if (r.atrasados.length) partes.push(plural(r.atrasados.length, 'atrasado', 'atrasados'));
+        if (r.hoy.length) partes.push(`${r.hoy.length} para hoy`);
+        if (r.sinPrimerPedido.length) partes.push(`${r.sinPrimerPedido.length} sin primer pedido`);
+        if (r.frios.length) partes.push(plural(r.frios.length, 'frío', 'fríos'));
+        if (partes.length) {
+            const nombres = [...new Set([...r.atrasados, ...r.hoy, ...r.sinPrimerPedido, ...r.frios].map(p => p.nombre))];
+            html += `<button onclick="irACrm('seguimientos')" class="w-full text-left bg-teal-600 text-white rounded-2xl p-4 flex items-center gap-3 shadow-md active:scale-95 transition-all">
                 <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><i class="fa-solid fa-briefcase"></i></div>
-                <div class="flex-1 min-w-0"><p class="font-bold">${plural(total, 'seguimiento pendiente', 'seguimientos pendientes')}</p><p class="text-xs text-white/80 truncate"><span class="font-bold text-white">${partes.join(' · ')}</span> · ${escaparHtml([...r.atrasados, ...r.hoy].map(p => p.nombre).join(', '))}</p></div>
+                <div class="flex-1 min-w-0"><p class="font-bold">${pendientes ? plural(pendientes, 'seguimiento pendiente', 'seguimientos pendientes') : 'Avisos del CRM'}</p><p class="text-xs text-white/80 truncate"><span class="font-bold text-white">${partes.join(' · ')}</span> · ${escaparHtml(nombres.join(', '))}</p></div>
                 <i class="fa-solid fa-chevron-right text-white/70"></i>
             </button>`;
         }
@@ -2458,7 +2610,7 @@ const filaHistorialCrm = (i) => {
     } else {
         icono = 'fa-solid fa-flag';
         color = 'bg-sky-100 text-sky-700';
-        titulo = `Se cargó en el CRM · ${textoEtapa(i.etapa, i.situacion)}`;
+        titulo = i.yaEraCliente ? 'Se cargó en el CRM · ya era cliente' : `Se cargó en el CRM · ${textoEtapa(i.etapa, i.situacion)}`;
     }
     return `
     <div class="flex gap-3">
@@ -2484,11 +2636,21 @@ function renderFichaProspecto() {
 
     const ig = linkInstagram(p.instagram);
     const enlace = (href, clases, icono, texto) => href ? `<a href="${escaparHtml(href)}" target="_blank" rel="noopener" class="flex-1 ${clases} font-bold py-2.5 rounded-xl text-xs text-center active:scale-95 transition-all"><i class="${icono} mr-1"></i>${texto}</a>` : '';
+    // WhatsApp abre los mensajes armados en vez de ir directo
+    const botonWa = linkWhatsApp(p.telefono) ? `<button onclick="abrirMensajeCrm('${p.id}')" class="flex-1 bg-green-500 text-white font-bold py-2.5 rounded-xl text-xs text-center active:scale-95 transition-all"><i class="fa-brands fa-whatsapp mr-1"></i>WhatsApp</button>` : '';
     const enlaces = [
-        enlace(linkWhatsApp(p.telefono), 'bg-green-500 text-white', 'fa-brands fa-whatsapp', 'WhatsApp'),
+        botonWa,
         enlace(ig, 'bg-pink-50 text-pink-600', ig.includes('instagram.com') ? 'fa-brands fa-instagram' : 'fa-solid fa-globe', ig.includes('instagram.com') ? 'Instagram' : 'Red social'),
         enlace(linkMapa(p), 'bg-blue-50 text-blue-600', 'fa-solid fa-location-dot', 'Mapa')
     ].join('');
+
+    const pedidos = pedidosDeProspecto(p);
+    const avisoPedido = pedidos.length ? `<div class="rounded-xl border border-green-200 bg-green-50 p-3 mb-4 text-green-800">
+            <p class="text-[10px] uppercase font-black tracking-widest opacity-70"><i class="fa-solid fa-cart-shopping mr-1"></i>${pedidos.length === 1 ? 'Hizo un pedido' : `Hizo ${pedidos.length} pedidos`}</p>
+            <p class="font-black">${formatearFecha(pedidos[0].timestamp)} · ${formatearDinero(Number(pedidos[0].total) || 0)}</p>
+            <p class="text-xs font-medium mt-0.5">Llegó con su mismo WhatsApp. Pasalo a cliente para que quede vinculado.</p>
+        </div>` : '';
+    const avisoPrimerPedido = sinPrimerPedido(p) ? `<div class="rounded-xl border border-violet-200 bg-violet-50 p-3 mb-4 text-violet-800 text-sm font-medium"><i class="fa-solid fa-hourglass-half mr-1"></i>Es cliente hace ${plural(diasEntre(aFecha(p.fechaConversion), new Date()), 'día', 'días')} y todavía no hizo su primer pedido.</div>` : '';
 
     const colorSeg = { atrasado: 'bg-red-50 border-red-200 text-red-700', hoy: 'bg-orange-50 border-orange-200 text-orange-700', proximo: 'bg-teal-50 border-teal-100 text-teal-800' }[estado];
     let seguimiento = '';
@@ -2498,6 +2660,8 @@ function renderFichaProspecto() {
             <p class="font-black">${textoSeguimiento(p)} <span class="font-medium text-xs opacity-70">(${formatearFecha(p.proximoSeguimiento)})</span></p>
             ${p.proximoPaso ? `<p class="text-sm font-medium mt-0.5"><i class="fa-solid fa-arrow-right mr-1"></i>${escaparHtml(p.proximoPaso)}</p>` : ''}
         </div>`;
+    } else if (estaFrio(p)) {
+        seguimiento = `<div class="rounded-xl border border-sky-200 bg-sky-50 p-3 mb-4 text-sm text-sky-800 font-medium"><i class="fa-solid fa-snowflake mr-1"></i><b>Se está enfriando:</b> ${plural(diasSinContacto(p), 'día', 'días')} ${u ? 'sin contacto' : 'sin contactar'} y sin seguimiento agendado${p.proximoPaso ? ` · ${escaparHtml(p.proximoPaso)}` : ''}</div>`;
     } else if (!ETAPAS_SIN_SEGUIMIENTO.includes(p.etapa)) {
         seguimiento = `<div class="rounded-xl border border-dashed border-gray-300 p-3 mb-4 text-sm text-gray-500 font-medium"><i class="fa-regular fa-calendar-xmark mr-1"></i>Sin seguimiento definido${p.proximoPaso ? ` · ${escaparHtml(p.proximoPaso)}` : ''}</div>`;
     }
@@ -2534,9 +2698,11 @@ function renderFichaProspecto() {
     cont.innerHTML = `
         <div class="mb-4">
             <p class="text-xl font-black text-gray-800 break-words leading-tight">${escaparHtml(p.nombre)}</p>
-            <div class="flex flex-wrap items-center gap-2 mt-1.5">${chipEtapa(p)}${p.rubro ? `<span class="text-xs font-bold text-gray-500">${escaparHtml(p.rubro)}</span>` : ''}</div>
+            <div class="flex flex-wrap items-center gap-2 mt-1.5">${chipEtapa(p)}${p.yaEraCliente ? `<span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap bg-sky-100 text-sky-700">Ya era cliente</span>` : ''}${p.rubro ? `<span class="text-xs font-bold text-gray-500">${escaparHtml(p.rubro)}</span>` : ''}</div>
         </div>
         ${enlaces ? `<div class="flex gap-2 mb-4">${enlaces}</div>` : ''}
+        ${avisoPedido}
+        ${avisoPrimerPedido}
         ${seguimiento}
         <div class="flex flex-col gap-2 mb-5">${acciones}</div>
 
@@ -2760,12 +2926,13 @@ window.elegirCanalCrm = function(canal) {
 
 const opcionesEtapaHtml = (opciones, actual) => opciones.map(([valor, texto]) => `<option value="${valor}">${texto}${valor === actual ? ' (actual)' : ''}</option>`).join('');
 
-window.abrirMovimientoCrm = function(id, modo) {
+// prellenado: lo que ya se sabe del contacto, por ejemplo después de mandar un mensaje armado
+window.abrirMovimientoCrm = function(id, modo, prellenado = {}) {
     if (!esAdmin) return;
     const p = prospectosData.find(x => x.id === id);
     if (!p) return;
     const actual = valorEtapa(p);
-    movimientoCrm = { id, modo, noInteresado: false };
+    movimientoCrm = { id, modo, noInteresado: false, fechaTocada: false };
 
     document.getElementById('titulo-movimiento-crm').innerText = { contacto: 'Registrar contacto', etapa: 'Cambiar etapa', reactivar: 'Reactivar negocio' }[modo];
     document.getElementById('movimiento-negocio').innerHTML = `${escaparHtml(datosProspecto(p).nombre)} · ${chipEtapa(p)}`;
@@ -2775,9 +2942,9 @@ window.abrirMovimientoCrm = function(id, modo) {
     const fecha = document.getElementById('movimiento-fecha');
     fecha.value = fechaAInput(new Date());
     fecha.max = fechaAInput(new Date());
-    document.getElementById('movimiento-resumen').value = '';
+    document.getElementById('movimiento-resumen').value = prellenado.resumen || '';
     document.getElementById('movimiento-nota').value = '';
-    renderCanalesCrm(p.canal || 'whatsapp');
+    renderCanalesCrm(prellenado.canal || p.canal || 'whatsapp');
 
     const select = document.getElementById('movimiento-etapa');
     if (modo === 'reactivar') {
@@ -2790,11 +2957,37 @@ window.abrirMovimientoCrm = function(id, modo) {
     }
     document.getElementById('movimiento-etapa-box').classList.toggle('hidden', p.etapa === 'cliente');
 
-    // al registrar un contacto el seguimiento anterior ya se cumplió; al cambiar etapa se conserva
-    document.getElementById('movimiento-proximo').value = modo === 'contacto' ? '' : fechaAInput(p.proximoSeguimiento);
+    // al registrar un contacto o reactivar se sugiere una fecha nueva según la etapa; al cambiar etapa se conserva hasta elegir otra
+    document.getElementById('movimiento-proximo').value = fechaAInput(p.proximoSeguimiento);
     document.getElementById('movimiento-paso').value = modo === 'contacto' ? '' : (p.proximoPaso || '');
+    document.getElementById('movimiento-sugerencia').classList.add('hidden');
     actualizarFormMovimientoCrm();
+    if (modo !== 'etapa') sugerirProximoCrm();
     abrirModal('modalMovimientoCrm');
+};
+
+// fecha del próximo seguimiento según la etapa elegida, salvo que ya se haya puesto una a mano
+function sugerirProximoCrm() {
+    const aviso = document.getElementById('movimiento-sugerencia');
+    if (movimientoCrm.fechaTocada) return;
+    aviso.classList.add('hidden');
+    const p = prospectosData.find(x => x.id === movimientoCrm.id);
+    const valor = document.getElementById('movimiento-etapa').value;
+    const input = document.getElementById('movimiento-proximo');
+    // si al cambiar etapa se vuelve a la actual, se recupera la fecha que ya tenía
+    if (movimientoCrm.modo === 'etapa' && p && valor === valorEtapa(p)) { input.value = fechaAInput(p.proximoSeguimiento); return; }
+    const dias = p?.etapa === 'cliente' ? null : SUGERENCIA_SEGUIMIENTO[valor];
+    input.value = dias ? fechaAInput(sumarDias(dias)) : '';
+    if (dias) {
+        const etapa = OPCIONES_ETAPA.find(([v]) => v === valor)?.[1] || '';
+        aviso.innerText = `Sugerida para ${etapa}: ${dias === 1 ? 'mañana' : `en ${dias} días`}. La podés cambiar.`;
+        aviso.classList.remove('hidden');
+    }
+}
+
+window.tocarProximoCrm = function() {
+    movimientoCrm.fechaTocada = true;
+    document.getElementById('movimiento-sugerencia').classList.add('hidden');
 };
 
 function actualizarFormMovimientoCrm() {
@@ -2808,16 +3001,19 @@ function actualizarFormMovimientoCrm() {
 window.cambioEtapaMovimiento = function() {
     movimientoCrm.noInteresado = false;
     actualizarFormMovimientoCrm();
+    sugerirProximoCrm();
 };
 
 window.resolverNoInteresado = function(destino) {
     document.getElementById('movimiento-etapa').value = destino;
     movimientoCrm.noInteresado = true;
     actualizarFormMovimientoCrm();
+    sugerirProximoCrm();
 };
 
 window.fijarProximoCrm = function(dias) {
     document.getElementById('movimiento-proximo').value = dias === null ? '' : fechaAInput(sumarDias(dias));
+    tocarProximoCrm();
 };
 
 window.guardarMovimientoCrm = async function(e) {
@@ -2974,6 +3170,319 @@ window.confirmarConversion = async function(e) {
         }
     });
 };
+
+// ----- Fichas para clientes que ya existían antes del CRM -----
+const mayoristasSinFicha = () => mayoristasData.filter(m => !prospectosData.some(p => p.mayoristaId === m.id))
+    .sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || '')));
+// si ya hay un prospecto con ese WhatsApp, se lo pasa a cliente en vez de crear otra ficha
+const prospectoMismoTelefono = (m) => {
+    const tel = normalizarTelefono(m.telefono);
+    return tel ? prospectosData.find(p => !p.mayoristaId && normalizarTelefono(p.telefono) === tel) || null : null;
+};
+
+window.crearFichaCliente = async function(mayoristaId) {
+    if (!esAdmin || creandoFicha) return;
+    if (estadoCrm !== 'listo') { mostrarAviso('El CRM todavía se está cargando. Probá en unos segundos.', 'error'); return; }
+    const m = mayoristasData.find(x => x.id === mayoristaId);
+    if (!m) { mostrarAviso('No se encontró el cliente en Mayorista.', 'error'); return; }
+    const existente = prospectosData.find(p => p.mayoristaId === m.id);
+    if (existente) { abrirFichaProspecto(existente.id); return; }
+    const pendiente = prospectoMismoTelefono(m);
+    if (pendiente) { abrirConvertirProspecto(pendiente.id); return; }
+
+    creandoFicha = true;
+    try {
+        const ahora = new Date();
+        const ref = await crearDoc(coleccion('prospectos'), {
+            nombre: m.nombre || '',
+            telefono: m.telefono || '',
+            rubro: '', zona: '', contacto: '', instagram: '', direccion: '', canal: '',
+            variedades: [], volumen: '', observaciones: '',
+            creado: ahora,
+            etapa: 'cliente',
+            situacion: null,
+            mayoristaId: m.id,
+            yaEraCliente: true,
+            // "cliente desde" es la fecha en que se cargó en Mayorista
+            fechaConversion: aFecha(m.creado) || null,
+            proximoSeguimiento: null,
+            proximoPaso: '',
+            interacciones: [{ tipo: 'alta', fecha: ahora, etapa: 'cliente', situacion: null, yaEraCliente: true }]
+        });
+        mostrarAviso(`Ficha de ${escaparHtml(m.nombre)} creada.`, 'ok');
+        setTimeout(() => abrirFichaProspecto(ref.id), 350);
+    } catch (error) {
+        console.error(error);
+        mostrarAviso('No se pudo crear la ficha. Probá de nuevo.', 'error');
+    } finally {
+        creandoFicha = false;
+    }
+};
+
+// ----- Mensajes armados de WhatsApp -----
+const textoPlantillaCrm = (clave) => ajustesCrm.plantillas?.[clave] || PLANTILLAS_CRM[clave].texto;
+const plantillasPara = (p) => Object.keys(PLANTILLAS_CRM).filter(clave => PLANTILLAS_CRM[clave].para === (p.etapa === 'cliente' ? 'cliente' : 'prospecto'));
+const plantillaSugerida = (p) => p.etapa === 'cliente' ? 'postventa' : p.etapa === 'nuevo' ? 'presentacion' : p.etapa === 'contactado' ? 'catalogo' : 'seguimiento';
+// "Diego (encargado)" -> "Diego"; sin persona de contacto se saluda al negocio
+const saludoCrm = (p) => String(p.contacto || '').replace(/\([^)]*\)/g, '').trim() || p.nombre;
+// con función de reemplazo, así un "$" en un nombre no rompe el texto
+const completarPlantilla = (texto, p) => texto
+    .replace(/\{nombre\}/g, () => saludoCrm(p))
+    .replace(/\{negocio\}/g, () => p.nombre)
+    .replace(/\{link\}/g, () => linkPedido(p.mayoristaId || null));
+
+window.abrirMensajeCrm = function(id) {
+    if (!esAdmin) return;
+    const original = prospectosData.find(x => x.id === id);
+    if (!original) return;
+    const p = datosProspecto(original);
+    if (!linkWhatsApp(p.telefono)) { mostrarAviso('Este negocio no tiene WhatsApp cargado.', 'error'); return; }
+    mensajeCrm = { id, plantilla: null };
+    document.getElementById('mensaje-crm-negocio').innerText = `${p.nombre} · ${p.telefono}`;
+    elegirPlantillaCrm(plantillaSugerida(p));
+    abrirModal('modalMensajeCrm');
+};
+
+window.elegirPlantillaCrm = function(clave) {
+    const original = prospectosData.find(x => x.id === mensajeCrm.id);
+    if (!original) return;
+    const p = datosProspecto(original);
+    mensajeCrm.plantilla = clave;
+    document.getElementById('mensaje-crm-opciones').innerHTML = [...plantillasPara(p), 'libre'].map(c => {
+        const t = c === 'libre' ? { titulo: 'Sin mensaje', icono: 'fa-pen' } : PLANTILLAS_CRM[c];
+        const activo = c === clave;
+        return `<button type="button" onclick="elegirPlantillaCrm('${c}')" class="flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-xs font-bold text-left transition-all ${activo ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500'}"><i class="fa-solid ${t.icono}"></i>${t.titulo}</button>`;
+    }).join('');
+    document.getElementById('mensaje-crm-texto').value = clave === 'libre' ? '' : completarPlantilla(textoPlantillaCrm(clave), p);
+};
+
+window.enviarMensajeCrm = function() {
+    const { id, plantilla } = mensajeCrm;
+    const original = prospectosData.find(x => x.id === id);
+    if (!original) return;
+    const url = linkWhatsApp(datosProspecto(original).telefono, document.getElementById('mensaje-crm-texto').value.trim());
+    if (!url) { mostrarAviso('Este negocio no tiene WhatsApp cargado.', 'error'); return; }
+    window.open(url, '_blank');
+    cerrarModal('modalMensajeCrm');
+    const resumen = PLANTILLAS_CRM[plantilla] ? `Le mandé el mensaje: ${PLANTILLAS_CRM[plantilla].titulo}` : 'Le escribí por WhatsApp';
+    // al volver de WhatsApp queda listo para anotar el contacto (si no se guarda, no queda nada)
+    setTimeout(() => abrirMovimientoCrm(id, 'contacto', { canal: 'whatsapp', resumen }), 350);
+};
+
+// ----- Ajustes del CRM: textos de los mensajes y días de los avisos -----
+window.abrirAjustesCrm = function() {
+    if (!esAdmin) return;
+    document.getElementById('ajustes-crm-plantillas').innerHTML = Object.entries(PLANTILLAS_CRM).map(([clave, t]) => `
+        <div class="mb-4">
+            <div class="flex justify-between items-center gap-2 mb-2">
+                <label for="ajuste-plantilla-${clave}" class="text-xs font-bold text-gray-400 uppercase tracking-widest"><i class="fa-solid ${t.icono} mr-1"></i>${t.titulo}${t.para === 'cliente' ? ' · clientes' : ''}</label>
+                <button type="button" onclick="restaurarPlantillaCrm('${clave}')" class="shrink-0 text-[11px] font-bold text-teal-700 active:text-teal-900"><i class="fa-solid fa-rotate-left mr-1"></i>Original</button>
+            </div>
+            <textarea id="ajuste-plantilla-${clave}" rows="4" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium resize-none text-sm">${escaparHtml(textoPlantillaCrm(clave))}</textarea>
+        </div>`).join('');
+    Object.keys(AVISOS_CRM_BASE).forEach(clave => { document.getElementById(`ajuste-${clave}`).value = diasAvisoCrm(clave); });
+    abrirModal('modalAjustesCrm');
+};
+
+window.restaurarPlantillaCrm = function(clave) {
+    document.getElementById(`ajuste-plantilla-${clave}`).value = PLANTILLAS_CRM[clave].texto;
+};
+
+window.guardarAjustesCrm = async function(e) {
+    e.preventDefault();
+    if (!esAdmin) return;
+    const avisos = {};
+    for (const clave of Object.keys(AVISOS_CRM_BASE)) {
+        const n = Number(document.getElementById(`ajuste-${clave}`).value);
+        if (!Number.isInteger(n) || n < 1 || n > 365) { mostrarAviso('Los días de los avisos tienen que ser un número entre 1 y 365.', 'error'); return; }
+        avisos[clave] = n;
+    }
+    // vacío o igual al original se guarda vacío: así sigue usando el texto original
+    const plantillas = Object.fromEntries(Object.keys(PLANTILLAS_CRM).map(clave => {
+        const texto = document.getElementById(`ajuste-plantilla-${clave}`).value.trim();
+        return [clave, texto === PLANTILLAS_CRM[clave].texto ? '' : texto];
+    }));
+    await conBotonBloqueado(e, async () => {
+        try {
+            await guardarDoc(documento('ajustes', 'crm'), { plantillas, avisos });
+            cerrarModal('modalAjustesCrm');
+            mostrarAviso('Ajustes del CRM guardados.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
+        }
+    });
+};
+
+// ----- Resultados -----
+const rangoPeriodoCrm = (periodo) => {
+    const hoy = new Date();
+    const inicioMes = (atras) => new Date(hoy.getFullYear(), hoy.getMonth() - atras, 1);
+    if (periodo === 'mes') return { desde: inicioMes(0), hasta: null };
+    if (periodo === 'pasado') return { desde: inicioMes(1), hasta: inicioMes(0) };
+    if (periodo === 'trimestre') return { desde: inicioMes(2), hasta: null };
+    return { desde: null, hasta: null };
+};
+const enPeriodo = (fecha, rango) => {
+    const d = aFecha(fecha);
+    return !!d && (!rango.desde || d >= rango.desde) && (!rango.hasta || d < rango.hasta);
+};
+// la etapa más avanzada a la que llegó, mirando todo su historial
+const etapaMaximaCrm = (p) => Math.max(0, ...[p.etapa, ...(p.interacciones || []).flatMap(i => [i.etapa, i.de, i.a, i.tipo === 'conversion' ? 'cliente' : null])]
+    .map(e => ORDEN_EMBUDO.indexOf(e)));
+const claveDimension = (p, dim) => dim === 'canal' ? (CANALES_CRM[p.canal] ? p.canal : '') : normalizarTexto(p[dim]);
+const textoDimension = (p, dim) => dim === 'canal' ? (CANALES_CRM[p.canal]?.texto || '') : String(p[dim] || '').trim();
+const promedioCrm = (lista) => lista.length ? Math.round(lista.reduce((s, n) => s + n, 0) / lista.length) : null;
+
+window.cambiarPeriodoCrm = function(periodo) {
+    periodoResultados = periodo;
+    renderResultadosCrm();
+};
+
+window.cambiarDimensionCrm = function(dimension) {
+    dimensionResultados = dimension;
+    renderResultadosCrm();
+};
+
+function renderResultadosCrm() {
+    const cont = document.getElementById('crm-resultados');
+    if (estadoCrm !== 'listo') { cont.innerHTML = avisoEstadoCrm(); return; }
+    const rango = rangoPeriodoCrm(periodoResultados);
+    // las fichas de clientes que ya existían no cuentan como logros del CRM
+    const delCrm = prospectosData.filter(p => !p.yaEraCliente);
+    const cargados = delCrm.filter(p => enPeriodo(p.creado, rango));
+    const cargadosClientes = cargados.filter(p => p.etapa === 'cliente');
+    const nuevosClientes = delCrm.filter(p => p.etapa === 'cliente' && enPeriodo(p.fechaConversion, rango));
+    const contactos = prospectosData.flatMap(p => (p.interacciones || []).filter(i => i.tipo === 'contacto' && enPeriodo(i.fecha, rango)));
+    const salidas = delCrm.flatMap(p => (p.interacciones || [])
+        .filter(i => i.tipo === 'etapa' && ['pausa', 'descartado'].includes(i.a) && enPeriodo(i.fecha, rango))
+        .map(i => ({ ...i, nombre: datosProspecto(p).nombre, id: p.id })));
+    const distintos = (destino) => new Set(salidas.filter(i => i.a === destino).map(i => i.id)).size;
+    const descartados = distintos('descartado');
+    const pausados = distintos('pausa');
+    const noInteresados = new Set(salidas.filter(i => i.motivo === 'no_interesado').map(i => i.id)).size;
+    const conversion = cargados.length ? Math.round(cargadosClientes.length * 100 / cargados.length) : null;
+    const diasCierre = promedioCrm(nuevosClientes.filter(p => p.creado).map(p => Math.max(0, diasEntre(aFecha(p.creado), aFecha(p.fechaConversion)))));
+    const contactosCierre = promedioCrm(nuevosClientes.map(p => (p.interacciones || []).filter(i => i.tipo === 'contacto' && aFecha(i.fecha) <= aFecha(p.fechaConversion)).length));
+
+    const caja = (contenido, extra = '') => `<div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-4 ${extra}">${contenido}</div>`;
+    const tituloCaja = (texto, icono) => `<p class="text-[11px] font-black text-teal-700 uppercase tracking-widest mb-3"><i class="fa-solid ${icono} mr-1"></i>${texto}</p>`;
+    const vacio = (texto) => `<p class="text-sm text-gray-400 font-medium text-center py-3">${texto}</p>`;
+
+    const periodos = `<div class="grid grid-cols-4 gap-1 bg-white p-1 rounded-xl shadow-sm border border-gray-100 mb-4">${Object.entries(PERIODOS_CRM).map(([clave, texto]) =>
+        `<button onclick="cambiarPeriodoCrm('${clave}')" class="py-2 rounded-lg text-[11px] font-bold transition-all ${periodoResultados === clave ? 'bg-teal-600 text-white shadow-sm' : 'text-gray-500'}">${texto}</button>`).join('')}</div>`;
+
+    const tiles = [
+        [cargados.length, 'Negocios cargados', 'text-gray-800'],
+        [contactos.length, 'Contactos hechos', 'text-teal-600'],
+        [nuevosClientes.length, 'Clientes nuevos', 'text-green-600'],
+        [descartados, 'Descartados', 'text-red-500'],
+        [conversion === null ? '—' : `${conversion}%`, 'Conversión', 'text-indigo-600'],
+        [diasCierre === null ? '—' : diasCierre, 'Días para cerrar', 'text-orange-600']
+    ];
+    const indicadores = `<div class="grid grid-cols-3 gap-2 mb-2">${tiles.map(([valor, texto, color]) => `
+        <div class="bg-white rounded-xl p-2.5 shadow-sm border border-gray-100 text-center">
+            <p class="text-xl font-black ${color} leading-tight">${valor}</p>
+            <p class="text-[9px] uppercase font-bold text-gray-400 leading-tight mt-0.5">${texto}</p>
+        </div>`).join('')}</div>`;
+    const lectura = [
+        cargados.length ? `De ${plural(cargados.length, 'negocio cargado', 'negocios cargados')} en el período, ${!cargadosClientes.length ? 'ninguno es cliente todavía' : cargadosClientes.length === 1 ? '1 ya es cliente' : `${cargadosClientes.length} ya son clientes`}.` : '',
+        diasCierre !== null ? `En promedio se cerraron en ${plural(diasCierre, 'día', 'días')} y con ${plural(contactosCierre, 'contacto', 'contactos')}.` : ''
+    ].filter(Boolean).join(' ');
+
+    // embudo: de los cargados en el período, cuántos llegaron al menos a cada etapa
+    const embudo = cargados.length ? ORDEN_EMBUDO.map((etapa, i) => {
+        const n = cargados.filter(p => etapaMaximaCrm(p) >= i).length;
+        const ancho = Math.round(n * 100 / cargados.length);
+        return `<div class="flex items-center gap-2">
+            <span class="w-24 shrink-0 text-xs font-bold text-gray-600">${i === 0 ? 'Cargados' : ETAPAS_CRM[etapa].texto}</span>
+            <div class="flex-1 h-6 bg-gray-100 rounded-lg overflow-hidden"><div class="h-full ${etapa === 'cliente' ? 'bg-green-500' : 'bg-teal-500'} rounded-lg" style="width: ${ancho}%"></div></div>
+            <span class="w-14 shrink-0 text-right text-xs font-black text-gray-800">${n} <span class="text-gray-400 font-bold">${ancho}%</span></span>
+        </div>`;
+    }).join('') : vacio('No cargaste negocios en este período.');
+
+    // qué canal, rubro o zona trae más clientes
+    const grupos = new Map();
+    const empiezaConMayuscula = (texto) => texto.charAt(0) !== texto.charAt(0).toLowerCase();
+    cargados.forEach(p => {
+        const clave = claveDimension(p, dimensionResultados);
+        const g = grupos.get(clave) || { texto: clave ? textoDimension(p, dimensionResultados) : 'Sin definir', cargados: 0, clientes: 0, sinDato: !clave };
+        // "norte" y "Norte" son la misma zona: se muestra la versión con mayúscula
+        if (clave && !empiezaConMayuscula(g.texto) && empiezaConMayuscula(textoDimension(p, dimensionResultados))) g.texto = textoDimension(p, dimensionResultados);
+        g.cargados++;
+        if (p.etapa === 'cliente') g.clientes++;
+        grupos.set(clave, g);
+    });
+    const filasDimension = [...grupos.values()].sort((a, b) => (a.sinDato - b.sinDato) || (b.clientes - a.clientes) || (b.cargados - a.cargados));
+    const botonesDimension = `<div class="grid grid-cols-3 gap-1 bg-gray-50 p-1 rounded-lg mb-3">${Object.entries(DIMENSIONES_CRM).map(([clave, texto]) =>
+        `<button onclick="cambiarDimensionCrm('${clave}')" class="py-1.5 rounded-md text-xs font-bold transition-all ${dimensionResultados === clave ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-500'}">${texto}</button>`).join('')}</div>`;
+    const tablaDimension = filasDimension.length ? `
+        <div class="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-2 text-xs items-center">
+            <span class="text-[10px] uppercase font-bold text-gray-400">${DIMENSIONES_CRM[dimensionResultados]}</span>
+            <span class="text-[10px] uppercase font-bold text-gray-400 text-right">Cargados</span>
+            <span class="text-[10px] uppercase font-bold text-gray-400 text-right">Clientes</span>
+            <span class="text-[10px] uppercase font-bold text-gray-400 text-right">%</span>
+            ${filasDimension.map(g => `
+            <span class="font-bold ${g.sinDato ? 'text-gray-400' : 'text-gray-700'} truncate">${escaparHtml(g.texto)}</span>
+            <span class="text-right font-bold text-gray-600">${g.cargados}</span>
+            <span class="text-right font-black text-green-600">${g.clientes}</span>
+            <span class="text-right font-black text-gray-800">${Math.round(g.clientes * 100 / g.cargados)}%</span>`).join('')}
+        </div>` : vacio('Sin datos en este período.');
+
+    // por qué se pierden
+    const notas = salidas.filter(i => i.nota).sort((a, b) => (aFecha(b.fecha)?.getTime() || 0) - (aFecha(a.fecha)?.getTime() || 0)).slice(0, 5);
+    const perdidas = salidas.length ? `
+        <div class="grid grid-cols-3 gap-2 text-center mb-3">
+            <div class="bg-gray-50 rounded-lg p-2"><p class="text-lg font-black text-gray-700">${pausados}</p><p class="text-[9px] uppercase font-bold text-gray-400 leading-tight">En pausa</p></div>
+            <div class="bg-gray-50 rounded-lg p-2"><p class="text-lg font-black text-red-500">${descartados}</p><p class="text-[9px] uppercase font-bold text-gray-400 leading-tight">Descartados</p></div>
+            <div class="bg-gray-50 rounded-lg p-2"><p class="text-lg font-black text-amber-600">${noInteresados}</p><p class="text-[9px] uppercase font-bold text-gray-400 leading-tight">No interesados</p></div>
+        </div>
+        ${notas.length ? `<p class="text-[10px] uppercase font-bold text-gray-400 mb-2">Últimos motivos anotados</p>
+        <div class="flex flex-col gap-2">${notas.map(i => `
+            <div class="text-xs bg-gray-50 rounded-lg p-2.5">
+                <p class="font-bold text-gray-700 truncate">${escaparHtml(i.nombre)} <span class="font-medium text-gray-400">· ${i.a === 'pausa' ? 'En pausa' : 'Descartado'} · ${formatearDiaMes(i.fecha)}</span></p>
+                <p class="text-gray-600 mt-0.5 break-words">${escaparHtml(i.nota)}</p>
+            </div>`).join('')}</div>` : `<p class="text-xs text-gray-400 font-medium">No anotaste motivos en este período.</p>`}` : vacio('Ningún negocio se pausó ni se descartó en este período.');
+
+    // lo que compraron los clientes que llegaron por el CRM (sin contar cancelados)
+    const idsClientesCrm = new Set(delCrm.filter(p => p.etapa === 'cliente' && p.mayoristaId).map(p => p.mayoristaId));
+    const pedidosPeriodo = pedidosData.filter(x => x.estado !== 'cancelado' && enPeriodo(x.timestamp, rango));
+    const pedidosCrm = pedidosPeriodo.filter(x => idsClientesCrm.has(contactoDePedido(x)?.id));
+    const suma = (lista) => lista.reduce((s, x) => s + (Number(x.total) || 0), 0);
+    const montoCrm = suma(pedidosCrm);
+    const montoMayorista = suma(pedidosPeriodo);
+    const ranking = new Map();
+    pedidosCrm.forEach(x => {
+        const id = contactoDePedido(x).id;
+        const r = ranking.get(id) || { nombre: nombrePedido(x), pedidos: 0, monto: 0 };
+        r.pedidos++;
+        r.monto += Number(x.total) || 0;
+        ranking.set(id, r);
+    });
+    const top = [...ranking.values()].sort((a, b) => b.monto - a.monto).slice(0, 5);
+    const ventas = pedidosCrm.length ? `
+        <p class="text-2xl font-black text-violet-700">${formatearDinero(montoCrm)}</p>
+        <p class="text-xs text-gray-500 font-medium mb-3">en ${plural(pedidosCrm.length, 'pedido', 'pedidos')}${montoMayorista ? ` · ${Math.round(montoCrm * 100 / montoMayorista)}% de todo lo vendido por mayor en el período` : ''}</p>
+        <p class="text-[10px] uppercase font-bold text-gray-400 mb-2">Los que más compraron</p>
+        <div class="flex flex-col gap-1.5">${top.map((r, i) => `
+            <div class="flex items-center gap-2 text-sm">
+                <span class="w-5 h-5 shrink-0 rounded-full bg-violet-100 text-violet-700 text-[10px] font-black flex items-center justify-center">${i + 1}</span>
+                <span class="flex-1 min-w-0 truncate font-bold text-gray-700">${escaparHtml(r.nombre)}</span>
+                <span class="text-[11px] text-gray-400 font-bold shrink-0">${plural(r.pedidos, 'pedido', 'pedidos')}</span>
+                <span class="font-black text-gray-800 shrink-0">${formatearDinero(r.monto)}</span>
+            </div>`).join('')}</div>` : vacio(idsClientesCrm.size ? 'Los clientes del CRM no hicieron pedidos en este período.' : 'Todavía no hay clientes que hayan llegado por el CRM.');
+
+    cont.innerHTML = `<div class="pb-8">
+        ${periodos}
+        ${indicadores}
+        ${lectura ? `<p class="text-xs text-gray-500 font-medium mb-4 px-1">${lectura}</p>` : '<div class="mb-4"></div>'}
+        ${caja(tituloCaja('Embudo', 'fa-filter') + `<p class="text-[11px] text-gray-400 font-medium -mt-2 mb-3">De los negocios cargados en el período, cuántos llegaron al menos a cada etapa.</p><div class="flex flex-col gap-2">${embudo}</div>`)}
+        ${caja(tituloCaja('Qué trae más clientes', 'fa-ranking-star') + botonesDimension + tablaDimension)}
+        ${caja(tituloCaja('Por qué se pierden', 'fa-heart-crack') + perdidas)}
+        ${caja(tituloCaja('Lo que compraron los clientes del CRM', 'fa-sack-dollar') + ventas)}
+        <p class="text-[11px] text-gray-400 font-medium px-1"><i class="fa-solid fa-circle-info mr-1"></i>Las fichas de clientes que ya existían antes del CRM no se cuentan en estos resultados.</p>
+    </div>`;
+}
 
 function refrescarTodo() {
     renderBalanceYResumen();
@@ -3135,6 +3644,7 @@ function cargarDatos() {
         if (esAdmin) {
             escuchar(coleccion('ajustes'), (snapshot) => {
                 ajustesPublicos = snapshot.docs.find(doc => doc.id === 'publico')?.data() || {};
+                ajustesCrm = snapshot.docs.find(doc => doc.id === 'crm')?.data() || {};
                 refrescarTodo();
             }, (error) => console.error(error));
 

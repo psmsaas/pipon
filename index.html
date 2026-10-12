@@ -282,9 +282,12 @@
         <div id="content-crm" class="tab-content hidden">
             <div class="flex justify-between items-end mb-4 px-1">
                 <h2 class="text-xl font-bold text-pipon-brown">CRM Comercial</h2>
-                <button onclick="abrirProspecto()" class="text-sm font-bold text-white bg-teal-600 px-4 py-1.5 rounded-full shadow-sm active:scale-95 transition-transform"><i class="fa-solid fa-plus mr-1"></i>Negocio</button>
+                <div class="flex items-center gap-2">
+                    <button onclick="abrirAjustesCrm()" class="w-8 h-8 bg-white border border-gray-200 rounded-full text-gray-500 text-sm shadow-sm active:bg-gray-50" aria-label="Ajustes del CRM"><i class="fa-solid fa-gear"></i></button>
+                    <button onclick="abrirProspecto()" class="text-sm font-bold text-white bg-teal-600 px-4 py-1.5 rounded-full shadow-sm active:scale-95 transition-transform"><i class="fa-solid fa-plus mr-1"></i>Negocio</button>
+                </div>
             </div>
-            <div id="subtabs-crm" class="grid grid-cols-3 gap-1 bg-white p-1 rounded-2xl shadow-sm border border-gray-100 mb-4"></div>
+            <div id="subtabs-crm" class="grid grid-cols-4 gap-1 bg-white p-1 rounded-2xl shadow-sm border border-gray-100 mb-4"></div>
 
             <div id="crm-prospectos" class="subtab-crm">
                 <div id="crm-indicadores" class="grid grid-cols-3 gap-2 mb-4"></div>
@@ -336,6 +339,7 @@
                             <option value="hoy">Hoy</option>
                             <option value="semana">Próx. 7 días</option>
                             <option value="sin">Sin fecha</option>
+                            <option value="frio">Fríos</option>
                         </select>
                     </div>
                     <button onclick="limpiarFiltrosCrm()" class="col-span-2 text-xs font-bold text-teal-700 py-2 active:bg-teal-50 rounded-lg"><i class="fa-solid fa-rotate-left mr-1"></i>Limpiar filtros</button>
@@ -344,6 +348,7 @@
             </div>
             <div id="crm-seguimientos" class="subtab-crm hidden"></div>
             <div id="crm-clientes" class="subtab-crm hidden"></div>
+            <div id="crm-resultados" class="subtab-crm hidden"></div>
         </div>
     </main>
 
@@ -653,6 +658,7 @@
                         <button type="button" id="contacto-ver-historial" class="bg-white border border-gray-200 text-gray-600 font-bold py-2.5 rounded-xl text-sm"><i class="fa-solid fa-clock-rotate-left mr-1.5"></i>Ver compras</button>
                     </div>
                     <button type="button" id="contacto-ver-ficha" class="hidden w-full bg-white border border-teal-200 text-teal-700 font-bold py-2.5 rounded-xl text-sm"><i class="fa-solid fa-briefcase mr-1.5"></i>Ficha comercial (CRM)</button>
+                    <button type="button" id="contacto-crear-ficha" class="hidden w-full bg-white border border-dashed border-teal-300 text-teal-700 font-bold py-2.5 rounded-xl text-sm"><i class="fa-solid fa-plus mr-1.5"></i>Crear ficha comercial (CRM)</button>
                 </div>
 
                 <button type="submit" class="w-full bg-violet-600 hover:bg-violet-700 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-violet-200 active:scale-95 transition-all">Guardar Contacto</button>
@@ -997,7 +1003,8 @@
 
                 <div id="movimiento-seguimiento-box" class="mb-6">
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Próximo seguimiento</label>
-                    <input type="date" id="movimiento-proximo" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium text-gray-800">
+                    <input type="date" id="movimiento-proximo" oninput="tocarProximoCrm()" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium text-gray-800">
+                    <p id="movimiento-sugerencia" class="hidden text-[11px] font-bold text-teal-700 mt-1.5"></p>
                     <div class="flex flex-wrap gap-1.5 mt-2">
                         <button type="button" onclick="fijarProximoCrm(1)" class="px-3 py-1.5 rounded-full bg-teal-50 text-teal-700 text-xs font-bold active:bg-teal-100">Mañana</button>
                         <button type="button" onclick="fijarProximoCrm(3)" class="px-3 py-1.5 rounded-full bg-teal-50 text-teal-700 text-xs font-bold active:bg-teal-100">3 días</button>
@@ -1067,6 +1074,60 @@
                 <button onclick="cerrarConfirmDeleteProspecto()" class="flex-1 bg-gray-100 text-gray-600 font-bold py-3 rounded-xl active:bg-gray-200 transition-colors">Cancelar</button>
                 <button id="btn-confirm-delete-prospecto" onclick="eliminarProspecto()" class="flex-1 bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-red-200 active:scale-95 transition-all">Eliminar</button>
             </div>
+        </div>
+    </div>
+
+    <div id="modalMensajeCrm" class="fixed inset-0 z-[55] hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-1">
+                <h2 class="text-2xl font-black text-green-600">Enviar WhatsApp</h2>
+                <button type="button" onclick="cerrarModal('modalMensajeCrm')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p id="mensaje-crm-negocio" class="text-sm font-bold text-gray-500 mb-5 break-words"></p>
+
+            <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿Qué le mandás?</label>
+            <div id="mensaje-crm-opciones" class="grid grid-cols-2 gap-2 mb-4"></div>
+
+            <label for="mensaje-crm-texto" class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Mensaje (lo podés retocar)</label>
+            <textarea id="mensaje-crm-texto" rows="6" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:bg-white transition-all font-medium resize-none text-sm mb-2" placeholder="Escribí el mensaje o dejalo vacío para escribirlo en WhatsApp"></textarea>
+            <p class="text-[11px] text-gray-400 font-medium mb-6"><i class="fa-solid fa-circle-info mr-1"></i>Al volver de WhatsApp te queda listo "Registrar contacto" para anotarlo. Si no lo guardás, no queda nada registrado.</p>
+
+            <button type="button" onclick="enviarMensajeCrm()" class="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-green-200 active:scale-95 transition-all"><i class="fa-brands fa-whatsapp mr-2"></i>Abrir WhatsApp</button>
+        </div>
+    </div>
+
+    <div id="modalAjustesCrm" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-5">
+                <h2 class="text-2xl font-black text-teal-600">Ajustes del CRM</h2>
+                <button type="button" onclick="cerrarModal('modalAjustesCrm')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="form-ajustes-crm" onsubmit="guardarAjustesCrm(event)">
+                <p class="text-[11px] font-black text-teal-700 uppercase tracking-widest mb-1"><i class="fa-brands fa-whatsapp mr-1"></i>Mensajes armados</p>
+                <p class="text-[11px] text-gray-500 font-medium mb-4">Podés usar <b>{nombre}</b> (la persona de contacto o, si no hay, el negocio), <b>{negocio}</b> y <b>{link}</b> (el link de pedidos: el general para prospectos y el personal para clientes). Si dejás un mensaje vacío, vuelve al original.</p>
+                <div id="ajustes-crm-plantillas"></div>
+
+                <p class="text-[11px] font-black text-teal-700 uppercase tracking-widest mb-3 mt-2"><i class="fa-solid fa-bell mr-1"></i>Avisos</p>
+                <div class="flex flex-col gap-3 mb-6 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <div class="flex items-center justify-between gap-3">
+                        <label for="ajuste-diasFrio" class="text-sm font-medium text-gray-600 leading-tight">Negocio frío: sin contacto ni seguimiento agendado hace</label>
+                        <div class="flex items-center gap-1.5 shrink-0"><input type="number" id="ajuste-diasFrio" min="1" max="365" step="1" inputmode="numeric" class="w-16 bg-white border border-gray-200 rounded-lg px-2 py-2 outline-none focus:border-teal-500 font-black text-center text-gray-800"><span class="text-xs font-bold text-gray-500">días</span></div>
+                    </div>
+                    <div class="flex items-center justify-between gap-3">
+                        <label for="ajuste-diasNuevoSinContactar" class="text-sm font-medium text-gray-600 leading-tight">Negocio nuevo sin contactar hace</label>
+                        <div class="flex items-center gap-1.5 shrink-0"><input type="number" id="ajuste-diasNuevoSinContactar" min="1" max="365" step="1" inputmode="numeric" class="w-16 bg-white border border-gray-200 rounded-lg px-2 py-2 outline-none focus:border-teal-500 font-black text-center text-gray-800"><span class="text-xs font-bold text-gray-500">días</span></div>
+                    </div>
+                    <div class="flex items-center justify-between gap-3">
+                        <label for="ajuste-diasSinPrimerPedido" class="text-sm font-medium text-gray-600 leading-tight">Cliente nuevo sin primer pedido hace</label>
+                        <div class="flex items-center gap-1.5 shrink-0"><input type="number" id="ajuste-diasSinPrimerPedido" min="1" max="365" step="1" inputmode="numeric" class="w-16 bg-white border border-gray-200 rounded-lg px-2 py-2 outline-none focus:border-teal-500 font-black text-center text-gray-800"><span class="text-xs font-bold text-gray-500">días</span></div>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-teal-200 active:scale-95 transition-all">Guardar</button>
+            </form>
         </div>
     </div>
 
