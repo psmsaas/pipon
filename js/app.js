@@ -22,9 +22,9 @@ if (MODO_PRUEBA) {
         const docs = [...memoria[ruta].entries()].map(([id, datos]) => ({ id, data: () => datos }));
         (oyentes[ruta] || []).forEach(cb => cb({ docs }));
     };
-    escuchar = (refColeccion, cb) => {
+    escuchar = (refColeccion, cb, alFallar) => {
         (oyentes[refColeccion.path] ||= []).push(cb);
-        asegurar(refColeccion).then(() => emitir(refColeccion.path));
+        asegurar(refColeccion).then(() => emitir(refColeccion.path)).catch(error => alFallar?.(error));
         return () => {};
     };
     crearDoc = async (refColeccion, datos) => {
@@ -704,6 +704,9 @@ window.cambiarPestana = function(pestana) {
     }
     if (pestana === 'proveedores') {
         renderProveedores();
+    }
+    if (pestana === 'crm') {
+        renderCrm();
     }
 };
 
@@ -1902,6 +1905,11 @@ window.abrirContacto = function(id = null) {
         document.getElementById('contacto-copiar-link').onclick = () => copiarLinkPedido(m.id);
         document.getElementById('contacto-ver-historial').onclick = () => { cerrarModal('modalContacto'); setTimeout(() => verHistorialContacto(m.id), 300); };
     }
+    // si el cliente vino del CRM, el admin puede ver su recorrido comercial
+    const ficha = m && esAdmin ? prospectosData.find(p => p.mayoristaId === m.id) : null;
+    const btnFicha = document.getElementById('contacto-ver-ficha');
+    btnFicha.classList.toggle('hidden', !ficha);
+    if (ficha) btnFicha.onclick = () => { cerrarModal('modalContacto'); setTimeout(() => abrirFichaProspecto(ficha.id), 300); };
     abrirModal('modalContacto');
 };
 
@@ -1950,6 +1958,980 @@ window.copiarLinkPedido = async function(id = null) {
     }
 };
 
+// ---------- CRM comercial (solo admin) ----------
+const ETAPAS_CRM = {
+    nuevo:       { texto: 'Nuevo',       clases: 'bg-sky-100 text-sky-700',       icono: 'fa-seedling' },
+    contactado:  { texto: 'Contactado',  clases: 'bg-indigo-100 text-indigo-700', icono: 'fa-comment-dots' },
+    evaluacion:  { texto: 'Evaluación',  clases: 'bg-amber-100 text-amber-700',   icono: 'fa-scale-balanced' },
+    negociacion: { texto: 'Negociación', clases: 'bg-orange-100 text-orange-700', icono: 'fa-handshake' },
+    cliente:     { texto: 'Cliente',     clases: 'bg-green-100 text-green-700',   icono: 'fa-store' },
+    pausa:       { texto: 'En pausa',    clases: 'bg-gray-200 text-gray-600',     icono: 'fa-pause' },
+    descartado:  { texto: 'Descartado',  clases: 'bg-red-100 text-red-600',       icono: 'fa-ban' }
+};
+const SITUACIONES_CRM = { interesado: 'Interesado', seguimiento: 'Seguimiento pendiente', no_interesado: 'No interesado' };
+const CANALES_CRM = {
+    whatsapp:  { texto: 'WhatsApp',  icono: 'fa-brands fa-whatsapp' },
+    instagram: { texto: 'Instagram', icono: 'fa-brands fa-instagram' },
+    llamada:   { texto: 'Llamada',   icono: 'fa-solid fa-phone' },
+    visita:    { texto: 'Visita',    icono: 'fa-solid fa-person-walking' },
+    otro:      { texto: 'Otro',      icono: 'fa-solid fa-ellipsis' }
+};
+const ETAPAS_EN_CURSO = ['nuevo', 'contactado', 'evaluacion', 'negociacion'];
+const ETAPAS_SIN_SEGUIMIENTO = ['cliente', 'descartado'];
+// "No interesado" no queda guardado como etapa: se resuelve en "En pausa" o "Descartado"
+const OPCIONES_ETAPA = [
+    ['nuevo', 'Nuevo'],
+    ['contactado', 'Contactado'],
+    ['evaluacion:interesado', 'Evaluación · Interesado'],
+    ['evaluacion:seguimiento', 'Evaluación · Seguimiento pendiente'],
+    ['evaluacion:no_interesado', 'Evaluación · No interesado'],
+    ['negociacion', 'Negociación'],
+    ['pausa', 'En pausa'],
+    ['descartado', 'Descartado']
+];
+const OPCIONES_ETAPA_EN_CURSO = OPCIONES_ETAPA.filter(([valor]) => ETAPAS_EN_CURSO.includes(valor.split(':')[0]) && valor !== 'evaluacion:no_interesado');
+const RUBROS_SUGERIDOS = ['Cancha de fútbol', 'Kiosco', 'Drugstore', 'Gastronómico'];
+
+let prospectosData = [];
+let estadoCrm = 'cargando';
+let subPestanaCrm = 'prospectos';
+let prospectoAbierto = null;
+let movimientoCrm = { id: null, modo: 'contacto', noInteresado: false };
+let variedadesForm = [];
+let conversionCrm = { id: null, destino: null, forzarNuevo: false };
+let prospectoAEliminar = null;
+
+const normalizarTexto = (texto) => String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+const fechaAInput = (fecha) => {
+    const d = aFecha(fecha);
+    return d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : '';
+};
+// los días elegidos se guardan al mediodía para que el huso horario no los corra de fecha
+const inputAFecha = (valor) => {
+    if (!valor) return null;
+    const [anio, mes, dia] = valor.split('-').map(Number);
+    return new Date(anio, mes - 1, dia, 12);
+};
+// si el día elegido es hoy se guarda la hora real, así el historial queda bien ordenado
+const fechaElegida = (valor) => valor === fechaAInput(new Date()) ? new Date() : inputAFecha(valor);
+const sumarDias = (dias) => {
+    const d = new Date();
+    d.setDate(d.getDate() + dias);
+    return d;
+};
+const formatearDiaMes = (fecha) => aFecha(fecha)?.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) || '';
+const haceDias = (fecha) => {
+    const n = diasEntre(aFecha(fecha), new Date());
+    return n <= 0 ? 'hoy' : n === 1 ? 'ayer' : `hace ${n} días`;
+};
+
+const clienteDeProspecto = (p) => p.mayoristaId ? mayoristasData.find(m => m.id === p.mayoristaId) || null : null;
+// una vez que es cliente, el nombre y el WhatsApp salen del panel mayorista (un solo registro)
+const datosProspecto = (p) => {
+    const m = clienteDeProspecto(p);
+    return m ? { ...p, nombre: m.nombre, telefono: m.telefono || '' } : p;
+};
+const ultimoContacto = (p) => (p.interacciones || []).filter(i => i.tipo === 'contacto').reduce((max, i) => {
+    const f = aFecha(i.fecha);
+    return f && (!max || f > max) ? f : max;
+}, null);
+const estadoSeguimiento = (p) => {
+    if (!p.proximoSeguimiento || ETAPAS_SIN_SEGUIMIENTO.includes(p.etapa)) return null;
+    const dias = diasEntre(new Date(), aFecha(p.proximoSeguimiento));
+    return dias < 0 ? 'atrasado' : dias === 0 ? 'hoy' : 'proximo';
+};
+const textoSeguimiento = (p) => {
+    const d = aFecha(p.proximoSeguimiento);
+    if (!d) return '';
+    const dias = diasEntre(new Date(), d);
+    if (dias < 0) return `Atrasado ${plural(-dias, 'día', 'días')}`;
+    if (dias === 0) return 'Hoy';
+    if (dias === 1) return 'Mañana';
+    return `${formatearDiaMes(d)} · en ${dias} días`;
+};
+const valorEtapa = (p) => p.etapa === 'evaluacion' ? `evaluacion:${p.situacion || 'interesado'}` : p.etapa;
+const textoEtapa = (etapa, situacion) => (ETAPAS_CRM[etapa]?.texto || 'Nuevo') + (etapa === 'evaluacion' && SITUACIONES_CRM[situacion] ? ` (${SITUACIONES_CRM[situacion].toLowerCase()})` : '');
+const chipEtapa = (p) => {
+    const e = ETAPAS_CRM[p.etapa] || ETAPAS_CRM.nuevo;
+    const situacion = p.etapa === 'evaluacion' && SITUACIONES_CRM[p.situacion] ? ` · ${SITUACIONES_CRM[p.situacion]}` : '';
+    return `<span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${e.clases}"><i class="fa-solid ${e.icono} mr-1"></i>${e.texto}${situacion}</span>`;
+};
+const linkInstagram = (valor) => {
+    const texto = String(valor || '').trim();
+    if (!texto) return '';
+    if (/^https?:\/\//i.test(texto) && !/instagram\.com/i.test(texto)) return texto;
+    const usuario = texto.replace(/^https?:\/\//i, '').replace(/^(www\.)?instagram\.com\//i, '').replace(/^@/, '').split(/[/?#\s]/)[0];
+    return usuario ? `https://instagram.com/${encodeURIComponent(usuario)}` : '';
+};
+const linkMapa = (p) => p.direccion ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([p.direccion, p.zona].filter(Boolean).join(', '))}` : '';
+const nombresVariedades = (p) => (p.variedades || []).map(v => productosData.find(x => x.id === v.id)?.nombre || v.nombre);
+// agrupa "kiosco" y "Kiosco" como un solo valor
+const valoresUnicosCrm = (campo) => {
+    const mapa = new Map();
+    prospectosData.forEach(p => {
+        const valor = String(p[campo] || '').trim();
+        const clave = normalizarTexto(valor);
+        if (clave && !mapa.has(clave)) mapa.set(clave, valor);
+    });
+    return [...mapa.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+};
+
+function resumenSeguimientos() {
+    const r = { atrasados: [], hoy: [], proximos: [], sinFecha: [] };
+    prospectosData.map(datosProspecto).forEach(p => {
+        const estado = estadoSeguimiento(p);
+        if (estado === 'atrasado') r.atrasados.push(p);
+        else if (estado === 'hoy') r.hoy.push(p);
+        else if (estado === 'proximo') r.proximos.push(p);
+        else if (ETAPAS_EN_CURSO.includes(p.etapa)) r.sinFecha.push(p);
+    });
+    const porFecha = (a, b) => aFecha(a.proximoSeguimiento) - aFecha(b.proximoSeguimiento);
+    [r.atrasados, r.hoy, r.proximos].forEach(lista => lista.sort(porFecha));
+    r.sinFecha.sort((a, b) => (aFecha(a.creado)?.getTime() || 0) - (aFecha(b.creado)?.getTime() || 0));
+    return r;
+}
+
+const avisoEstadoCrm = () => estadoCrm === 'error'
+    ? `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-red-200 shadow-sm"><i class="fa-solid fa-lock text-4xl text-red-200 mb-3 block"></i><p class="text-gray-500 font-medium px-6">No se pudo cargar el CRM. Revisá la conexión o los permisos de la cuenta.</p></div>`
+    : `<p class="text-center text-gray-500 mt-10">Cargando CRM...</p>`;
+
+window.cambiarSubPestanaCrm = function(sub) {
+    subPestanaCrm = sub;
+    renderCrm();
+};
+
+window.irACrm = function(sub) {
+    subPestanaCrm = sub;
+    cambiarPestana('crm');
+};
+
+function renderCrm() {
+    if (!esAdmin) return;
+    const r = resumenSeguimientos();
+    const pendientes = r.atrasados.length + r.hoy.length;
+
+    const badge = document.getElementById('badge-crm');
+    badge.innerText = pendientes;
+    badge.classList.toggle('hidden', !pendientes);
+    badge.classList.toggle('flex', pendientes > 0);
+
+    const subtabs = [
+        { id: 'prospectos', texto: 'Prospectos', icono: 'fa-store', badge: 0 },
+        { id: 'seguimientos', texto: 'Seguimientos', icono: 'fa-bell', badge: pendientes },
+        { id: 'clientes', texto: 'Clientes', icono: 'fa-handshake', badge: 0 }
+    ];
+    document.getElementById('subtabs-crm').innerHTML = subtabs.map(s => {
+        const activa = subPestanaCrm === s.id;
+        const badgeHtml = s.badge ? `<span class="absolute -top-1.5 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] flex items-center justify-center bg-red-500 text-white shadow-sm">${s.badge}</span>` : '';
+        return `<button onclick="cambiarSubPestanaCrm('${s.id}')" class="relative py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${activa ? 'bg-teal-600 text-white shadow-sm' : 'text-gray-500'}"><i class="fa-solid ${s.icono} hidden min-[400px]:inline"></i>${s.texto}${badgeHtml}</button>`;
+    }).join('');
+
+    document.querySelectorAll('.subtab-crm').forEach(el => el.classList.add('hidden'));
+    document.getElementById(`crm-${subPestanaCrm}`).classList.remove('hidden');
+
+    renderSugerenciasCrm();
+    renderIndicadoresCrm(r);
+    renderOpcionesFiltrosCrm();
+    renderListaCrm();
+    renderSeguimientosCrm(r);
+    renderClientesCrm();
+}
+
+function renderSugerenciasCrm() {
+    const rubros = new Map(RUBROS_SUGERIDOS.map(r => [normalizarTexto(r), r]));
+    valoresUnicosCrm('rubro').forEach(([clave, texto]) => { if (!rubros.has(clave)) rubros.set(clave, texto); });
+    document.getElementById('crm-lista-rubros').innerHTML = [...rubros.values()].map(v => `<option value="${escaparHtml(v)}"></option>`).join('');
+    document.getElementById('crm-lista-zonas').innerHTML = valoresUnicosCrm('zona').map(([, v]) => `<option value="${escaparHtml(v)}"></option>`).join('');
+}
+
+function renderIndicadoresCrm(r) {
+    const cuenta = (etapa) => prospectosData.filter(p => p.etapa === etapa).length;
+    const tiles = [
+        [prospectosData.length, 'Registrados', `filtrarEtapaCrm('todas')`, 'text-gray-800'],
+        [cuenta('nuevo'), 'Nuevos', `filtrarEtapaCrm('nuevo')`, 'text-sky-600'],
+        [cuenta('negociacion'), 'En negociación', `filtrarEtapaCrm('negociacion')`, 'text-orange-600'],
+        [r.atrasados.length + r.hoy.length, 'Seguimientos pendientes', `cambiarSubPestanaCrm('seguimientos')`, r.atrasados.length ? 'text-red-600' : 'text-teal-600'],
+        [cuenta('cliente'), 'Clientes', `cambiarSubPestanaCrm('clientes')`, 'text-green-600'],
+        [cuenta('descartado'), 'Descartados', `filtrarEtapaCrm('descartado')`, 'text-red-500']
+    ];
+    document.getElementById('crm-indicadores').innerHTML = tiles.map(([valor, texto, accion, color]) => `
+        <button onclick="${accion}" class="bg-white rounded-xl p-2.5 shadow-sm border border-gray-100 text-center active:bg-gray-50 transition-colors">
+            <p class="text-xl font-black ${color} leading-tight">${valor}</p>
+            <p class="text-[9px] uppercase font-bold text-gray-400 leading-tight mt-0.5">${texto}</p>
+        </button>`).join('');
+}
+
+function renderOpcionesFiltrosCrm() {
+    [['crm-f-rubro', 'rubro', 'Todos'], ['crm-f-zona', 'zona', 'Todas']].forEach(([id, campo, todos]) => {
+        const select = document.getElementById(id);
+        const elegido = select.value;
+        const opciones = valoresUnicosCrm(campo);
+        select.innerHTML = `<option value="">${todos}</option>` + opciones.map(([clave, texto]) => `<option value="${escaparHtml(clave)}">${escaparHtml(texto)}</option>`).join('');
+        select.value = opciones.some(([clave]) => clave === elegido) ? elegido : '';
+    });
+}
+
+window.filtrarCrm = function() {
+    renderListaCrm();
+};
+
+window.filtrarEtapaCrm = function(etapa) {
+    document.getElementById('crm-f-etapa').value = etapa;
+    subPestanaCrm = 'prospectos';
+    renderCrm();
+};
+
+window.alternarFiltrosCrm = function() {
+    const panel = document.getElementById('crm-filtros');
+    const abrir = panel.classList.contains('hidden');
+    panel.classList.toggle('hidden', !abrir);
+    panel.classList.toggle('grid', abrir);
+};
+
+window.limpiarFiltrosCrm = function() {
+    document.getElementById('crm-busqueda').value = '';
+    document.getElementById('crm-f-etapa').value = 'activos';
+    ['crm-f-rubro', 'crm-f-zona', 'crm-f-ultimo', 'crm-f-proximo'].forEach(id => { document.getElementById(id).value = ''; });
+    renderListaCrm();
+};
+
+function prospectosFiltrados() {
+    const busqueda = normalizarTexto(document.getElementById('crm-busqueda').value);
+    const digitos = busqueda.replace(/\D/g, '');
+    let etapa = document.getElementById('crm-f-etapa').value;
+    // al buscar se mira todo, así también aparecen los pausados, descartados o clientes
+    if (busqueda && etapa === 'activos') etapa = 'todas';
+    const rubro = document.getElementById('crm-f-rubro').value;
+    const zona = document.getElementById('crm-f-zona').value;
+    const ultimo = document.getElementById('crm-f-ultimo').value;
+    const proximo = document.getElementById('crm-f-proximo').value;
+
+    // se guarda también el nombre que tenía en el CRM, por si el cliente vinculado se llama distinto
+    return prospectosData.map(p => ({ ...datosProspecto(p), nombreEnCrm: p.nombre })).filter(p => {
+        if (etapa === 'activos' ? !ETAPAS_EN_CURSO.includes(p.etapa) : etapa !== 'todas' && p.etapa !== etapa) return false;
+        if (rubro && normalizarTexto(p.rubro) !== rubro) return false;
+        if (zona && normalizarTexto(p.zona) !== zona) return false;
+        if (ultimo) {
+            const u = ultimoContacto(p);
+            if (ultimo === 'nunca' ? u : !u || diasEntre(u, new Date()) < Number(ultimo)) return false;
+        }
+        if (proximo) {
+            const estado = estadoSeguimiento(p);
+            if (proximo === 'sin' && p.proximoSeguimiento) return false;
+            if (proximo === 'atrasado' && estado !== 'atrasado') return false;
+            if (proximo === 'hoy' && estado !== 'hoy') return false;
+            if (proximo === 'semana' && !(estado === 'hoy' || (estado === 'proximo' && diasEntre(new Date(), aFecha(p.proximoSeguimiento)) <= 7))) return false;
+        }
+        if (busqueda) {
+            const texto = normalizarTexto([p.nombre, p.nombreEnCrm, p.contacto, p.instagram, p.rubro, p.zona, p.direccion].join(' '));
+            const tel = String(p.telefono || '').replace(/\D/g, '');
+            if (!texto.includes(busqueda) && !(digitos.length >= 3 && tel.includes(digitos))) return false;
+        }
+        return true;
+    });
+}
+
+const tarjetaProspecto = (p) => {
+    const estado = estadoSeguimiento(p);
+    const u = ultimoContacto(p);
+    const wa = linkWhatsApp(p.telefono);
+    const borde = { atrasado: 'border-l-red-500', hoy: 'border-l-orange-400' }[estado] || 'border-l-teal-500';
+    const colorSeg = { atrasado: 'bg-red-50 text-red-600', hoy: 'bg-orange-50 text-orange-600', proximo: 'bg-gray-100 text-gray-600' }[estado];
+    const lugar = [p.rubro, p.zona].filter(Boolean).map(escaparHtml).join(' · ');
+    const seguimiento = estado
+        ? `<span class="px-2 py-0.5 rounded ${colorSeg}"><i class="fa-regular fa-calendar mr-1"></i>${textoSeguimiento(p)}</span>`
+        : ETAPAS_EN_CURSO.includes(p.etapa) ? `<span class="text-gray-400"><i class="fa-regular fa-calendar-xmark mr-1"></i>Sin seguimiento</span>` : '';
+    return `
+    <div class="bg-white rounded-xl shadow-sm border-l-4 ${borde} flex">
+        <button onclick="abrirFichaProspecto('${p.id}')" class="flex-1 min-w-0 text-left p-4 active:bg-gray-50 rounded-l-xl">
+            <p class="font-bold text-gray-800 truncate">${escaparHtml(p.nombre)}</p>
+            <div class="flex items-center gap-2 mt-1 min-w-0">${chipEtapa(p)}${lugar ? `<span class="text-xs text-gray-500 font-medium truncate">${lugar}</span>` : ''}</div>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px] font-bold">
+                ${seguimiento}
+                <span class="text-gray-400"><i class="fa-regular fa-comments mr-1"></i>${u ? 'Último contacto ' + haceDias(u) : 'Sin contactar'}</span>
+            </div>
+            ${estado && p.proximoPaso ? `<p class="text-xs text-gray-600 mt-1.5 truncate"><i class="fa-solid fa-arrow-right text-teal-500 mr-1"></i>${escaparHtml(p.proximoPaso)}</p>` : ''}
+        </button>
+        ${wa ? `<a href="${wa}" target="_blank" class="w-12 shrink-0 flex items-center justify-center text-green-500 text-2xl border-l border-gray-100 active:bg-green-50 rounded-r-xl" aria-label="Escribir por WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>` : ''}
+    </div>`;
+};
+
+function renderListaCrm() {
+    const cont = document.getElementById('crm-lista');
+    const etapaFiltro = document.getElementById('crm-f-etapa').value;
+    const filtrosActivos = ['crm-f-rubro', 'crm-f-zona', 'crm-f-ultimo', 'crm-f-proximo'].filter(id => document.getElementById(id).value).length + (etapaFiltro !== 'activos' ? 1 : 0);
+    const badge = document.getElementById('crm-filtros-badge');
+    badge.innerText = filtrosActivos;
+    badge.classList.toggle('hidden', !filtrosActivos);
+    badge.classList.toggle('flex', filtrosActivos > 0);
+
+    if (estadoCrm !== 'listo') { cont.innerHTML = avisoEstadoCrm(); return; }
+    if (!prospectosData.length) {
+        cont.innerHTML = `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm"><i class="fa-solid fa-store text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium px-6">Todavía no cargaste negocios. Tocá <span class="text-teal-600 font-bold">+ Negocio</span> para empezar.</p></div>`;
+        return;
+    }
+
+    // primero los que tienen seguimiento más cercano, después los más nuevos
+    const orden = (p) => estadoSeguimiento(p) ? aFecha(p.proximoSeguimiento).getTime() : Infinity;
+    const lista = prospectosFiltrados().sort((a, b) => (orden(a) - orden(b)) || ((aFecha(b.creado)?.getTime() || 0) - (aFecha(a.creado)?.getTime() || 0)));
+    let html = lista.length
+        ? lista.map(tarjetaProspecto).join('')
+        : `<p class="text-center text-sm text-gray-400 font-medium py-8 bg-white rounded-xl border border-dashed border-gray-200">Ningún negocio coincide con la búsqueda o los filtros.</p>`;
+
+    if (etapaFiltro === 'activos' && !document.getElementById('crm-busqueda').value.trim()) {
+        const textos = { pausa: ['en pausa', 'en pausa'], descartado: ['descartado', 'descartados'], cliente: ['cliente', 'clientes'] };
+        const ocultos = Object.keys(textos).map(e => [e, prospectosData.filter(p => p.etapa === e).length]).filter(([, n]) => n);
+        if (ocultos.length) {
+            html += `<button onclick="filtrarEtapaCrm('todas')" class="text-xs font-bold text-gray-400 py-2 text-center">No se muestran ${ocultos.map(([e, n]) => plural(n, ...textos[e])).join(', ')} · <span class="text-teal-600">Ver todos</span></button>`;
+        }
+    }
+    cont.innerHTML = html;
+}
+
+const filaSeguimiento = (p, color) => {
+    const wa = linkWhatsApp(p.telefono);
+    return `
+    <div class="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+        <button onclick="abrirFichaProspecto('${p.id}')" class="w-full text-left">
+            <div class="flex justify-between items-start gap-2">
+                <p class="font-bold text-gray-800 truncate min-w-0">${escaparHtml(p.nombre)}</p>
+                <span class="text-[11px] font-black shrink-0 ${color}">${textoSeguimiento(p) || 'Sin fecha'}</span>
+            </div>
+            <div class="flex items-center gap-2 mt-1 min-w-0">${chipEtapa(p)}${p.proximoPaso ? `<span class="text-xs text-gray-500 truncate">${escaparHtml(p.proximoPaso)}</span>` : ''}</div>
+        </button>
+        <div class="grid ${wa ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mt-2.5">
+            ${wa ? `<a href="${wa}" target="_blank" class="bg-green-50 text-green-600 font-bold py-2 rounded-lg text-xs text-center active:bg-green-100"><i class="fa-brands fa-whatsapp mr-1"></i>WhatsApp</a>` : ''}
+            <button onclick="abrirMovimientoCrm('${p.id}', 'contacto')" class="bg-teal-50 text-teal-700 font-bold py-2 rounded-lg text-xs active:bg-teal-100"><i class="fa-solid fa-pen-to-square mr-1"></i>Registrar contacto</button>
+        </div>
+    </div>`;
+};
+
+function renderSeguimientosCrm(r) {
+    const cont = document.getElementById('crm-seguimientos');
+    if (estadoCrm !== 'listo') { cont.innerHTML = avisoEstadoCrm(); return; }
+    const grupo = (titulo, icono, color, lista) => !lista.length ? '' : `
+        <div class="mb-5">
+            <h3 class="text-xs font-black uppercase tracking-widest ${color} mb-2 px-1 flex items-center gap-2"><i class="fa-solid ${icono}"></i>${titulo}<span class="ml-auto bg-white border border-gray-100 text-gray-500 px-2 rounded-full">${lista.length}</span></h3>
+            <div class="flex flex-col gap-2">${lista.map(p => filaSeguimiento(p, color)).join('')}</div>
+        </div>`;
+    const html = grupo('Atrasados', 'fa-triangle-exclamation', 'text-red-600', r.atrasados)
+        + grupo('Para hoy', 'fa-bell', 'text-orange-600', r.hoy)
+        + grupo('Próximos', 'fa-calendar-days', 'text-teal-700', r.proximos)
+        + grupo('Sin seguimiento definido', 'fa-calendar-xmark', 'text-gray-500', r.sinFecha);
+    cont.innerHTML = html
+        ? `<div class="pb-8">${html}</div>`
+        : `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm"><i class="fa-solid fa-calendar-check text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium">No hay seguimientos pendientes.</p></div>`;
+}
+
+function renderClientesCrm() {
+    const cont = document.getElementById('crm-clientes');
+    if (estadoCrm !== 'listo') { cont.innerHTML = avisoEstadoCrm(); return; }
+    const clientes = prospectosData.filter(p => p.etapa === 'cliente')
+        .sort((a, b) => (aFecha(b.fechaConversion)?.getTime() || 0) - (aFecha(a.fechaConversion)?.getTime() || 0));
+    const nota = `<p class="text-xs text-gray-500 font-medium mb-3 px-1"><i class="fa-solid fa-circle-info text-teal-500 mr-1"></i>Negocios que llegaron desde el CRM. Sus pedidos, descuentos y links se manejan en Mayorista.</p>`;
+    if (!clientes.length) {
+        cont.innerHTML = nota + `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm"><i class="fa-solid fa-handshake text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium px-6">Todavía ningún negocio del CRM pasó a cliente.</p></div>`;
+        return;
+    }
+    cont.innerHTML = nota + `<div class="flex flex-col gap-3 pb-8">${clientes.map(original => {
+        const m = clienteDeProspecto(original);
+        const p = datosProspecto(original);
+        const est = m ? estadisticasContacto(m) : null;
+        const demora = p.fechaConversion && p.creado ? diasEntre(aFecha(p.creado), aFecha(p.fechaConversion)) : null;
+        const textoDemora = demora === null ? '' : demora <= 0 ? ' · se cerró el mismo día' : ` · se cerró en ${plural(demora, 'día', 'días')}`;
+        return `
+        <div class="bg-white rounded-xl p-4 shadow-sm border-l-4 border-l-green-500">
+            <button onclick="abrirFichaProspecto('${p.id}')" class="w-full text-left">
+                <p class="font-bold text-gray-800 truncate">${escaparHtml(p.nombre)}</p>
+                <p class="text-xs text-gray-500 font-medium mt-0.5">Cliente desde ${formatearFecha(p.fechaConversion)}${textoDemora}</p>
+            </button>
+            ${m ? `
+            <div class="grid grid-cols-2 gap-2 mt-3 text-center">
+                <div class="bg-gray-50 rounded-lg p-2"><p class="text-lg font-black text-gray-800">${est.compras}</p><p class="text-[9px] uppercase font-bold text-gray-400 leading-tight">Compras</p></div>
+                <div class="bg-gray-50 rounded-lg p-2"><p class="text-sm font-black text-gray-800 leading-7">${est.ultima ? formatearFecha(est.ultima) : '—'}</p><p class="text-[9px] uppercase font-bold text-gray-400 leading-tight">Última compra</p></div>
+            </div>` : `<p class="mt-3 text-xs font-bold text-red-500"><i class="fa-solid fa-triangle-exclamation mr-1"></i>No se encontró en Mayorista → Contactos.</p>`}
+            <div class="grid grid-cols-2 gap-2 mt-3">
+                <button onclick="abrirFichaProspecto('${p.id}')" class="bg-teal-50 text-teal-700 font-bold py-2 rounded-lg text-xs active:bg-teal-100"><i class="fa-solid fa-briefcase mr-1"></i>Ficha comercial</button>
+                <button onclick="verClienteEnMayorista('${p.id}')" class="bg-violet-50 text-violet-700 font-bold py-2 rounded-lg text-xs active:bg-violet-100"><i class="fa-solid fa-boxes-stacked mr-1"></i>Ver en Mayorista</button>
+            </div>
+        </div>`;
+    }).join('')}</div>`;
+}
+
+function renderAlertaCrm() {
+    const cont = document.getElementById('alertas-crm');
+    let html = '';
+    if (esAdmin && estadoCrm === 'listo') {
+        const r = resumenSeguimientos();
+        const total = r.atrasados.length + r.hoy.length;
+        if (total) {
+            const partes = [];
+            if (r.atrasados.length) partes.push(plural(r.atrasados.length, 'atrasado', 'atrasados'));
+            if (r.hoy.length) partes.push(`${r.hoy.length} para hoy`);
+            html = `<button onclick="irACrm('seguimientos')" class="w-full text-left bg-teal-600 text-white rounded-2xl p-4 flex items-center gap-3 shadow-md active:scale-95 transition-all">
+                <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><i class="fa-solid fa-briefcase"></i></div>
+                <div class="flex-1 min-w-0"><p class="font-bold">${plural(total, 'seguimiento pendiente', 'seguimientos pendientes')}</p><p class="text-xs text-white/80 truncate"><span class="font-bold text-white">${partes.join(' · ')}</span> · ${escaparHtml([...r.atrasados, ...r.hoy].map(p => p.nombre).join(', '))}</p></div>
+                <i class="fa-solid fa-chevron-right text-white/70"></i>
+            </button>`;
+        }
+    }
+    cont.innerHTML = html;
+    cont.classList.toggle('hidden', !html);
+    cont.classList.toggle('flex', !!html);
+}
+
+// ----- Ficha comercial -----
+window.abrirFichaProspecto = function(id) {
+    if (!esAdmin) return;
+    prospectoAbierto = id;
+    renderFichaProspecto();
+    abrirModal('modalFichaProspecto');
+};
+
+window.cerrarFichaProspecto = function() {
+    prospectoAbierto = null;
+    if (!document.getElementById('modalFichaProspecto').classList.contains('hidden')) cerrarModal('modalFichaProspecto');
+};
+
+const filaHistorialCrm = (i) => {
+    let icono, color, titulo, detalle = '';
+    if (i.tipo === 'contacto') {
+        const canal = CANALES_CRM[i.canal] || CANALES_CRM.otro;
+        icono = canal.icono;
+        color = 'bg-teal-100 text-teal-700';
+        titulo = `Contacto por ${canal.texto}`;
+        detalle = escaparHtml(i.resumen);
+        if (i.proximoPaso || i.proximaFecha) detalle += `<span class="block text-gray-400 mt-0.5"><i class="fa-solid fa-arrow-right mr-1"></i>${escaparHtml(i.proximoPaso || 'Seguimiento')}${i.proximaFecha ? ` · ${formatearFecha(i.proximaFecha)}` : ''}</span>`;
+    } else if (i.tipo === 'etapa') {
+        icono = 'fa-solid fa-arrow-right-arrow-left';
+        color = 'bg-amber-100 text-amber-700';
+        titulo = `${textoEtapa(i.de, i.situacionDe)} → ${textoEtapa(i.a, i.situacion)}`;
+        detalle = [i.motivo === 'no_interesado' ? 'No interesado' : '', escaparHtml(i.nota)].filter(Boolean).join(' · ');
+    } else if (i.tipo === 'conversion') {
+        icono = 'fa-solid fa-store';
+        color = 'bg-green-100 text-green-700';
+        titulo = 'Pasó a cliente mayorista';
+        detalle = escaparHtml(i.nota);
+    } else {
+        icono = 'fa-solid fa-flag';
+        color = 'bg-sky-100 text-sky-700';
+        titulo = `Se cargó en el CRM · ${textoEtapa(i.etapa, i.situacion)}`;
+    }
+    return `
+    <div class="flex gap-3">
+        <div class="w-8 h-8 rounded-full ${color} flex items-center justify-center shrink-0 text-xs"><i class="${icono}"></i></div>
+        <div class="flex-1 min-w-0 pb-3 border-b border-gray-100">
+            <div class="flex justify-between items-start gap-2"><p class="text-sm font-bold text-gray-800">${titulo}</p><span class="text-[11px] text-gray-400 font-bold shrink-0 mt-0.5">${formatearFecha(i.fecha)}</span></div>
+            ${detalle ? `<p class="text-xs text-gray-600 mt-0.5 leading-relaxed break-words">${detalle}</p>` : ''}
+        </div>
+    </div>`;
+};
+
+function renderFichaProspecto() {
+    const cont = document.getElementById('ficha-prospecto-contenido');
+    const original = prospectosData.find(x => x.id === prospectoAbierto);
+    if (!original) { cont.innerHTML = `<p class="text-center text-gray-400 py-8">Este negocio ya no está en el CRM.</p>`; return; }
+    const p = datosProspecto(original);
+    const cliente = clienteDeProspecto(original);
+    const esCliente = p.etapa === 'cliente';
+    const cerrado = ['pausa', 'descartado'].includes(p.etapa);
+    const u = ultimoContacto(p);
+    const estado = estadoSeguimiento(p);
+    const variedades = nombresVariedades(p);
+
+    const ig = linkInstagram(p.instagram);
+    const enlace = (href, clases, icono, texto) => href ? `<a href="${escaparHtml(href)}" target="_blank" rel="noopener" class="flex-1 ${clases} font-bold py-2.5 rounded-xl text-xs text-center active:scale-95 transition-all"><i class="${icono} mr-1"></i>${texto}</a>` : '';
+    const enlaces = [
+        enlace(linkWhatsApp(p.telefono), 'bg-green-500 text-white', 'fa-brands fa-whatsapp', 'WhatsApp'),
+        enlace(ig, 'bg-pink-50 text-pink-600', ig.includes('instagram.com') ? 'fa-brands fa-instagram' : 'fa-solid fa-globe', ig.includes('instagram.com') ? 'Instagram' : 'Red social'),
+        enlace(linkMapa(p), 'bg-blue-50 text-blue-600', 'fa-solid fa-location-dot', 'Mapa')
+    ].join('');
+
+    const colorSeg = { atrasado: 'bg-red-50 border-red-200 text-red-700', hoy: 'bg-orange-50 border-orange-200 text-orange-700', proximo: 'bg-teal-50 border-teal-100 text-teal-800' }[estado];
+    let seguimiento = '';
+    if (estado) {
+        seguimiento = `<div class="rounded-xl border p-3 mb-4 ${colorSeg}">
+            <p class="text-[10px] uppercase font-black tracking-widest opacity-70">Próximo seguimiento</p>
+            <p class="font-black">${textoSeguimiento(p)} <span class="font-medium text-xs opacity-70">(${formatearFecha(p.proximoSeguimiento)})</span></p>
+            ${p.proximoPaso ? `<p class="text-sm font-medium mt-0.5"><i class="fa-solid fa-arrow-right mr-1"></i>${escaparHtml(p.proximoPaso)}</p>` : ''}
+        </div>`;
+    } else if (!ETAPAS_SIN_SEGUIMIENTO.includes(p.etapa)) {
+        seguimiento = `<div class="rounded-xl border border-dashed border-gray-300 p-3 mb-4 text-sm text-gray-500 font-medium"><i class="fa-regular fa-calendar-xmark mr-1"></i>Sin seguimiento definido${p.proximoPaso ? ` · ${escaparHtml(p.proximoPaso)}` : ''}</div>`;
+    }
+
+    const boton = (onclick, clases, icono, texto) => `<button onclick="${onclick}" class="${clases} font-bold py-3 rounded-xl text-sm active:scale-95 transition-all"><i class="fa-solid ${icono} mr-1.5"></i>${texto}</button>`;
+    const principal = 'w-full bg-teal-600 text-white shadow-lg shadow-teal-200';
+    const secundario = 'bg-gray-50 border border-gray-100 text-gray-600';
+    const editar = boton(`abrirProspecto('${p.id}')`, secundario, 'fa-pen', 'Editar datos');
+    let acciones;
+    if (esCliente) {
+        acciones = `
+            ${boton(`abrirMovimientoCrm('${p.id}', 'contacto')`, principal, 'fa-pen-to-square', 'Registrar contacto')}
+            <div class="grid grid-cols-2 gap-2">${boton(`verClienteEnMayorista('${p.id}')`, 'bg-violet-50 text-violet-700', 'fa-boxes-stacked', 'Ver en Mayorista')}${editar}</div>
+            ${cliente ? boton(`enviarLinkPedido('${cliente.id}')`, 'w-full bg-green-50 text-green-700', 'fa-link', 'Enviarle su link de pedidos') : ''}`;
+    } else if (cerrado) {
+        acciones = `
+            ${boton(`abrirMovimientoCrm('${p.id}', 'reactivar')`, principal, 'fa-rotate-left', 'Reactivar')}
+            <div class="grid grid-cols-2 gap-2">${boton(`abrirMovimientoCrm('${p.id}', 'contacto')`, secundario, 'fa-pen-to-square', 'Registrar contacto')}${editar}</div>`;
+    } else {
+        acciones = `
+            ${boton(`abrirMovimientoCrm('${p.id}', 'contacto')`, principal, 'fa-pen-to-square', 'Registrar contacto')}
+            <div class="grid grid-cols-2 gap-2">${boton(`abrirMovimientoCrm('${p.id}', 'etapa')`, secundario, 'fa-arrow-right-arrow-left', 'Cambiar etapa')}${editar}</div>
+            ${boton(`abrirConvertirProspecto('${p.id}')`, 'w-full bg-green-50 text-green-700 border border-green-200', 'fa-store', 'Pasar a cliente mayorista')}`;
+    }
+
+    const dato = (icono, etiqueta, valor) => valor ? `
+        <div class="flex gap-2.5">
+            <i class="fa-solid ${icono} text-gray-300 w-4 text-center mt-1 text-sm"></i>
+            <div class="min-w-0"><p class="text-[10px] uppercase font-bold text-gray-400 leading-tight">${etiqueta}</p><div class="text-sm font-medium text-gray-700 break-words">${valor}</div></div>
+        </div>` : '';
+    const historial = (p.interacciones || []).map((i, orden) => ({ ...i, orden }))
+        .sort((a, b) => ((aFecha(b.fecha)?.getTime() || 0) - (aFecha(a.fecha)?.getTime() || 0)) || b.orden - a.orden);
+
+    cont.innerHTML = `
+        <div class="mb-4">
+            <p class="text-xl font-black text-gray-800 break-words leading-tight">${escaparHtml(p.nombre)}</p>
+            <div class="flex flex-wrap items-center gap-2 mt-1.5">${chipEtapa(p)}${p.rubro ? `<span class="text-xs font-bold text-gray-500">${escaparHtml(p.rubro)}</span>` : ''}</div>
+        </div>
+        ${enlaces ? `<div class="flex gap-2 mb-4">${enlaces}</div>` : ''}
+        ${seguimiento}
+        <div class="flex flex-col gap-2 mb-5">${acciones}</div>
+
+        <div class="bg-gray-50 rounded-xl border border-gray-100 p-4 mb-4">
+            <p class="text-[11px] font-black text-teal-700 uppercase tracking-widest mb-3">Datos del negocio</p>
+            <div class="flex flex-col gap-3">
+                ${dato('fa-user', 'Persona de contacto', escaparHtml(p.contacto))}
+                ${dato('fa-phone', 'WhatsApp', escaparHtml(p.telefono))}
+                ${dato('fa-hashtag', 'Instagram / red social', escaparHtml(p.instagram))}
+                ${dato('fa-location-dot', 'Dirección', escaparHtml(p.direccion))}
+                ${dato('fa-map', 'Zona o barrio', escaparHtml(p.zona))}
+                ${dato('fa-calendar-plus', 'Alta en el CRM', formatearFecha(p.creado))}
+            </div>
+        </div>
+
+        <div class="bg-gray-50 rounded-xl border border-gray-100 p-4 mb-5">
+            <p class="text-[11px] font-black text-teal-700 uppercase tracking-widest mb-3">Información comercial</p>
+            <div class="flex flex-col gap-3">
+                ${dato('fa-signal', 'Canal de contacto', CANALES_CRM[p.canal]?.texto || '')}
+                ${dato('fa-comments', 'Último contacto', u ? `${formatearFecha(u)} (${haceDias(u)})` : 'Todavía sin contactar')}
+                ${dato('fa-box', 'Variedades de interés', variedades.length ? `<div class="flex flex-wrap gap-1.5 mt-1">${variedades.map(n => `<span class="text-[11px] font-bold bg-white border border-teal-100 text-teal-700 px-2 py-0.5 rounded-full">${escaparHtml(n)}</span>`).join('')}</div>` : '')}
+                ${dato('fa-weight-scale', 'Volumen estimado', escaparHtml(p.volumen))}
+                ${dato('fa-note-sticky', 'Observaciones', escaparHtml(p.observaciones).replace(/\n/g, '<br>'))}
+                ${esCliente ? dato('fa-store', 'Cliente desde', formatearFecha(p.fechaConversion)) : ''}
+            </div>
+        </div>
+
+        <p class="text-[11px] font-black text-teal-700 uppercase tracking-widest mb-3 px-1">Historial (${historial.length})</p>
+        <div class="flex flex-col gap-3">${historial.map(filaHistorialCrm).join('') || `<p class="text-sm text-gray-400">Sin movimientos.</p>`}</div>`;
+}
+
+window.verClienteEnMayorista = function(id) {
+    const p = prospectosData.find(x => x.id === id);
+    const m = p && clienteDeProspecto(p);
+    if (!m) { mostrarAviso('No se encontró el cliente en Mayorista.', 'error'); return; }
+    cerrarFichaProspecto();
+    irAMayorista('contactos');
+    setTimeout(() => abrirContacto(m.id), 300);
+};
+
+// ----- Alta y edición -----
+function renderVariedadesProspecto() {
+    const cont = document.getElementById('prospecto-variedades');
+    const opciones = productosData.map(p => ({ id: p.id, nombre: p.nombre }));
+    // si un producto se borró del catálogo, igual se muestra mientras esté elegido
+    variedadesForm.forEach(v => { if (!opciones.some(o => o.id === v.id)) opciones.push(v); });
+    if (!opciones.length) {
+        cont.innerHTML = `<p class="text-xs text-gray-400 font-medium">Todavía no hay productos en el Catálogo.</p>`;
+        return;
+    }
+    cont.innerHTML = opciones.map(o => {
+        const activo = variedadesForm.some(v => v.id === o.id);
+        return `<button type="button" data-id="${escaparHtml(o.id)}" onclick="alternarVariedad(this.dataset.id)" class="px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${activo ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-gray-200 text-gray-600'}">${activo ? '<i class="fa-solid fa-check mr-1"></i>' : ''}${escaparHtml(o.nombre)}</button>`;
+    }).join('');
+}
+
+window.alternarVariedad = function(id) {
+    if (variedadesForm.some(v => v.id === id)) {
+        variedadesForm = variedadesForm.filter(v => v.id !== id);
+    } else {
+        const producto = productosData.find(p => p.id === id);
+        if (producto) variedadesForm.push({ id, nombre: producto.nombre });
+    }
+    renderVariedadesProspecto();
+};
+
+window.abrirProspecto = function(id = null) {
+    if (!esAdmin) return;
+    const p = id ? prospectosData.find(x => x.id === id) : null;
+    const datos = p ? datosProspecto(p) : {};
+    const esCliente = p?.etapa === 'cliente';
+
+    document.getElementById('titulo-modal-prospecto').innerText = p ? 'Editar negocio' : 'Nuevo negocio';
+    document.getElementById('prospecto-id').value = p?.id || '';
+    const campos = { nombre: datos.nombre, telefono: datos.telefono, rubro: p?.rubro, zona: p?.zona, contacto: p?.contacto, instagram: p?.instagram, direccion: p?.direccion, volumen: p?.volumen, observaciones: p?.observaciones, paso: p?.proximoPaso };
+    Object.entries(campos).forEach(([campo, valor]) => { document.getElementById(`prospecto-${campo}`).value = valor || ''; });
+    ['nombre', 'telefono'].forEach(campo => { document.getElementById(`prospecto-${campo}`).disabled = esCliente; });
+    document.getElementById('prospecto-nota-cliente').classList.toggle('hidden', !esCliente);
+
+    const alta = document.getElementById('prospecto-alta');
+    alta.value = fechaAInput(p?.creado || new Date());
+    alta.max = fechaAInput(new Date());
+    const canal = document.getElementById('prospecto-canal');
+    canal.innerHTML = `<option value="">Sin definir</option>` + Object.entries(CANALES_CRM).map(([valor, c]) => `<option value="${valor}">${c.texto}</option>`).join('');
+    canal.value = p?.canal || '';
+
+    const etapa = document.getElementById('prospecto-etapa');
+    etapa.innerHTML = OPCIONES_ETAPA_EN_CURSO.map(([valor, texto]) => `<option value="${valor}">${texto}</option>`).join('');
+    etapa.value = 'nuevo';
+    // en una ficha existente la etapa se cambia con "Cambiar etapa", para que quede en el historial
+    document.getElementById('prospecto-etapa-box').classList.toggle('hidden', !!p);
+    document.getElementById('prospecto-seguimiento-box').classList.toggle('hidden', !!p && ETAPAS_SIN_SEGUIMIENTO.includes(p.etapa));
+    document.getElementById('prospecto-proximo').value = fechaAInput(p?.proximoSeguimiento);
+
+    variedadesForm = (p?.variedades || []).map(v => ({ id: v.id, nombre: v.nombre }));
+    renderVariedadesProspecto();
+
+    const eliminar = document.getElementById('prospecto-eliminar');
+    eliminar.classList.toggle('hidden', !p);
+    eliminar.classList.toggle('flex', !!p);
+    abrirModal('modalProspecto');
+};
+
+window.guardarProspecto = async function(e) {
+    e.preventDefault();
+    if (!esAdmin) return;
+    await conBotonBloqueado(e, async () => {
+        const id = document.getElementById('prospecto-id').value;
+        const actual = id ? prospectosData.find(x => x.id === id) : null;
+        const valor = (campo) => document.getElementById(`prospecto-${campo}`).value.trim();
+        const nombre = valor('nombre');
+        const telefono = valor('telefono');
+
+        // un cliente ya convertido toma nombre y WhatsApp del panel mayorista, así que no se controla
+        if (!actual?.mayoristaId) {
+            const tel = normalizarTelefono(telefono);
+            const cliente = tel && mayoristasData.find(m => normalizarTelefono(m.telefono) === tel);
+            if (cliente) { mostrarAviso(`Ese WhatsApp ya es del cliente ${escaparHtml(cliente.nombre)}.`, 'error'); return; }
+            const repetido = tel && prospectosData.find(x => x.id !== id && !x.mayoristaId && normalizarTelefono(x.telefono) === tel);
+            if (repetido) { mostrarAviso(`Ese WhatsApp ya está cargado en ${escaparHtml(repetido.nombre)}.`, 'error'); return; }
+
+            const clave = normalizarTexto(nombre);
+            const clienteMismoNombre = mayoristasData.find(m => normalizarTexto(m.nombre) === clave);
+            const prospectoMismoNombre = prospectosData.find(x => x.id !== id && normalizarTexto(datosProspecto(x).nombre) === clave);
+            const aviso = clienteMismoNombre ? `Ya hay un cliente mayorista llamado "${clienteMismoNombre.nombre}".`
+                : prospectoMismoNombre ? `Ya hay un negocio en el CRM llamado "${prospectoMismoNombre.nombre}".` : '';
+            const cambioNombre = !actual || normalizarTexto(actual.nombre) !== clave;
+            if (aviso && cambioNombre && !confirm(`${aviso}\n¿Lo guardo igual?`)) return;
+        }
+
+        const alta = document.getElementById('prospecto-alta').value;
+        const datos = {
+            rubro: valor('rubro'),
+            zona: valor('zona'),
+            contacto: valor('contacto'),
+            instagram: valor('instagram'),
+            direccion: valor('direccion'),
+            canal: document.getElementById('prospecto-canal').value,
+            variedades: variedadesForm,
+            volumen: valor('volumen'),
+            observaciones: valor('observaciones'),
+            creado: (actual && fechaAInput(actual.creado) === alta ? actual.creado : null) || fechaElegida(alta) || new Date()
+        };
+        if (!actual?.mayoristaId) {
+            datos.nombre = nombre;
+            datos.telefono = telefono;
+        }
+        if (!actual || !ETAPAS_SIN_SEGUIMIENTO.includes(actual.etapa)) {
+            datos.proximoSeguimiento = inputAFecha(document.getElementById('prospecto-proximo').value);
+            datos.proximoPaso = valor('paso');
+        }
+
+        try {
+            if (actual) {
+                await actualizarDoc(documento('prospectos', id), datos);
+                cerrarModal('modalProspecto');
+                mostrarAviso('Datos actualizados.', 'ok');
+            } else {
+                const [etapa, situacion = null] = document.getElementById('prospecto-etapa').value.split(':');
+                const ref = await crearDoc(coleccion('prospectos'), {
+                    ...datos,
+                    etapa,
+                    situacion,
+                    mayoristaId: null,
+                    interacciones: [{ tipo: 'alta', fecha: datos.creado, etapa, situacion }]
+                });
+                cerrarModal('modalProspecto');
+                mostrarAviso('Negocio cargado en el CRM.', 'ok');
+                setTimeout(() => abrirFichaProspecto(ref.id), 350);
+            }
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
+        }
+    });
+};
+
+window.confirmarEliminarProspecto = function() {
+    if (!esAdmin) return;
+    const p = prospectosData.find(x => x.id === document.getElementById('prospecto-id').value);
+    if (!p) return;
+    prospectoAEliminar = p.id;
+    document.getElementById('texto-eliminar-prospecto').innerText = p.etapa === 'cliente'
+        ? `Se borra la ficha de ${datosProspecto(p).nombre} y su historial comercial. El cliente sigue en Mayorista con sus pedidos. No se puede deshacer.`
+        : `Se borra ${p.nombre} y todo su historial. No se puede deshacer. Si no está interesado, mejor pasalo a "Descartado".`;
+    abrirConfirmacion('modalConfirmDeleteProspecto');
+};
+
+window.cerrarConfirmDeleteProspecto = function() {
+    cerrarConfirmacion('modalConfirmDeleteProspecto', () => { prospectoAEliminar = null; });
+};
+
+window.eliminarProspecto = async function() {
+    if (!esAdmin || !prospectoAEliminar) return;
+    await conBotonBloqueadoClick(document.getElementById('btn-confirm-delete-prospecto'), async () => {
+        try {
+            await borrarDoc(documento('prospectos', prospectoAEliminar));
+            cerrarConfirmDeleteProspecto();
+            cerrarModal('modalProspecto');
+            cerrarFichaProspecto();
+            mostrarAviso('Negocio eliminado del CRM.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo eliminar. Probá de nuevo.', 'error');
+        }
+    });
+};
+
+// ----- Registrar contacto, cambiar etapa y reactivar -----
+function renderCanalesCrm(elegido) {
+    document.getElementById('movimiento-canal').value = elegido;
+    document.getElementById('movimiento-canales').innerHTML = Object.entries(CANALES_CRM).map(([valor, c]) => {
+        const activo = valor === elegido;
+        return `<button type="button" onclick="elegirCanalCrm('${valor}')" class="flex flex-col items-center gap-1 py-2 rounded-xl border-2 text-[10px] font-bold transition-all ${activo ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-500'}"><i class="${c.icono} text-base"></i>${c.texto}</button>`;
+    }).join('');
+}
+
+window.elegirCanalCrm = function(canal) {
+    renderCanalesCrm(canal);
+};
+
+const opcionesEtapaHtml = (opciones, actual) => opciones.map(([valor, texto]) => `<option value="${valor}">${texto}${valor === actual ? ' (actual)' : ''}</option>`).join('');
+
+window.abrirMovimientoCrm = function(id, modo) {
+    if (!esAdmin) return;
+    const p = prospectosData.find(x => x.id === id);
+    if (!p) return;
+    const actual = valorEtapa(p);
+    movimientoCrm = { id, modo, noInteresado: false };
+
+    document.getElementById('titulo-movimiento-crm').innerText = { contacto: 'Registrar contacto', etapa: 'Cambiar etapa', reactivar: 'Reactivar negocio' }[modo];
+    document.getElementById('movimiento-negocio').innerHTML = `${escaparHtml(datosProspecto(p).nombre)} · ${chipEtapa(p)}`;
+    document.getElementById('movimiento-contacto-box').classList.toggle('hidden', modo !== 'contacto');
+    document.getElementById('movimiento-nota-box').classList.toggle('hidden', modo === 'contacto');
+
+    const fecha = document.getElementById('movimiento-fecha');
+    fecha.value = fechaAInput(new Date());
+    fecha.max = fechaAInput(new Date());
+    document.getElementById('movimiento-resumen').value = '';
+    document.getElementById('movimiento-nota').value = '';
+    renderCanalesCrm(p.canal || 'whatsapp');
+
+    const select = document.getElementById('movimiento-etapa');
+    if (modo === 'reactivar') {
+        select.innerHTML = opcionesEtapaHtml(OPCIONES_ETAPA_EN_CURSO, actual);
+        select.value = OPCIONES_ETAPA_EN_CURSO.some(([valor]) => valor === p.etapaPrevia) ? p.etapaPrevia : 'contactado';
+    } else {
+        select.innerHTML = opcionesEtapaHtml(OPCIONES_ETAPA, actual);
+        // si recién se lo contacta por primera vez, se sugiere pasarlo a "Contactado"
+        select.value = modo === 'contacto' && p.etapa === 'nuevo' ? 'contactado' : actual;
+    }
+    document.getElementById('movimiento-etapa-box').classList.toggle('hidden', p.etapa === 'cliente');
+
+    // al registrar un contacto el seguimiento anterior ya se cumplió; al cambiar etapa se conserva
+    document.getElementById('movimiento-proximo').value = modo === 'contacto' ? '' : fechaAInput(p.proximoSeguimiento);
+    document.getElementById('movimiento-paso').value = modo === 'contacto' ? '' : (p.proximoPaso || '');
+    actualizarFormMovimientoCrm();
+    abrirModal('modalMovimientoCrm');
+};
+
+function actualizarFormMovimientoCrm() {
+    const p = prospectosData.find(x => x.id === movimientoCrm.id);
+    const valor = document.getElementById('movimiento-etapa').value;
+    document.getElementById('movimiento-no-interesado').classList.toggle('hidden', valor !== 'evaluacion:no_interesado');
+    document.getElementById('movimiento-motivo').classList.toggle('hidden', !movimientoCrm.noInteresado);
+    document.getElementById('movimiento-seguimiento-box').classList.toggle('hidden', p?.etapa === 'cliente' || valor === 'descartado');
+}
+
+window.cambioEtapaMovimiento = function() {
+    movimientoCrm.noInteresado = false;
+    actualizarFormMovimientoCrm();
+};
+
+window.resolverNoInteresado = function(destino) {
+    document.getElementById('movimiento-etapa').value = destino;
+    movimientoCrm.noInteresado = true;
+    actualizarFormMovimientoCrm();
+};
+
+window.fijarProximoCrm = function(dias) {
+    document.getElementById('movimiento-proximo').value = dias === null ? '' : fechaAInput(sumarDias(dias));
+};
+
+window.guardarMovimientoCrm = async function(e) {
+    e.preventDefault();
+    if (!esAdmin) return;
+    const { id, modo, noInteresado } = movimientoCrm;
+    const p = prospectosData.find(x => x.id === id);
+    if (!p) return;
+    const esCliente = p.etapa === 'cliente';
+    const valor = esCliente ? valorEtapa(p) : document.getElementById('movimiento-etapa').value;
+    const cambiaEtapa = valor !== valorEtapa(p);
+    const resumen = document.getElementById('movimiento-resumen').value.trim();
+    const fechaInput = document.getElementById('movimiento-fecha').value;
+
+    if (valor === 'evaluacion:no_interesado') { mostrarAviso('Elegí si pasa a En pausa o a Descartado.', 'error'); return; }
+    if (modo === 'contacto' && !fechaInput) { mostrarAviso('Elegí la fecha del contacto.', 'error'); return; }
+    if (modo === 'contacto' && !resumen) { mostrarAviso('Contá brevemente qué pasó.', 'error'); return; }
+    if (modo !== 'contacto' && !cambiaEtapa) { mostrarAviso('Elegí una etapa distinta a la actual.', 'error'); return; }
+
+    await conBotonBloqueado(e, async () => {
+        const [etapa, situacion = null] = valor.split(':');
+        const fecha = modo === 'contacto' ? fechaElegida(fechaInput) : new Date();
+        const sinSeguimiento = ETAPAS_SIN_SEGUIMIENTO.includes(etapa);
+        const proximo = sinSeguimiento ? null : inputAFecha(document.getElementById('movimiento-proximo').value);
+        const paso = sinSeguimiento ? '' : document.getElementById('movimiento-paso').value.trim();
+        const canal = document.getElementById('movimiento-canal').value;
+
+        const nuevas = [];
+        if (modo === 'contacto') nuevas.push({ tipo: 'contacto', fecha, canal, resumen, proximoPaso: paso, proximaFecha: proximo });
+        if (cambiaEtapa) nuevas.push({
+            tipo: 'etapa', fecha, de: p.etapa, situacionDe: p.situacion || null, a: etapa, situacion,
+            motivo: noInteresado ? 'no_interesado' : null,
+            nota: modo === 'contacto' ? '' : document.getElementById('movimiento-nota').value.trim()
+        });
+
+        const cambios = { interacciones: [...(p.interacciones || []), ...nuevas], proximoSeguimiento: proximo, proximoPaso: paso };
+        if (cambiaEtapa) {
+            cambios.etapa = etapa;
+            cambios.situacion = situacion;
+            // al pausar o descartar se recuerda dónde estaba, para reactivarlo en esa etapa
+            if (['pausa', 'descartado'].includes(etapa) && ETAPAS_EN_CURSO.includes(p.etapa)) cambios.etapaPrevia = valorEtapa(p);
+        }
+        if (modo === 'contacto' && !p.canal) cambios.canal = canal;
+
+        try {
+            await actualizarDoc(documento('prospectos', id), cambios);
+            cerrarModal('modalMovimientoCrm');
+            mostrarAviso({ contacto: 'Contacto registrado.', etapa: 'Etapa actualizada.', reactivar: 'Negocio reactivado.' }[modo], 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
+        }
+    });
+};
+
+// ----- Conversión a cliente mayorista -----
+window.abrirConvertirProspecto = function(id) {
+    if (!esAdmin) return;
+    const p = prospectosData.find(x => x.id === id);
+    if (!p || p.etapa === 'cliente') return;
+    conversionCrm = { id, destino: null, forzarNuevo: false };
+    document.getElementById('convertir-nombre').value = p.nombre || '';
+    document.getElementById('convertir-telefono').value = p.telefono || '';
+    document.getElementById('convertir-dias-aviso').value = '';
+    const variedades = nombresVariedades(p);
+    document.getElementById('convertir-notas').value = [variedades.length ? `Le interesa: ${variedades.join(', ')}` : '', p.volumen ? `Volumen: ${p.volumen}` : ''].filter(Boolean).join(' · ');
+    document.getElementById('convertir-descuento-btns').innerHTML = DESCUENTOS.map(d =>
+        `<button type="button" data-valor="${d}" onclick="elegirDescuento('convertir', ${d})" class="desc-btn-convertir">${d ? d + '%' : 'Sin desc.'}</button>`
+    ).join('');
+    elegirDescuento('convertir', 0);
+    actualizarCoincidenciaConversion();
+    abrirModal('modalConvertirProspecto');
+};
+
+// busca si el negocio ya existe en Mayorista: primero por WhatsApp, después por nombre
+const coincidenciaConversion = () => {
+    const tel = normalizarTelefono(document.getElementById('convertir-telefono').value);
+    const porTelefono = tel && mayoristasData.find(m => normalizarTelefono(m.telefono) === tel);
+    if (porTelefono) return { cliente: porTelefono, por: 'telefono' };
+    const nombre = normalizarTexto(document.getElementById('convertir-nombre').value);
+    const porNombre = nombre && mayoristasData.find(m => normalizarTexto(m.nombre) === nombre);
+    return porNombre ? { cliente: porNombre, por: 'nombre' } : null;
+};
+
+window.actualizarCoincidenciaConversion = function() {
+    const c = coincidenciaConversion();
+    const vincular = !!c && (c.por === 'telefono' || !conversionCrm.forzarNuevo);
+    conversionCrm.destino = vincular ? c.cliente.id : null;
+
+    const box = document.getElementById('convertir-coincidencia');
+    box.classList.toggle('hidden', !c);
+    if (c) {
+        const quien = `<b>${escaparHtml(c.cliente.nombre)}</b>${c.cliente.telefono ? ` (${escaparHtml(c.cliente.telefono)})` : ''}`;
+        const otraFicha = prospectosData.find(p => p.mayoristaId === c.cliente.id && p.id !== conversionCrm.id);
+        const avisoFicha = otraFicha ? `<p class="mt-2 text-[11px] font-bold">Ojo: ese cliente ya está vinculado con otra ficha del CRM (${escaparHtml(otraFicha.nombre)}).</p>` : '';
+        const opcion = (nuevo, texto) => `<button type="button" onclick="elegirModoConversion(${nuevo})" class="py-2 rounded-lg text-xs font-bold border ${conversionCrm.forzarNuevo === nuevo ? 'bg-amber-600 border-amber-600 text-white' : 'bg-white border-amber-200 text-amber-800'}">${texto}</button>`;
+        box.innerHTML = c.por === 'telefono'
+            ? `<div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-900"><i class="fa-solid fa-link mr-1"></i>Ese WhatsApp ya es del cliente ${quien}. Se va a <b>vincular con ese cliente</b>, sin crear otro.${avisoFicha}</div>`
+            : `<div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-900"><p class="mb-2"><i class="fa-solid fa-circle-question mr-1"></i>Ya hay un cliente llamado ${quien}. ¿Es el mismo negocio?</p><div class="grid grid-cols-2 gap-2">${opcion(false, 'Sí, vincular')}${opcion(true, 'No, crear otro')}</div>${avisoFicha}</div>`;
+    }
+    document.getElementById('convertir-condiciones').classList.toggle('hidden', vincular);
+    document.getElementById('convertir-submit').innerText = vincular ? 'Vincular con ese cliente' : 'Crear cliente mayorista';
+};
+
+window.elegirModoConversion = function(nuevo) {
+    conversionCrm.forzarNuevo = nuevo;
+    actualizarCoincidenciaConversion();
+};
+
+window.confirmarConversion = async function(e) {
+    e.preventDefault();
+    if (!esAdmin) return;
+    const p = prospectosData.find(x => x.id === conversionCrm.id);
+    if (!p) return;
+    await conBotonBloqueado(e, async () => {
+        // se vuelve a buscar justo antes de guardar, por si el panel mayorista cambió
+        actualizarCoincidenciaConversion();
+        const nombre = document.getElementById('convertir-nombre').value.trim();
+        try {
+            let clienteId = conversionCrm.destino;
+            let nombreCliente = nombre;
+            let nota;
+            if (clienteId) {
+                nombreCliente = mayoristasData.find(m => m.id === clienteId)?.nombre || nombre;
+                nota = `Se vinculó con el cliente que ya existía: ${nombreCliente}`;
+            } else {
+                const diasAviso = parseInt(document.getElementById('convertir-dias-aviso').value, 10);
+                const ref = await crearDoc(coleccion('mayoristas'), {
+                    nombre,
+                    telefono: document.getElementById('convertir-telefono').value.trim(),
+                    descuento: Number(document.getElementById('convertir-descuento').value) || 0,
+                    diasAviso: diasAviso > 0 ? diasAviso : null,
+                    notas: document.getElementById('convertir-notas').value.trim(),
+                    creado: new Date()
+                });
+                clienteId = ref.id;
+                nota = 'Se creó como cliente nuevo en Mayorista';
+            }
+            const ahora = new Date();
+            await actualizarDoc(documento('prospectos', p.id), {
+                etapa: 'cliente',
+                situacion: null,
+                mayoristaId: clienteId,
+                fechaConversion: ahora,
+                proximoSeguimiento: null,
+                proximoPaso: '',
+                interacciones: [...(p.interacciones || []), { tipo: 'conversion', fecha: ahora, de: p.etapa, nota }]
+            });
+            cerrarModal('modalConvertirProspecto');
+            mostrarAviso(`¡${escaparHtml(nombreCliente)} ya es cliente mayorista!`, 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
+        }
+    });
+};
+
 function refrescarTodo() {
     renderBalanceYResumen();
     renderVentas();
@@ -1961,6 +2943,9 @@ function refrescarTodo() {
     if (!document.getElementById('content-balances').classList.contains('hidden')) renderGridBalances();
     if (pedidoDetalleAbierto) renderDetallePedido();
     if (historialContactoAbierto) renderHistorialContacto();
+    renderCrm();
+    renderAlertaCrm();
+    if (prospectoAbierto) renderFichaProspecto();
 }
 
 const usuarioAEmail = (usuario) => {
@@ -2028,6 +3013,17 @@ function aplicarPermisos() {
         el.classList.toggle('hidden', !esAdmin);
         el.classList.toggle('flex', esAdmin);
     });
+    // el admin tiene un botón más en la barra (CRM): se achican márgenes para que entren las 9 etiquetas
+    const barra = document.getElementById('barra-nav');
+    barra.classList.toggle('grid-cols-8', !esAdmin);
+    barra.classList.toggle('grid-cols-9', esAdmin);
+    barra.classList.toggle('gap-0.5', !esAdmin);
+    barra.classList.toggle('px-1', !esAdmin);
+    barra.classList.toggle('px-0.5', esAdmin);
+    barra.querySelectorAll('.nav-btn span:not([id])').forEach(etiqueta => {
+        etiqueta.classList.toggle('tracking-tight', !esAdmin);
+        etiqueta.classList.toggle('tracking-tighter', esAdmin);
+    });
 }
 
 function inicializar() {
@@ -2091,6 +3087,19 @@ function cargarDatos() {
             pedidosData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             refrescarTodo();
         });
+
+        // el CRM solo lo lee la cuenta admin
+        if (esAdmin) {
+            escuchar(coleccion('prospectos'), (snapshot) => {
+                prospectosData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                estadoCrm = 'listo';
+                refrescarTodo();
+            }, (error) => {
+                console.error(error);
+                estadoCrm = 'error';
+                renderCrm();
+            });
+        }
     } catch (error) {
         console.error("Error inicializando Firebase:", error);
     }

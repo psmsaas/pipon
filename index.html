@@ -97,6 +97,7 @@
             </div>
 
             <div id="alertas-mayorista" class="hidden flex-col gap-3 mb-6"></div>
+            <div id="alertas-crm" class="hidden flex-col gap-3 mb-6"></div>
 
             <h3 class="font-bold text-pipon-brown mb-3 px-1">Resumen rápido</h3>
             <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 text-center">
@@ -277,13 +278,81 @@
             <div id="mayorista-historial" class="subtab-mayorista hidden"></div>
             <div id="mayorista-contactos" class="subtab-mayorista hidden"></div>
         </div>
+
+        <div id="content-crm" class="tab-content hidden">
+            <div class="flex justify-between items-end mb-4 px-1">
+                <h2 class="text-xl font-bold text-pipon-brown">CRM Comercial</h2>
+                <button onclick="abrirProspecto()" class="text-sm font-bold text-white bg-teal-600 px-4 py-1.5 rounded-full shadow-sm active:scale-95 transition-transform"><i class="fa-solid fa-plus mr-1"></i>Negocio</button>
+            </div>
+            <div id="subtabs-crm" class="grid grid-cols-3 gap-1 bg-white p-1 rounded-2xl shadow-sm border border-gray-100 mb-4"></div>
+
+            <div id="crm-prospectos" class="subtab-crm">
+                <div id="crm-indicadores" class="grid grid-cols-3 gap-2 mb-4"></div>
+                <div class="flex gap-2 mb-3">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300 text-sm"></i>
+                        <input type="search" id="crm-busqueda" oninput="filtrarCrm()" placeholder="Buscar negocio, contacto o teléfono" class="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-3 py-2.5 outline-none focus:border-teal-500 text-sm font-medium shadow-sm">
+                    </div>
+                    <button onclick="alternarFiltrosCrm()" class="relative shrink-0 w-11 bg-white border border-gray-200 rounded-xl text-gray-500 shadow-sm active:bg-gray-50" aria-label="Filtros"><i class="fa-solid fa-sliders"></i><span id="crm-filtros-badge" class="hidden absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-teal-600 text-white text-[10px] font-black items-center justify-center"></span></button>
+                </div>
+                <div id="crm-filtros" class="hidden grid-cols-2 gap-2 mb-3 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                    <div class="col-span-2">
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Etapa</label>
+                        <select id="crm-f-etapa" onchange="filtrarCrm()" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-2 text-sm font-bold text-gray-700 outline-none focus:border-teal-500">
+                            <option value="activos">En curso (de Nuevo a Negociación)</option>
+                            <option value="todas">Todas</option>
+                            <option value="nuevo">Nuevo</option>
+                            <option value="contactado">Contactado</option>
+                            <option value="evaluacion">Evaluación</option>
+                            <option value="negociacion">Negociación</option>
+                            <option value="pausa">En pausa</option>
+                            <option value="descartado">Descartado</option>
+                            <option value="cliente">Cliente</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Rubro</label>
+                        <select id="crm-f-rubro" onchange="filtrarCrm()" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-2 text-sm font-bold text-gray-700 outline-none focus:border-teal-500"></select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Zona</label>
+                        <select id="crm-f-zona" onchange="filtrarCrm()" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-2 text-sm font-bold text-gray-700 outline-none focus:border-teal-500"></select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Último contacto</label>
+                        <select id="crm-f-ultimo" onchange="filtrarCrm()" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-2 text-sm font-bold text-gray-700 outline-none focus:border-teal-500">
+                            <option value="">Cualquiera</option>
+                            <option value="7">Hace +7 días</option>
+                            <option value="15">Hace +15 días</option>
+                            <option value="30">Hace +30 días</option>
+                            <option value="nunca">Nunca</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Seguimiento</label>
+                        <select id="crm-f-proximo" onchange="filtrarCrm()" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-2 text-sm font-bold text-gray-700 outline-none focus:border-teal-500">
+                            <option value="">Cualquiera</option>
+                            <option value="atrasado">Atrasado</option>
+                            <option value="hoy">Hoy</option>
+                            <option value="semana">Próx. 7 días</option>
+                            <option value="sin">Sin fecha</option>
+                        </select>
+                    </div>
+                    <button onclick="limpiarFiltrosCrm()" class="col-span-2 text-xs font-bold text-teal-700 py-2 active:bg-teal-50 rounded-lg"><i class="fa-solid fa-rotate-left mr-1"></i>Limpiar filtros</button>
+                </div>
+                <div id="crm-lista" class="flex flex-col gap-3 pb-8"></div>
+            </div>
+            <div id="crm-seguimientos" class="subtab-crm hidden"></div>
+            <div id="crm-clientes" class="subtab-crm hidden"></div>
+        </div>
     </main>
 
     <nav class="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 z-30 pb-safe">
-        <div class="max-w-md mx-auto grid grid-cols-8 px-1 py-2 gap-0.5">
+        <div id="barra-nav" class="max-w-md mx-auto grid grid-cols-8 px-1 py-2 gap-0.5">
             <button onclick="cambiarPestana('inicio')" id="nav-inicio" class="nav-btn flex flex-col items-center justify-center py-2 text-pipon-orange transition-colors rounded-xl"><i class="fa-solid fa-house text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Inicio</span></button>
             <button onclick="cambiarPestana('ventas')" id="nav-ventas" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-cash-register text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Ventas</span></button>
             <button onclick="cambiarPestana('mayorista')" id="nav-mayorista" class="nav-btn relative flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-boxes-stacked text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Mayorista</span><span id="badge-mayorista" class="hidden absolute top-0 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black items-center justify-center"></span></button>
+            <button onclick="cambiarPestana('crm')" id="nav-crm" class="nav-btn solo-admin hidden relative flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-briefcase text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">CRM</span><span id="badge-crm" class="hidden absolute top-0 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black items-center justify-center"></span></button>
             <button onclick="cambiarPestana('catalogo')" id="nav-catalogo" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-book-open text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Catálogo</span></button>
             <button onclick="cambiarPestana('gastos')" id="nav-gastos" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-receipt text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Gastos</span></button>
             <button onclick="cambiarPestana('proveedores')" id="nav-proveedores" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-address-book text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Agenda</span></button>
@@ -583,6 +652,7 @@
                         <button type="button" id="contacto-copiar-link" class="bg-white border border-gray-200 text-gray-600 font-bold py-2.5 rounded-xl text-sm"><i class="fa-regular fa-copy mr-1.5"></i>Copiar link</button>
                         <button type="button" id="contacto-ver-historial" class="bg-white border border-gray-200 text-gray-600 font-bold py-2.5 rounded-xl text-sm"><i class="fa-solid fa-clock-rotate-left mr-1.5"></i>Ver compras</button>
                     </div>
+                    <button type="button" id="contacto-ver-ficha" class="hidden w-full bg-white border border-teal-200 text-teal-700 font-bold py-2.5 rounded-xl text-sm"><i class="fa-solid fa-briefcase mr-1.5"></i>Ficha comercial (CRM)</button>
                 </div>
 
                 <button type="submit" class="w-full bg-violet-600 hover:bg-violet-700 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-violet-200 active:scale-95 transition-all">Guardar Contacto</button>
@@ -760,6 +830,227 @@
             </div>
         </div>
     </div>
+
+    <!-- CRM comercial (solo admin) -->
+    <div id="modalFichaProspecto" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-black text-teal-600">Ficha comercial</h2>
+                <button type="button" onclick="cerrarFichaProspecto()" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="ficha-prospecto-contenido"></div>
+        </div>
+    </div>
+
+    <div id="modalProspecto" class="fixed inset-0 z-[55] hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-5">
+                <h2 id="titulo-modal-prospecto" class="text-2xl font-black text-teal-600">Nuevo negocio</h2>
+                <button type="button" onclick="cerrarModal('modalProspecto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="form-prospecto" onsubmit="guardarProspecto(event)">
+                <input type="hidden" id="prospecto-id" value="">
+
+                <p class="text-[11px] font-black text-teal-700 uppercase tracking-widest mb-3"><i class="fa-solid fa-store mr-1"></i>Datos del negocio</p>
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Nombre del negocio</label>
+                    <input type="text" id="prospecto-nombre" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-bold text-gray-800 disabled:text-gray-400" placeholder="Ej: Kiosco La Esquina" required>
+                    <p id="prospecto-nota-cliente" class="hidden text-[11px] text-gray-400 font-medium mt-1">El nombre y el WhatsApp de un cliente se editan desde Mayorista → Contactos.</p>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Rubro</label>
+                        <input type="text" id="prospecto-rubro" list="crm-lista-rubros" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium text-gray-800" placeholder="Ej: Kiosco">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Zona / barrio</label>
+                        <input type="text" id="prospecto-zona" list="crm-lista-zonas" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium text-gray-800" placeholder="Ej: Centro">
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Persona de contacto</label>
+                    <input type="text" id="prospecto-contacto" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium text-gray-800" placeholder="Ej: Martín (encargado)">
+                </div>
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">WhatsApp</label>
+                        <input type="tel" id="prospecto-telefono" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium text-gray-800 disabled:text-gray-400" placeholder="11 2345 6789">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Instagram</label>
+                        <input type="text" id="prospecto-instagram" autocapitalize="none" spellcheck="false" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium text-gray-800" placeholder="@usuario">
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Dirección</label>
+                    <input type="text" id="prospecto-direccion" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium text-gray-800" placeholder="Ej: Av. Mitre 1234">
+                </div>
+                <div class="grid grid-cols-2 gap-3 mb-6">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Alta en CRM</label>
+                        <input type="date" id="prospecto-alta" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium text-gray-800 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Canal</label>
+                        <select id="prospecto-canal" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-bold text-gray-700 text-sm appearance-none"></select>
+                    </div>
+                </div>
+
+                <p class="text-[11px] font-black text-teal-700 uppercase tracking-widest mb-3"><i class="fa-solid fa-chart-line mr-1"></i>Información comercial</p>
+                <div id="prospecto-etapa-box" class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Etapa</label>
+                    <select id="prospecto-etapa" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-bold text-gray-700 appearance-none"></select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Variedades de interés</label>
+                    <div id="prospecto-variedades" class="flex flex-wrap gap-2"></div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Volumen estimado (Opcional)</label>
+                    <input type="text" id="prospecto-volumen" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium text-gray-800" placeholder="Ej: 40 unidades por semana">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Observaciones (Opcional)</label>
+                    <textarea id="prospecto-observaciones" rows="2" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium resize-none" placeholder="Ej: abre de noche, decide el dueño"></textarea>
+                </div>
+                <div id="prospecto-seguimiento-box" class="mb-6">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Próximo seguimiento (Opcional)</label>
+                    <input type="date" id="prospecto-proximo" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium text-gray-800 mb-2">
+                    <input type="text" id="prospecto-paso" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium text-gray-800" placeholder="Próximo paso: ej. llevar una muestra">
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="button" id="prospecto-eliminar" onclick="confirmarEliminarProspecto()" class="hidden w-14 bg-red-50 text-red-500 rounded-2xl items-center justify-center text-lg active:bg-red-100 transition-colors" aria-label="Eliminar negocio"><i class="fa-solid fa-trash"></i></button>
+                    <button type="submit" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-teal-200 active:scale-95 transition-all">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalMovimientoCrm" class="fixed inset-0 z-[55] hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-1">
+                <h2 id="titulo-movimiento-crm" class="text-2xl font-black text-teal-600">Registrar contacto</h2>
+                <button type="button" onclick="cerrarModal('modalMovimientoCrm')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p id="movimiento-negocio" class="text-sm font-bold text-gray-500 mb-5"></p>
+
+            <form id="form-movimiento-crm" onsubmit="guardarMovimientoCrm(event)">
+                <div id="movimiento-contacto-box">
+                    <div class="mb-4">
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Fecha</label>
+                        <input type="date" id="movimiento-fecha" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium text-gray-800">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Medio</label>
+                        <div id="movimiento-canales" class="grid grid-cols-5 gap-1.5"></div>
+                        <input type="hidden" id="movimiento-canal" value="whatsapp">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿Qué pasó?</label>
+                        <textarea id="movimiento-resumen" rows="3" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium resize-none" placeholder="Ej: se dejó una muestra, pidió precios mayoristas..."></textarea>
+                    </div>
+                </div>
+
+                <div id="movimiento-nota-box" class="hidden mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Motivo o nota (Opcional)</label>
+                    <textarea id="movimiento-nota" rows="2" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium resize-none" placeholder="Ej: por ahora tiene proveedor fijo"></textarea>
+                </div>
+
+                <div id="movimiento-etapa-box" class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Etapa</label>
+                    <select id="movimiento-etapa" onchange="cambioEtapaMovimiento()" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-bold text-gray-700 appearance-none"></select>
+                    <div id="movimiento-no-interesado" class="hidden mt-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                        <p class="text-xs font-bold text-amber-800 mb-2">¿Puede interesarse más adelante?</p>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button type="button" onclick="resolverNoInteresado('pausa')" class="bg-white border border-gray-200 text-gray-700 font-bold py-2.5 rounded-lg text-xs active:bg-gray-50"><i class="fa-solid fa-pause mr-1"></i>Sí · En pausa</button>
+                            <button type="button" onclick="resolverNoInteresado('descartado')" class="bg-white border border-red-200 text-red-600 font-bold py-2.5 rounded-lg text-xs active:bg-red-50"><i class="fa-solid fa-ban mr-1"></i>No · Descartado</button>
+                        </div>
+                    </div>
+                    <p id="movimiento-motivo" class="hidden text-[11px] font-bold text-amber-700 mt-1.5"><i class="fa-solid fa-circle-info mr-1"></i>Queda registrado como "no interesado".</p>
+                </div>
+
+                <div id="movimiento-seguimiento-box" class="mb-6">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Próximo seguimiento</label>
+                    <input type="date" id="movimiento-proximo" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium text-gray-800">
+                    <div class="flex flex-wrap gap-1.5 mt-2">
+                        <button type="button" onclick="fijarProximoCrm(1)" class="px-3 py-1.5 rounded-full bg-teal-50 text-teal-700 text-xs font-bold active:bg-teal-100">Mañana</button>
+                        <button type="button" onclick="fijarProximoCrm(3)" class="px-3 py-1.5 rounded-full bg-teal-50 text-teal-700 text-xs font-bold active:bg-teal-100">3 días</button>
+                        <button type="button" onclick="fijarProximoCrm(7)" class="px-3 py-1.5 rounded-full bg-teal-50 text-teal-700 text-xs font-bold active:bg-teal-100">1 semana</button>
+                        <button type="button" onclick="fijarProximoCrm(14)" class="px-3 py-1.5 rounded-full bg-teal-50 text-teal-700 text-xs font-bold active:bg-teal-100">2 semanas</button>
+                        <button type="button" onclick="fijarProximoCrm(null)" class="px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 text-xs font-bold active:bg-gray-200">Sin fecha</button>
+                    </div>
+                    <input type="text" id="movimiento-paso" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 focus:bg-white transition-all font-medium text-gray-800 mt-3" placeholder="Próximo paso: ej. confirmar cantidades">
+                </div>
+
+                <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-teal-200 active:scale-95 transition-all">Guardar</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalConvertirProspecto" class="fixed inset-0 z-[55] hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-1">
+                <h2 class="text-2xl font-black text-green-600">Pasar a cliente</h2>
+                <button type="button" onclick="cerrarModal('modalConvertirProspecto')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="text-xs text-gray-500 font-medium mb-5">Queda como cliente en Mayorista → Contactos. La ficha y su historial se conservan.</p>
+
+            <form id="form-convertir" onsubmit="confirmarConversion(event)">
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Nombre</label>
+                    <input type="text" id="convertir-nombre" oninput="actualizarCoincidenciaConversion()" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:bg-white transition-all font-bold text-gray-800" required>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">WhatsApp</label>
+                    <input type="tel" id="convertir-telefono" oninput="actualizarCoincidenciaConversion()" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:bg-white transition-all font-medium" placeholder="11 2345 6789 (sin 0 ni 15)">
+                </div>
+
+                <div id="convertir-coincidencia" class="hidden mb-4"></div>
+
+                <div id="convertir-condiciones">
+                    <div class="mb-4">
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Descuento acordado</label>
+                        <div id="convertir-descuento-btns" class="grid grid-cols-4 gap-2"></div>
+                        <input type="hidden" id="convertir-descuento" value="0">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Avisarme si pasan... sin comprar</label>
+                        <div class="flex items-center gap-3">
+                            <input type="number" id="convertir-dias-aviso" min="1" step="1" inputmode="numeric" class="w-24 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:bg-white transition-all font-black text-center text-gray-800" placeholder="—">
+                            <span class="text-sm font-bold text-gray-500">días <span class="font-medium text-gray-400">(vacío = sin aviso)</span></span>
+                        </div>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Notas del acuerdo (Opcional)</label>
+                        <textarea id="convertir-notas" rows="2" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:bg-white transition-all font-medium resize-none"></textarea>
+                    </div>
+                </div>
+
+                <button type="submit" id="convertir-submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-green-200 active:scale-95 transition-all">Crear cliente mayorista</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalConfirmDeleteProspecto" class="fixed inset-0 z-[70] hidden flex-col justify-center items-center bg-black/60 backdrop-blur-sm p-4 opacity-0 transition-opacity">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform scale-95 transition-transform" id="modalConfirmDeleteProspectoContent">
+            <div class="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-3xl"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <h3 class="text-xl font-black text-center text-gray-800 mb-2">¿Eliminar del CRM?</h3>
+            <p id="texto-eliminar-prospecto" class="text-center text-sm text-gray-500 font-medium mb-6"></p>
+            <div class="flex gap-3">
+                <button onclick="cerrarConfirmDeleteProspecto()" class="flex-1 bg-gray-100 text-gray-600 font-bold py-3 rounded-xl active:bg-gray-200 transition-colors">Cancelar</button>
+                <button id="btn-confirm-delete-prospecto" onclick="eliminarProspecto()" class="flex-1 bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-red-200 active:scale-95 transition-all">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <datalist id="crm-lista-rubros"></datalist>
+    <datalist id="crm-lista-zonas"></datalist>
 
     <div id="modalComprobante"class="fixed inset-0 z-[60] hidden flex-col justify-center items-center bg-black/80 backdrop-blur-sm p-4">
         <div class="w-full max-w-md bg-white rounded-2xl overflow-hidden shadow-2xl modal-enter relative">
