@@ -2007,13 +2007,13 @@ window.guardarWhatsappPipon = async function(e) {
 
 // ---------- CRM comercial (solo admin) ----------
 const ETAPAS_CRM = {
-    nuevo:       { texto: 'Nuevo',       clases: 'bg-sky-100 text-sky-700',       icono: 'fa-seedling' },
-    contactado:  { texto: 'Contactado',  clases: 'bg-indigo-100 text-indigo-700', icono: 'fa-comment-dots' },
-    evaluacion:  { texto: 'Evaluación',  clases: 'bg-amber-100 text-amber-700',   icono: 'fa-scale-balanced' },
-    negociacion: { texto: 'Negociación', clases: 'bg-orange-100 text-orange-700', icono: 'fa-handshake' },
-    cliente:     { texto: 'Cliente',     clases: 'bg-green-100 text-green-700',   icono: 'fa-store' },
-    pausa:       { texto: 'En pausa',    clases: 'bg-gray-200 text-gray-600',     icono: 'fa-pause' },
-    descartado:  { texto: 'Descartado',  clases: 'bg-red-100 text-red-600',       icono: 'fa-ban' }
+    nuevo:       { texto: 'Nuevo',       clases: 'bg-sky-100 text-sky-700',       icono: 'fa-seedling', color: '#0284c7' },
+    contactado:  { texto: 'Contactado',  clases: 'bg-indigo-100 text-indigo-700', icono: 'fa-comment-dots', color: '#4f46e5' },
+    evaluacion:  { texto: 'Evaluación',  clases: 'bg-amber-100 text-amber-700',   icono: 'fa-scale-balanced', color: '#f59e0b' },
+    negociacion: { texto: 'Negociación', clases: 'bg-orange-100 text-orange-700', icono: 'fa-handshake', color: '#ea580c' },
+    cliente:     { texto: 'Cliente',     clases: 'bg-green-100 text-green-700',   icono: 'fa-store', color: '#16a34a' },
+    pausa:       { texto: 'En pausa',    clases: 'bg-gray-200 text-gray-600',     icono: 'fa-pause', color: '#9ca3af' },
+    descartado:  { texto: 'Descartado',  clases: 'bg-red-100 text-red-600',       icono: 'fa-ban', color: '#ef4444' }
 };
 const SITUACIONES_CRM = { interesado: 'Interesado', seguimiento: 'Seguimiento pendiente', no_interesado: 'No interesado' };
 const CANALES_CRM = {
@@ -2065,6 +2065,20 @@ let mensajeCrm = { id: null, plantilla: null };
 let periodoResultados = 'mes';
 let dimensionResultados = 'canal';
 let creandoFicha = false;
+let mapaCrm = null;
+let capaMapaCrm = null;
+let firmaMapaCrm = '';
+let mapaCrmCentrado = false;
+let mapaCrmGrande = false;
+const etapasOcultasMapa = new Set();
+let progresoUbicarCrm = null;
+// direcciones que el buscador no encontró en esta sesión, para no reintentarlas en cada tanda
+const sinEncontrarMapa = new Set();
+let mapaForm = null;
+let pinForm = null;
+let ubicacionForm = null;
+let ubicacionTocada = false;
+let ubicacionNuncaBuscada = true;
 
 const normalizarTexto = (texto) => String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 const fechaAInput = (fecha) => {
@@ -2239,6 +2253,7 @@ function renderCrm() {
     renderIndicadoresCrm(r);
     renderOpcionesFiltrosCrm();
     renderListaCrm();
+    if (subPestanaCrm === 'prospectos') renderMapaCrm().catch(error => console.error(error));
     renderSeguimientosCrm(r);
     renderClientesCrm();
     if (subPestanaCrm === 'resultados') renderResultadosCrm();
@@ -2266,6 +2281,418 @@ function renderIndicadoresCrm(r) {
             <p class="text-xl font-black ${color} leading-tight">${valor}</p>
             <p class="text-[9px] uppercase font-bold text-gray-400 leading-tight mt-0.5">${texto}</p>
         </button>`).join('');
+}
+
+// ----- Mapa de Concordia -----
+const LEAFLET_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/';
+const CENTRO_CONCORDIA = [-31.3929, -58.0209];
+// recuadro de la ciudad: lo que el buscador devuelva fuera de acá se descarta
+const LIMITES_CONCORDIA = { oeste: -58.16, sur: -31.47, este: -57.94, norte: -31.31 };
+// abajo los que ya no están en curso, arriba los que se están trabajando
+const ORDEN_MAPA = ['descartado', 'pausa', 'cliente', 'nuevo', 'contactado', 'evaluacion', 'negociacion'];
+const TEXTOS_ORIGEN_UBICACION = { direccion: 'Ubicado por la dirección', mapa: 'Marcado a mano en el mapa', gps: 'Ubicado con el GPS' };
+
+let cargaLeaflet = null;
+// la librería del mapa se baja recién cuando el admin la necesita
+const cargarLeaflet = () => {
+    if (window.L) return Promise.resolve(window.L);
+    if (!cargaLeaflet) {
+        cargaLeaflet = new Promise((resolve, reject) => {
+            const comun = { crossOrigin: 'anonymous', referrerPolicy: 'no-referrer' };
+            const css = Object.assign(document.createElement('link'), { ...comun, rel: 'stylesheet', href: `${LEAFLET_CDN}leaflet.min.css`, integrity: 'sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==' });
+            const js = Object.assign(document.createElement('script'), { ...comun, src: `${LEAFLET_CDN}leaflet.min.js`, integrity: 'sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==' });
+            js.onload = () => window.L ? resolve(window.L) : reject(new Error('Leaflet no quedó disponible'));
+            js.onerror = () => {
+                cargaLeaflet = null;
+                css.remove();
+                js.remove();
+                reject(new Error('No se pudo cargar Leaflet'));
+            };
+            document.head.append(css, js);
+        });
+    }
+    return cargaLeaflet;
+};
+// crédito del mapa sin la bandera que Leaflet agrega por defecto, y botones de zoom en castellano
+const prepararMapa = (L, mapa, posicionZoom = 'topleft') => {
+    mapa.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
+    L.control.zoom({ position: posicionZoom, zoomInTitle: 'Acercar', zoomOutTitle: 'Alejar' }).addTo(mapa);
+    capaCalles(L).addTo(mapa);
+    return mapa;
+};
+const capaCalles = (L) => L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+});
+
+const tieneUbicacion = (p) => Number.isFinite(p?.ubicacion?.lat) && Number.isFinite(p?.ubicacion?.lng);
+const dentroDeConcordia = (lat, lng) => lat <= LIMITES_CONCORDIA.norte && lat >= LIMITES_CONCORDIA.sur && lng >= LIMITES_CONCORDIA.oeste && lng <= LIMITES_CONCORDIA.este;
+const redondearCoord = (n) => Math.round(n * 1e6) / 1e6;
+const etapaMapa = (p) => ETAPAS_CRM[p.etapa] ? p.etapa : 'nuevo';
+const claveSinEncontrar = (p) => `${p.id}|${normalizarTexto(p.direccion)}`;
+// sin el campo "ubicacion" = cargado antes del mapa; con null = se quitó o no se encontró, y no se reintenta solo
+const pendientesUbicarCrm = () => prospectosData.filter(p => p.ubicacion === undefined && String(p.direccion || '').trim() && !sinEncontrarMapa.has(claveSinEncontrar(p)));
+
+// el buscador de OpenStreetMap pide no más de una consulta por segundo: van en fila
+let colaBusquedaMapa = Promise.resolve();
+let ultimaBusquedaMapa = 0;
+const consultarBuscador = (parametros) => {
+    const turno = colaBusquedaMapa.then(async () => {
+        const espera = ultimaBusquedaMapa + 1100 - Date.now();
+        if (espera > 0) await new Promise(r => setTimeout(r, espera));
+        ultimaBusquedaMapa = Date.now();
+        const control = new AbortController();
+        const corte = setTimeout(() => control.abort(), 10000);
+        try {
+            const params = new URLSearchParams({ ...parametros, countrycodes: 'ar', format: 'jsonv2', addressdetails: '1', limit: '1', 'accept-language': 'es' });
+            const resp = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, { signal: control.signal });
+            if (!resp.ok) throw new Error(`Buscador de direcciones: ${resp.status}`);
+            return await resp.json();
+        } finally {
+            clearTimeout(corte);
+        }
+    });
+    colaBusquedaMapa = turno.catch(() => {});
+    return turno;
+};
+
+// solo se manda el texto de la dirección; si no encuentra la altura exacta queda como aproximada
+async function buscarDireccionMapa(direccion) {
+    const { oeste, norte, este, sur } = LIMITES_CONCORDIA;
+    const consultas = [
+        { street: direccion, city: 'Concordia', state: 'Entre Ríos', country: 'Argentina' },
+        { q: `${direccion}, Concordia, Entre Ríos`, viewbox: `${oeste},${norte},${este},${sur}`, bounded: '1' }
+    ];
+    for (const consulta of consultas) {
+        const [r] = await consultarBuscador(consulta);
+        const lat = Number(r?.lat);
+        const lng = Number(r?.lon);
+        if (r && dentroDeConcordia(lat, lng)) {
+            return { lat: redondearCoord(lat), lng: redondearCoord(lng), origen: 'direccion', aproximada: !r.address?.house_number };
+        }
+    }
+    return null;
+}
+
+const popupMapaCrm = (p) => {
+    const lugar = [p.rubro, p.zona].filter(Boolean).map(escaparHtml).join(' · ');
+    return `
+        <div style="min-width: 170px">
+            <div class="font-bold text-gray-800 text-sm leading-tight">${escaparHtml(p.nombre)}</div>
+            <div class="mt-1">${chipEtapa(p)}</div>
+            ${lugar ? `<div class="text-xs text-gray-500 font-medium mt-1">${lugar}</div>` : ''}
+            ${p.direccion ? `<div class="text-xs text-gray-500 mt-0.5"><i class="fa-solid fa-location-dot text-gray-300 mr-1"></i>${escaparHtml(p.direccion)}${p.ubicacion.aproximada ? ' <span class="text-amber-600 font-bold">(aprox.)</span>' : ''}</div>` : ''}
+            <button onclick="verFichaDesdeMapa('${p.id}')" class="mt-2 w-full bg-teal-600 text-white text-xs font-bold py-1.5 rounded-lg active:bg-teal-700">Ver ficha</button>
+        </div>`;
+};
+
+function renderLeyendaMapaCrm() {
+    const leyenda = document.getElementById('crm-mapa-leyenda');
+    const pie = document.getElementById('crm-mapa-pie');
+    if (estadoCrm !== 'listo') { leyenda.innerHTML = ''; pie.innerHTML = ''; return; }
+
+    const ubicados = prospectosData.filter(tieneUbicacion);
+    leyenda.innerHTML = Object.keys(ETAPAS_CRM).map(etapa => {
+        const n = ubicados.filter(p => etapaMapa(p) === etapa).length;
+        if (!n) return '';
+        const oculta = etapasOcultasMapa.has(etapa);
+        return `<button onclick="alternarEtapaMapaCrm('${etapa}')" aria-pressed="${!oculta}" class="flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-full border border-gray-200 text-[11px] font-bold active:bg-gray-50 ${oculta ? 'text-gray-300 line-through' : 'text-gray-600'}">
+            <span class="w-3 h-3 rounded-full border-2 border-white shadow-sm" style="background: ${oculta ? '#e5e7eb' : ETAPAS_CRM[etapa].color}"></span>${ETAPAS_CRM[etapa].texto}<span class="${oculta ? 'text-gray-300' : 'text-gray-400'}">${n}</span>
+        </button>`;
+    }).join('');
+
+    const total = prospectosData.length;
+    const pendientes = pendientesUbicarCrm().length;
+    const noEncontrados = prospectosData.filter(p => p.ubicacion === undefined && String(p.direccion || '').trim() && sinEncontrarMapa.has(claveSinEncontrar(p))).length;
+    const resumen = total
+        ? `${ubicados.length} de ${plural(total, 'negocio ubicado', 'negocios ubicados')}`
+        : 'Cargá negocios con dirección y van a aparecer acá.';
+    const boton = progresoUbicarCrm
+        ? `<span class="shrink-0 text-[11px] font-bold text-teal-700"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Ubicando ${progresoUbicarCrm.actual} de ${progresoUbicarCrm.total}...</span>`
+        : pendientes ? `<button onclick="ubicarPendientesCrm()" class="shrink-0 text-[11px] font-bold text-teal-700 bg-teal-50 px-2.5 py-1 rounded-full active:bg-teal-100"><i class="fa-solid fa-location-dot mr-1"></i>Ubicar ${plural(pendientes, 'con dirección', 'con dirección')}</button>` : '';
+    pie.innerHTML = `
+        <div class="flex items-center justify-between gap-2 px-1"><p class="text-[11px] font-bold text-gray-400">${resumen}</p>${boton}</div>
+        ${noEncontrados ? `<p class="text-[11px] font-medium text-amber-600 px-1 mt-1">${plural(noEncontrados, 'dirección no se encontró', 'direcciones no se encontraron')} en el mapa: ${noEncontrados === 1 ? 'marcala' : 'marcalas'} a mano desde Editar.</p>` : ''}`;
+}
+
+async function renderMapaCrm() {
+    renderLeyendaMapaCrm();
+    const caja = document.getElementById('crm-mapa-caja');
+    // con el CRM oculto el mapa no tiene tamaño: se dibuja al volver a mostrarse
+    if (!caja.getClientRects().length) return;
+    const estado = document.getElementById('crm-mapa-estado');
+    let L;
+    try {
+        L = await cargarLeaflet();
+    } catch (error) {
+        console.error(error);
+        estado.innerText = 'No se pudo cargar el mapa. Revisá la conexión y volvé a entrar al CRM.';
+        return;
+    }
+    if (!mapaCrm) {
+        // en el celular un dedo mueve la página y dos dedos hacen zoom; agrandado se mueve libre
+        mapaCrm = prepararMapa(L, L.map('crm-mapa', { center: CENTRO_CONCORDIA, zoom: 13, dragging: !L.Browser.mobile, scrollWheelZoom: false, zoomControl: false }), 'topright');
+        capaMapaCrm = L.layerGroup().addTo(mapaCrm);
+        estado.classList.add('hidden');
+    }
+    mapaCrm.invalidateSize();
+    if (estadoCrm !== 'listo') return;
+
+    const puntos = prospectosData.filter(tieneUbicacion).map(datosProspecto)
+        .filter(p => !etapasOcultasMapa.has(etapaMapa(p)))
+        .sort((a, b) => ORDEN_MAPA.indexOf(etapaMapa(a)) - ORDEN_MAPA.indexOf(etapaMapa(b)));
+    // solo se redibuja si cambió algo, así no se cierra el cartelito abierto
+    const firma = JSON.stringify(puntos.map(p => [p.id, p.ubicacion.lat, p.ubicacion.lng, p.ubicacion.aproximada, p.etapa, p.situacion, p.nombre, p.rubro, p.zona, p.direccion]));
+    if (firma !== firmaMapaCrm) {
+        firmaMapaCrm = firma;
+        capaMapaCrm.clearLayers();
+        puntos.forEach(p => {
+            L.circleMarker([p.ubicacion.lat, p.ubicacion.lng], { radius: 8, color: '#ffffff', weight: 2, fillColor: ETAPAS_CRM[etapaMapa(p)].color, fillOpacity: 1 })
+                // el margen derecho deja libre la columna de botones del mapa
+                .bindPopup(popupMapaCrm(p), { minWidth: 170, maxWidth: 210, autoPanPaddingTopLeft: [10, 10], autoPanPaddingBottomRight: [54, 10] })
+                .addTo(capaMapaCrm);
+        });
+    }
+    if (!mapaCrmCentrado && puntos.length) {
+        mapaCrmCentrado = true;
+        centrarMapaCrm();
+    }
+}
+
+window.centrarMapaCrm = function() {
+    if (!mapaCrm) return;
+    const capas = capaMapaCrm.getLayers();
+    if (!capas.length) { mapaCrm.setView(CENTRO_CONCORDIA, 13); return; }
+    mapaCrm.fitBounds(window.L.latLngBounds(capas.map(c => c.getLatLng())), { padding: [30, 30], maxZoom: 16 });
+};
+
+window.alternarEtapaMapaCrm = function(etapa) {
+    if (etapasOcultasMapa.has(etapa)) etapasOcultasMapa.delete(etapa);
+    else etapasOcultasMapa.add(etapa);
+    renderMapaCrm();
+};
+
+window.alternarMapaGrandeCrm = function(grande = !mapaCrmGrande) {
+    if (!mapaCrm) return;
+    mapaCrmGrande = grande;
+    const card = document.getElementById('crm-mapa-card');
+    const caja = document.getElementById('crm-mapa-caja');
+    card.style.cssText = grande ? 'position: fixed; inset: 0; z-index: 60; margin: 0; border-radius: 0; display: flex; flex-direction: column; padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom));' : '';
+    caja.style.cssText = grande ? 'height: auto; flex: 1 1 0%;' : '';
+    document.body.style.overflow = grande ? 'hidden' : '';
+    document.getElementById('crm-mapa-icono-grande').className = `fa-solid ${grande ? 'fa-compress' : 'fa-expand'}`;
+    if (grande || !window.L.Browser.mobile) mapaCrm.dragging.enable(); else mapaCrm.dragging.disable();
+    if (grande) mapaCrm.scrollWheelZoom.enable(); else mapaCrm.scrollWheelZoom.disable();
+    mapaCrm.invalidateSize();
+};
+
+window.verFichaDesdeMapa = function(id) {
+    mapaCrm?.closePopup();
+    if (mapaCrmGrande) alternarMapaGrandeCrm(false);
+    abrirFichaProspecto(id);
+};
+
+window.ubicarPendientesCrm = async function() {
+    if (!esAdmin || progresoUbicarCrm || estadoCrm !== 'listo') return;
+    const pendientes = pendientesUbicarCrm();
+    if (!pendientes.length) return;
+    let ubicados = 0;
+    let aproximados = 0;
+    let noEncontrados = 0;
+    let cortado = false;
+    try {
+        for (const [i, p] of pendientes.entries()) {
+            progresoUbicarCrm = { actual: i + 1, total: pendientes.length };
+            renderLeyendaMapaCrm();
+            const direccion = p.direccion.trim();
+            const r = await buscarDireccionMapa(direccion);
+            // si mientras tanto se editó, se ubicó o se borró, no se pisa
+            const actual = prospectosData.find(x => x.id === p.id);
+            if (!actual || actual.ubicacion !== undefined || String(actual.direccion || '').trim() !== direccion) continue;
+            if (!r) {
+                sinEncontrarMapa.add(claveSinEncontrar(actual));
+                noEncontrados++;
+                continue;
+            }
+            await actualizarDoc(documento('prospectos', p.id), { ubicacion: r });
+            ubicados++;
+            if (r.aproximada) aproximados++;
+        }
+    } catch (error) {
+        console.error(error);
+        cortado = true;
+    } finally {
+        progresoUbicarCrm = null;
+        renderMapaCrm();
+    }
+    const partes = [`${plural(ubicados, 'negocio ubicado', 'negocios ubicados')}${aproximados ? ` (${aproximados} aproximado${aproximados === 1 ? '' : 's'}: revisalos)` : ''}`];
+    if (noEncontrados) partes.push(`${noEncontrados} sin encontrar`);
+    if (cortado) mostrarAviso(`Se cortó la búsqueda. Revisá la conexión. ${partes.join(', ')}.`, 'error');
+    else mostrarAviso(`${partes.join(', ')}.`, ubicados ? 'ok' : 'error');
+};
+
+// ----- Ubicación en el formulario del negocio -----
+function mostrarUbicacionForm() {
+    const u = ubicacionForm;
+    const mapaVisible = !document.getElementById('prospecto-mapa-caja').classList.contains('hidden');
+    document.getElementById('prospecto-ubicacion-texto').innerHTML = u
+        ? (u.aproximada
+            ? `<span class="text-amber-600 font-bold">Ubicación aproximada:</span> revisá el pin y movelo al lugar exacto.`
+            : `<i class="fa-solid fa-check text-teal-600 mr-1"></i>${TEXTOS_ORIGEN_UBICACION[u.origen] || 'Ubicado en el mapa'}. Si no quedó bien, arrastrá el pin o tocá el lugar correcto.`)
+        : mapaVisible ? 'Tocá el mapa en el lugar del negocio.'
+        : ubicacionTocada ? 'Se va a guardar sin ubicación en el mapa.'
+        : ubicacionNuncaBuscada ? 'Sin ubicar en el mapa. Si cargás la dirección, se busca sola al guardar.'
+        : 'Sin ubicar en el mapa. Usá «Buscar en el mapa» o «Estoy acá» (si cambiás la dirección, se busca sola).';
+    document.getElementById('prospecto-quitar-ubicacion').classList.toggle('hidden', !u);
+}
+
+const iconoPinForm = (L) => L.divIcon({
+    className: '',
+    html: '<i class="fa-solid fa-location-dot" style="display: block; font-size: 36px; line-height: 1; color: #0d9488; filter: drop-shadow(0 2px 2px rgba(0,0,0,.35))"></i>',
+    iconSize: [28, 36],
+    iconAnchor: [14, 35]
+});
+
+function dibujarPinForm(centrar) {
+    if (!mapaForm) return;
+    if (!ubicacionForm) {
+        pinForm?.remove();
+        pinForm = null;
+        if (centrar) mapaForm.setView(CENTRO_CONCORDIA, 13);
+        return;
+    }
+    const posicion = [ubicacionForm.lat, ubicacionForm.lng];
+    if (!pinForm) {
+        pinForm = window.L.marker(posicion, { draggable: true, autoPan: true, icon: iconoPinForm(window.L) }).addTo(mapaForm);
+        pinForm.on('dragend', () => {
+            const { lat, lng } = pinForm.getLatLng();
+            fijarUbicacionForm({ lat, lng, origen: 'mapa', aproximada: false });
+        });
+    } else {
+        pinForm.setLatLng(posicion);
+    }
+    if (centrar) mapaForm.setView(posicion, 17);
+}
+
+function fijarUbicacionForm(u, centrar = false) {
+    ubicacionForm = { ...u, lat: redondearCoord(u.lat), lng: redondearCoord(u.lng) };
+    ubicacionTocada = true;
+    dibujarPinForm(centrar);
+    mostrarUbicacionForm();
+}
+
+async function abrirMapaForm() {
+    const caja = document.getElementById('prospecto-mapa-caja');
+    caja.classList.remove('hidden');
+    let L;
+    try {
+        L = await cargarLeaflet();
+    } catch (error) {
+        console.error(error);
+        caja.classList.add('hidden');
+        mostrarAviso('No se pudo cargar el mapa. Revisá la conexión.', 'error');
+        return false;
+    }
+    if (!mapaForm) {
+        mapaForm = prepararMapa(L, L.map('prospecto-mapa', { center: CENTRO_CONCORDIA, zoom: 13, zoomControl: false }));
+        mapaForm.on('click', (ev) => fijarUbicacionForm({ lat: ev.latlng.lat, lng: ev.latlng.lng, origen: 'mapa', aproximada: false }));
+    }
+    mapaForm.invalidateSize();
+    dibujarPinForm(true);
+    mostrarUbicacionForm();
+    // el modal entra con una animación: se vuelve a medir cuando terminó
+    setTimeout(() => { mapaForm.invalidateSize(); dibujarPinForm(true); }, 350);
+    return true;
+}
+
+function prepararUbicacionForm(p) {
+    ubicacionForm = tieneUbicacion(p) ? { lat: p.ubicacion.lat, lng: p.ubicacion.lng, origen: p.ubicacion.origen || 'direccion', aproximada: !!p.ubicacion.aproximada } : null;
+    ubicacionTocada = false;
+    ubicacionNuncaBuscada = !p || p.ubicacion === undefined;
+    document.getElementById('prospecto-mapa-caja').classList.add('hidden');
+    pinForm?.remove();
+    pinForm = null;
+    mostrarUbicacionForm();
+    if (ubicacionForm) abrirMapaForm();
+}
+
+window.buscarUbicacionForm = async function(boton) {
+    const direccion = document.getElementById('prospecto-direccion').value.trim();
+    if (!direccion) { mostrarAviso('Escribí la dirección primero.', 'error'); return; }
+    await conBotonBloqueadoClick(boton, async () => {
+        const original = boton.innerHTML;
+        boton.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Buscando...';
+        try {
+            const r = await buscarDireccionMapa(direccion);
+            if (!await abrirMapaForm()) return;
+            if (r) fijarUbicacionForm({ ...r, buscada: direccion }, true);
+            else mostrarAviso('No encontré esa dirección. Tocá el mapa en el lugar del negocio.', 'error');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo buscar la dirección. Revisá la conexión.', 'error');
+        } finally {
+            boton.innerHTML = original;
+        }
+    });
+};
+
+window.usarGpsForm = async function(boton) {
+    if (!navigator.geolocation) { mostrarAviso('Este dispositivo no permite usar la ubicación.', 'error'); return; }
+    await conBotonBloqueadoClick(boton, async () => {
+        const original = boton.innerHTML;
+        boton.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Buscando...';
+        try {
+            const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }));
+            if (!await abrirMapaForm()) return;
+            const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+            fijarUbicacionForm({ lat, lng, origen: 'gps', aproximada: false }, true);
+            if (!dentroDeConcordia(lat, lng)) mostrarAviso('Esa ubicación queda fuera de Concordia. Revisá el pin.', 'error');
+            else if (accuracy > 150) mostrarAviso('La señal del GPS es poco precisa. Revisá el pin.', 'error');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso(error?.code === 1 ? 'No diste permiso para usar la ubicación. Activalo en el navegador.' : 'No se pudo obtener la ubicación. Probá de nuevo.', 'error');
+        } finally {
+            boton.innerHTML = original;
+        }
+    });
+};
+
+window.quitarUbicacionForm = function() {
+    ubicacionForm = null;
+    ubicacionTocada = true;
+    dibujarPinForm(false);
+    document.getElementById('prospecto-mapa-caja').classList.add('hidden');
+    mostrarUbicacionForm();
+};
+
+// decide qué ubicación se guarda: la marcada a mano se respeta, y si cambió la dirección se vuelve a buscar
+async function ubicacionAGuardar(direccion, actual) {
+    const cambioDireccion = normalizarTexto(direccion) !== normalizarTexto(actual?.direccion);
+    const u = ubicacionForm;
+    const buscar = direccion && (ubicacionTocada
+        ? u?.origen === 'direccion' && u.buscada && normalizarTexto(u.buscada) !== normalizarTexto(direccion)
+        : cambioDireccion || (!u && actual?.ubicacion === undefined));
+    const limpiar = (x) => x ? { lat: x.lat, lng: x.lng, origen: x.origen, aproximada: !!x.aproximada } : null;
+    if (!buscar) {
+        // si se borró la dirección, la ubicación que salió de ella ya no corresponde
+        if (!direccion && cambioDireccion && !ubicacionTocada && u?.origen === 'direccion') return { ubicacion: null, aviso: '' };
+        return { ubicacion: limpiar(u), aviso: '' };
+    }
+    let r = null;
+    let fallo = false;
+    try {
+        r = await buscarDireccionMapa(direccion);
+    } catch (error) {
+        console.error(error);
+        fallo = true;
+    }
+    if (r) return { ubicacion: limpiar(r), aviso: r.aproximada ? 'La ubicación en el mapa quedó aproximada: revisala desde Editar.' : '' };
+    const motivo = fallo ? 'No se pudo buscar la dirección en el mapa (revisá la conexión)' : 'No encontré la dirección en el mapa';
+    // una ubicación marcada a mano o con GPS no se pierde por no encontrar la dirección nueva
+    if (u && u.origen !== 'direccion') return { ubicacion: limpiar(u), aviso: `${motivo}: quedó la ubicación que ya tenía.` };
+    // sin conexión, uno que nunca se buscó queda pendiente para "Ubicar con dirección" (undefined = no se toca el campo)
+    if (fallo && !u && actual?.ubicacion === undefined) return { ubicacion: undefined, aviso: `${motivo}.` };
+    return { ubicacion: null, aviso: `${motivo}: marcala a mano desde Editar.` };
 }
 
 function renderOpcionesFiltrosCrm() {
@@ -2712,7 +3139,7 @@ function renderFichaProspecto() {
                 ${dato('fa-user', 'Persona de contacto', escaparHtml(p.contacto))}
                 ${dato('fa-phone', 'WhatsApp', escaparHtml(p.telefono))}
                 ${dato('fa-hashtag', 'Instagram / red social', escaparHtml(p.instagram))}
-                ${dato('fa-location-dot', 'Dirección', escaparHtml(p.direccion))}
+                ${dato('fa-location-dot', 'Dirección', p.direccion ? escaparHtml(p.direccion) + (!tieneUbicacion(p) ? ' <span class="text-[11px] font-bold text-gray-400">· sin ubicar en el mapa</span>' : p.ubicacion.aproximada ? ' <span class="text-[11px] font-bold text-amber-600">· ubicación aproximada</span>' : '') : '')}
                 ${dato('fa-map', 'Zona o barrio', escaparHtml(p.zona))}
                 ${dato('fa-calendar-plus', 'Alta en el CRM', formatearFecha(p.creado))}
             </div>
@@ -2804,6 +3231,7 @@ window.abrirProspecto = function(id = null) {
     eliminar.classList.toggle('hidden', !p);
     eliminar.classList.toggle('flex', !!p);
     abrirModal('modalProspecto');
+    prepararUbicacionForm(p);
 };
 
 window.guardarProspecto = async function(e) {
@@ -2834,12 +3262,14 @@ window.guardarProspecto = async function(e) {
         }
 
         const alta = document.getElementById('prospecto-alta').value;
+        const { ubicacion, aviso: avisoUbicacion } = await ubicacionAGuardar(valor('direccion'), actual);
         const datos = {
             rubro: valor('rubro'),
             zona: valor('zona'),
             contacto: valor('contacto'),
             instagram: valor('instagram'),
             direccion: valor('direccion'),
+            ...(ubicacion !== undefined && { ubicacion }),
             canal: document.getElementById('prospecto-canal').value,
             variedades: variedadesForm,
             volumen: valor('volumen'),
@@ -2859,7 +3289,7 @@ window.guardarProspecto = async function(e) {
             if (actual) {
                 await actualizarDoc(documento('prospectos', id), datos);
                 cerrarModal('modalProspecto');
-                mostrarAviso('Datos actualizados.', 'ok');
+                mostrarAviso(avisoUbicacion ? `Datos actualizados. ${avisoUbicacion}` : 'Datos actualizados.', avisoUbicacion ? 'error' : 'ok');
             } else {
                 const [etapa, situacion = null] = document.getElementById('prospecto-etapa').value.split(':');
                 const ref = await crearDoc(coleccion('prospectos'), {
@@ -2870,7 +3300,7 @@ window.guardarProspecto = async function(e) {
                     interacciones: [{ tipo: 'alta', fecha: datos.creado, etapa, situacion }]
                 });
                 cerrarModal('modalProspecto');
-                mostrarAviso('Negocio cargado en el CRM.', 'ok');
+                mostrarAviso(avisoUbicacion ? `Negocio cargado. ${avisoUbicacion}` : 'Negocio cargado en el CRM.', avisoUbicacion ? 'error' : 'ok');
                 setTimeout(() => abrirFichaProspecto(ref.id), 350);
             }
         } catch (error) {
