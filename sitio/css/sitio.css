@@ -129,6 +129,33 @@ a { color: inherit; }
     transform: scale(0);
 }
 .portada-logo { position: relative; width: min(46vw, 30vh, 270px); color: var(--crema); }
+.logo-meneo { position: relative; }
+/* versión mordida del logo: va encima de la original y aparece en el momento del mordisco */
+.logo-mordido {
+    position: absolute;
+    inset: 0;
+    -webkit-mask-image: url(../img/pipon-mordido.png);
+    mask-image: url(../img/pipon-mordido.png);
+    opacity: 0;
+}
+/* el punto donde muerde: 61% del ancho y 44% del alto del dibujo */
+.nam, .miga-mordida { position: absolute; left: 61%; top: 44%; opacity: 0; pointer-events: none; }
+.nam {
+    left: 74%;
+    top: 14%;
+    font: 700 clamp(1.4rem, 6vw, 2.4rem)/1 var(--fuente-titulo);
+    color: var(--amarillo);
+    white-space: nowrap;
+    transform: rotate(-12deg);
+}
+.miga-mordida {
+    width: 11px;
+    height: 9px;
+    margin: -5px 0 0 -5px;
+    border-radius: 45% 55% 40% 60%;
+    background: var(--crema);
+}
+.miga-mordida:nth-child(odd) { background: var(--amarillo); width: 8px; height: 8px; }
 .portada-titulo {
     position: relative;
     display: flex;

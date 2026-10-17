@@ -342,30 +342,61 @@ function iniciarAnimaciones() {
         // el muñeco se mece suave todo el tiempo
         gsap.fromTo('.logo-meneo', { rotate: -3 }, { rotate: 3, duration: 1.8, ease: 'sine.inOut', yoyo: true, repeat: -1, delay: 1 });
 
-        // Portada fija mientras el círculo crema la cubre y el logo cambia de color
+        // Portada fija: el muñeco se acerca al sanguche, le pega un mordisco y desde la mordida
+        // crece el círculo crema que da paso al resto de la web
         const giros = [-24, 14, -10, 20, -16];
+        const ACERCAR = 1.32;
+        // dónde queda la mordida dentro de la portada (61% / 44% del dibujo, ya agrandado)
+        const puntoMordida = () => {
+            const logo = $('.portada-logo');
+            return {
+                x: logo.offsetLeft + logo.offsetWidth * (.5 + (.61 - .5) * ACERCAR),
+                y: logo.offsetTop + logo.offsetHeight * (.5 + (.44 - .5) * ACERCAR)
+            };
+        };
+        // hacia dónde salta cada miga (x, y, giro), pensado para un logo de 270 px de ancho
+        const MIGAS = [[70, -95, 200], [115, -35, -160], [100, 40, 240], [60, 100, -200], [150, -75, 320], [35, -125, -90], [130, 90, 180], [90, 8, -280]];
+        const escalaMigas = () => $('.portada-logo').offsetWidth / 270;
         gsap.timeline({
             scrollTrigger: {
                 trigger: '.portada',
                 start: 'top top',
-                end: '+=120%',
+                end: '+=170%',
                 pin: true,
                 scrub: .6,
                 anticipatePin: 1,
+                invalidateOnRefresh: true,
                 onUpdate: (self) => {
-                    const cubierta = self.progress > .45;
+                    const cubierta = self.progress > .62;
                     if (cubierta !== portadaCubierta) { portadaCubierta = cubierta; actualizarCabecera(); }
                 }
             }
         })
-            .to('.deslizar', { opacity: 0, y: 20, duration: .12 }, 0)
-            .to('.portada-titulo .letra', { y: () => -innerHeight * .28, rotate: i => giros[i], opacity: 0, stagger: .03, duration: .35, ease: 'power2.in' }, 0)
-            .to('.portada-bajada', { y: -30, opacity: 0, duration: .2 }, 0)
-            .to('.miga', { y: i => -innerHeight * (.15 + i * .06), duration: .6, ease: 'none' }, 0)
-            .to('.portada-circulo', { scale: 1, duration: .38, ease: 'power2.in' }, .1)
-            .to('.portada-logo', { color: '#5C260E', duration: .15 }, .1)
-            .to('.portada-logo', { y: () => -innerHeight * .14, scale: .78, duration: .5, ease: 'power2.inOut' }, .3)
-            .fromTo('.portada-hola', { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: .25 }, .62)
+            .set('.portada-circulo', { left: () => puntoMordida().x, top: () => puntoMordida().y }, 0)
+            .to('.deslizar', { opacity: 0, y: 20, duration: .1 }, 0)
+            .to('.portada-titulo .letra', { y: () => -innerHeight * .28, rotate: i => giros[i], opacity: 0, stagger: .03, duration: .3, ease: 'power2.in' }, 0)
+            .to('.portada-bajada', { y: -30, opacity: 0, duration: .18 }, 0)
+            .to('.miga', { y: i => -innerHeight * (.15 + i * .06), duration: 1, ease: 'none' }, 0)
+            // se acerca al sanguche
+            .to('.portada-logo', { scale: ACERCAR, rotate: -4, duration: .25, ease: 'power1.inOut' }, .05)
+            // aprieta... ¡y muerde!
+            .to('.portada-logo', { scaleX: ACERCAR * 1.06, scaleY: ACERCAR * .9, duration: .05, ease: 'power2.in' }, .3)
+            .set('.logo-meneo > .logo-forma:not(.logo-mordido)', { opacity: 0 }, .35)
+            .set('.logo-mordido', { opacity: 1 }, .35)
+            .to('.portada-logo', { scaleX: ACERCAR, scaleY: ACERCAR, duration: .12, ease: 'back.out(3)' }, .35)
+            .fromTo('.miga-mordida', { opacity: 0 }, { opacity: 1, duration: .01, immediateRender: false }, .35)
+            .fromTo('.miga-mordida', { x: 0, y: 0, rotate: 0, scale: .4 }, {
+                x: i => MIGAS[i][0] * escalaMigas(), y: i => MIGAS[i][1] * escalaMigas(), rotate: i => MIGAS[i][2], scale: 1,
+                duration: .3, ease: 'power2.out', immediateRender: false
+            }, .35)
+            .to('.miga-mordida', { opacity: 0, duration: .1 }, .55)
+            .fromTo('.nam', { opacity: 0, scale: 0 }, { opacity: 1, scale: 1, duration: .08, ease: 'back.out(2.5)', immediateRender: false }, .36)
+            .to('.nam', { opacity: 0, y: -20, duration: .1 }, .52)
+            // desde la mordida crece el círculo crema y el muñeco se vuelve marrón
+            .to('.portada-circulo', { scale: 1, duration: .38, ease: 'power2.in' }, .55)
+            .to('.portada-logo', { color: '#5C260E', duration: .12 }, .58)
+            .to('.portada-logo', { y: () => -innerHeight * .14, scale: .78, rotate: 0, duration: .45, ease: 'power2.inOut' }, .75)
+            .fromTo('.portada-hola', { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: .25 }, 1)
             .to({}, { duration: .15 });
 
         // Cinta: el texto y los cuadros corren en sentidos opuestos
