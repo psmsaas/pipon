@@ -75,6 +75,14 @@ const lista = (valor, base, max, armar) => {
     return items.length ? items : base;
 };
 
+// la foto de un capítulo se guarda aparte (negocio/pipon/webfotos/{id}); acá solo queda la referencia
+const fotoValida = (f) => {
+    if (!f || typeof f.id !== 'string' || !/^[A-Za-z0-9_-]{1,40}$/.test(f.id)) return null;
+    const ancho = Number(f.ancho), alto = Number(f.alto);
+    if (!(ancho > 0 && alto > 0 && ancho <= 10000 && alto <= 10000)) return null;
+    return { id: f.id, ancho, alto };
+};
+
 // mezcla lo guardado con los textos base, descartando lo que no tenga la forma esperada
 export function combinarTextosWeb(guardado) {
     const g = guardado && typeof guardado === 'object' ? guardado : {};
@@ -95,7 +103,7 @@ export function combinarTextosWeb(guardado) {
             resaltado: optativo(g.historia?.resaltado, b.historia.resaltado, L.corto),
             capitulos: lista(g.historia?.capitulos, b.historia.capitulos, L.capitulos, c => {
                 if (!c || typeof c.titulo !== 'string' || typeof c.texto !== 'string' || !c.titulo.trim() || !c.texto.trim()) return null;
-                return { etiqueta: optativo(c.etiqueta, '', L.corto), titulo: c.titulo.trim().slice(0, L.titulo), texto: c.texto.trim().slice(0, L.texto) };
+                return { etiqueta: optativo(c.etiqueta, '', L.corto), titulo: c.titulo.trim().slice(0, L.titulo), texto: c.texto.trim().slice(0, L.texto), foto: fotoValida(c.foto) };
             })
         },
         frase: {

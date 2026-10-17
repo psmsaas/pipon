@@ -268,6 +268,68 @@ a { color: inherit; }
 .capitulo h3 { font: 600 clamp(1.7rem, 5vw, 2.3rem)/1.1 var(--fuente-titulo); margin: 6px 0 12px; }
 .capitulo p { font-size: 1.07rem; max-width: 52ch; color: rgba(92, 38, 14, .86); }
 
+/* Foto del capítulo: marco blanco tipo foto pegada, girado hacia un lado o el otro */
+.capitulo-foto {
+    --giro: -2deg;
+    position: relative;
+    margin: 28px 0 10px;
+    max-width: 100%;
+    transform: rotate(var(--giro));
+}
+.capitulo:nth-child(even) .capitulo-foto { --giro: 2deg; margin-left: auto; margin-right: 6px; }
+.foto-marco {
+    position: absolute;
+    inset: 0;
+    padding: 8px;
+    border-radius: 24px;
+    background: #fff;
+    box-shadow: 0 26px 44px -26px rgba(92, 38, 14, .6), 0 0 0 1px rgba(92, 38, 14, .06);
+}
+.foto-recorte { position: relative; height: 100%; border-radius: 17px; overflow: hidden; }
+/* mientras llega la foto se ve un fondo amarillo que late suave */
+.foto-marco::before {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border-radius: 17px;
+    background: rgba(252, 200, 115, .45);
+    animation: latido 1.4s ease-in-out infinite;
+}
+.capitulo-foto.cargada .foto-marco::before { animation: none; opacity: 0; }
+@keyframes latido { 50% { opacity: .45; } }
+.foto-marco img {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transform: scale(1.12);
+    transition: opacity .6s;
+}
+.capitulo-foto.cargada .foto-marco img { opacity: 1; }
+/* calcomanía con el muñeco, del color del capítulo */
+.foto-sticker {
+    position: absolute;
+    top: -16px;
+    right: -12px;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--naranja);
+    color: var(--crema);
+    border: 4px solid var(--crema);
+    box-shadow: 0 8px 16px -8px rgba(92, 38, 14, .6);
+    transform: rotate(12deg);
+}
+.foto-sticker .logo-forma { width: 46%; }
+.capitulo[data-tema="amarillo"] .foto-sticker { background: var(--amarillo); color: var(--marron); }
+.capitulo[data-tema="marron"] .foto-sticker { background: var(--marron); color: var(--amarillo); }
+.capitulo[data-tema="blanco"] .foto-sticker { background: #fff; color: var(--naranja); }
+.capitulo:nth-child(even) .foto-sticker { right: auto; left: -12px; transform: rotate(-12deg); }
+
 /* ----- Frase ----- */
 .frase { background: var(--marron); color: var(--crema); padding: clamp(96px, 16vw, 180px) 0; text-align: center; overflow: hidden; }
 .frase-logo { width: 74px; margin: 0 auto 28px; color: var(--amarillo); }
@@ -390,6 +452,6 @@ a { color: inherit; }
 /* Quien pidió menos movimiento ve todo quieto */
 @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
-    .carril, .deslizar i { animation: none; }
+    .carril, .deslizar i, .foto-marco::before { animation: none; }
     .carriles { overflow-x: auto; }
 }

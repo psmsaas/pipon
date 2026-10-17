@@ -1,5 +1,5 @@
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { addDoc, onSnapshot, updateDoc, deleteDoc, getDocs, setDoc, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { addDoc, onSnapshot, updateDoc, deleteDoc, getDoc, getDocs, setDoc, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { auth, dominioAuth, coleccion, documento } from './firebase.js';
 import { formatearDinero, escaparHtml, modoPrueba, mostrarAviso, bannerPrueba } from './utils.js';
 
@@ -2031,6 +2031,15 @@ const PASOS_WEB = 3;
 const campoWeb = (id) => document.getElementById(`cw-${id}`);
 const lineasWeb = (texto) => texto.split('\n').map(l => l.trim()).filter(Boolean);
 const CLASE_CAMPO_WEB = 'w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-pipon-orange transition-all font-medium text-sm';
+// fotos de los capítulos: cada una va en su propio documento (negocio/pipon/webfotos/{id}) porque
+// un documento admite hasta 1 MB. Las elegidas quedan acá hasta tocar "Guardar cambios".
+const fotosNuevasWeb = new Map();
+const cacheFotosWeb = new Map();
+let fotosPreparandoWeb = 0;
+const MAX_LADO_FOTO_WEB = 1400;
+const MAX_CARACTERES_FOTO_WEB = 700000;
+const idAzarWeb = () => Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+const idsFotosWeb = (ajustes) => (ajustes?.historia?.capitulos || []).map(c => c?.foto?.id).filter(Boolean);
 
 addEventListener('beforeunload', (e) => { if (configWebCambiada) e.preventDefault(); });
 
@@ -2043,8 +2052,9 @@ function renderEstadoConfigWeb() {
 function renderCapitulosWeb(capitulos) {
     const ultimo = capitulos.length - 1;
     const boton = 'w-8 h-8 rounded-lg bg-white border border-gray-200 text-xs disabled:opacity-30';
+    capitulos.forEach(c => { c.uid ||= idAzarWeb(); });
     document.getElementById('cw-capitulos').innerHTML = capitulos.map((c, i) => `
-        <div class="cw-capitulo bg-gray-50 rounded-xl border border-gray-200 p-3">
+        <div class="cw-capitulo bg-gray-50 rounded-xl border border-gray-200 p-3" data-uid="${c.uid}" data-foto="${escaparHtml(JSON.stringify(c.foto || null))}">
             <div class="flex items-center justify-between mb-2">
                 <span class="text-xs font-black text-pipon-brown uppercase tracking-widest">Capítulo ${i + 1}</span>
                 <div class="flex gap-1">
@@ -2056,13 +2066,136 @@ function renderCapitulosWeb(capitulos) {
             <input type="text" data-campo="etiqueta" maxlength="${textosWeb.LIMITES_WEB.corto}" value="${escaparHtml(c.etiqueta)}" placeholder="Año o etiqueta (opcional), ej: 2019" aria-label="Año o etiqueta del capítulo ${i + 1}" class="${CLASE_CAMPO_WEB} mb-2">
             <input type="text" data-campo="titulo" maxlength="${textosWeb.LIMITES_WEB.titulo}" value="${escaparHtml(c.titulo)}" placeholder="Título" aria-label="Título del capítulo ${i + 1}" class="${CLASE_CAMPO_WEB} mb-2">
             <textarea data-campo="texto" rows="4" maxlength="${textosWeb.LIMITES_WEB.texto}" placeholder="Texto" aria-label="Texto del capítulo ${i + 1}" class="${CLASE_CAMPO_WEB} resize-none">${escaparHtml(c.texto)}</textarea>
+            ${htmlFotoCapituloWeb(c, i)}
         </div>`).join('');
     document.getElementById('cw-agregar-capitulo').classList.toggle('hidden', capitulos.length >= textosWeb.LIMITES_WEB.capitulos);
+    mostrarMiniaturasWeb();
 }
+
+function htmlFotoCapituloWeb(c, i) {
+    const elegir = (texto, clases) => `<label class="${clases} cursor-pointer">${texto}<input type="file" accept="image/*" class="hidden" onchange="elegirFotoCapituloWeb('${c.uid}', this)" aria-label="Elegir foto del capítulo ${i + 1}"></label>`;
+    if (!c.foto) {
+        return `<div class="cw-foto mt-2">${elegir('<i class="fa-regular fa-image mr-1.5"></i>Agregar foto (opcional)', 'w-full flex items-center justify-center border-2 border-dashed border-gray-200 bg-white text-gray-500 font-bold py-2.5 rounded-xl text-xs active:bg-gray-50')}</div>`;
+    }
+    const nueva = c.foto.nueva ? fotosNuevasWeb.get(c.foto.nueva) : null;
+    const detalle = nueva ? `Foto nueva (${Math.round(nueva.datos.length * 0.75 / 1024)} KB): se sube al guardar` : 'Foto guardada';
+    // una foto chica se ve borrosa al estirarse al ancho de la web
+    const chica = Math.max(c.foto.ancho, c.foto.alto) < 700 ? '<p class="text-[11px] font-bold text-amber-600 mb-1.5">Es chica: en la web puede verse borrosa.</p>' : '';
+    return `
+        <div class="cw-foto mt-2 flex flex-wrap items-center gap-3 bg-white rounded-xl border border-gray-200 p-2">
+            <img data-miniatura alt="Foto del capítulo ${i + 1}" class="w-20 h-20 shrink-0 rounded-lg object-cover bg-gray-100">
+            <div class="min-w-0 flex-1">
+                <p class="cw-foto-detalle text-[11px] font-bold text-gray-500 mb-1.5">${detalle}</p>
+                ${chica}
+                <div class="flex gap-1.5">
+                    ${elegir('Cambiar', 'flex-1 text-center bg-gray-50 text-gray-600 font-bold py-2 rounded-lg text-xs active:bg-gray-100')}
+                    <button type="button" onclick="quitarFotoCapituloWeb('${c.uid}')" class="flex-1 bg-red-50 text-red-600 font-bold py-2 rounded-lg text-xs active:bg-red-100">Quitar</button>
+                </div>
+            </div>
+        </div>`;
+}
+
+// las fotos ya guardadas se piden a la base una sola vez por sesión
+function mostrarMiniaturasWeb() {
+    document.querySelectorAll('#cw-capitulos .cw-capitulo').forEach(async (caja) => {
+        const foto = JSON.parse(caja.dataset.foto);
+        const img = caja.querySelector('[data-miniatura]');
+        if (!foto || !img) return;
+        if (foto.nueva) { img.src = fotosNuevasWeb.get(foto.nueva)?.datos || ''; return; }
+        try {
+            if (!cacheFotosWeb.has(foto.id)) {
+                const snap = await getDoc(documento('webfotos', foto.id));
+                cacheFotosWeb.set(foto.id, snap.exists() ? snap.data().datos : null);
+            }
+        } catch (error) {
+            console.error(error);
+        }
+        const datos = cacheFotosWeb.get(foto.id);
+        if (datos) img.src = datos;
+        else caja.querySelector('.cw-foto-detalle').textContent = 'No se pudo cargar la foto guardada';
+    });
+}
+
+// achica la foto (lado mayor 1400 px) y la comprime hasta que entre cómoda en un documento
+async function prepararFotoWeb(archivo) {
+    if (!archivo.type.startsWith('image/')) throw new Error('no-imagen');
+    if (archivo.size > 40 * 1024 * 1024) throw new Error('muy-grande');
+    const url = URL.createObjectURL(archivo);
+    try {
+        const img = new Image();
+        img.src = url;
+        await img.decode();
+        const lienzo = document.createElement('canvas');
+        let escala = Math.min(1, MAX_LADO_FOTO_WEB / Math.max(img.naturalWidth, img.naturalHeight));
+        for (let intento = 0; intento < 6; intento++) {
+            lienzo.width = Math.max(1, Math.round(img.naturalWidth * escala));
+            lienzo.height = Math.max(1, Math.round(img.naturalHeight * escala));
+            const ctx = lienzo.getContext('2d');
+            // fondo blanco: las PNG con partes transparentes no quedan negras
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, lienzo.width, lienzo.height);
+            ctx.drawImage(img, 0, 0, lienzo.width, lienzo.height);
+            for (const calidad of [0.82, 0.72, 0.62]) {
+                let datos = lienzo.toDataURL('image/webp', calidad);
+                // algunos navegadores (Safari) no generan webp y devuelven png: ahí usamos jpg
+                if (!datos.startsWith('data:image/webp')) datos = lienzo.toDataURL('image/jpeg', calidad);
+                if (datos.length <= MAX_CARACTERES_FOTO_WEB) return { datos, ancho: lienzo.width, alto: lienzo.height };
+            }
+            escala *= 0.75;
+        }
+        throw new Error('muy-grande');
+    } catch (error) {
+        if (['no-imagen', 'muy-grande'].includes(error.message)) throw error;
+        console.error(error);
+        throw new Error('ilegible');
+    } finally {
+        URL.revokeObjectURL(url);
+    }
+}
+
+window.elegirFotoCapituloWeb = async function(uid, input) {
+    const archivo = input.files?.[0];
+    input.value = '';
+    if (!archivo) return;
+    const caja = document.querySelector(`.cw-capitulo[data-uid="${uid}"] .cw-foto`);
+    caja?.insertAdjacentHTML('beforeend', '<p class="cw-foto-preparando w-full text-[11px] font-bold text-pipon-orange mt-1.5"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Preparando foto...</p>');
+    fotosPreparandoWeb++;
+    try {
+        const foto = await prepararFotoWeb(archivo);
+        const clave = idAzarWeb();
+        fotosNuevasWeb.set(clave, foto);
+        // se vuelve a leer el formulario: mientras se preparaba la foto pudo seguir escribiendo
+        const capitulos = leerCapitulosWeb();
+        const capitulo = capitulos.find(c => c.uid === uid);
+        if (!capitulo) return;
+        capitulo.foto = { nueva: clave, ancho: foto.ancho, alto: foto.alto };
+        renderCapitulosWeb(capitulos);
+        configWebCambiada = true;
+    } catch (error) {
+        const mensajes = {
+            'no-imagen': 'Ese archivo no es una imagen.',
+            'muy-grande': 'La foto es demasiado grande. Probá con otra.',
+            'ilegible': 'No se pudo leer la foto. Probá con una JPG o PNG.'
+        };
+        mostrarAviso(mensajes[error.message] || mensajes.ilegible, 'error');
+        document.querySelector(`.cw-capitulo[data-uid="${uid}"] .cw-foto-preparando`)?.remove();
+    } finally {
+        fotosPreparandoWeb--;
+    }
+};
+
+window.quitarFotoCapituloWeb = function(uid) {
+    const capitulos = leerCapitulosWeb();
+    const capitulo = capitulos.find(c => c.uid === uid);
+    if (!capitulo) return;
+    capitulo.foto = null;
+    renderCapitulosWeb(capitulos);
+    configWebCambiada = true;
+};
 
 const leerCapitulosWeb = () => [...document.querySelectorAll('#cw-capitulos .cw-capitulo')].map(el => {
     const valor = (campo) => el.querySelector(`[data-campo="${campo}"]`).value.trim();
-    return { etiqueta: valor('etiqueta'), titulo: valor('titulo'), texto: valor('texto') };
+    return { uid: el.dataset.uid, etiqueta: valor('etiqueta'), titulo: valor('titulo'), texto: valor('texto'), foto: JSON.parse(el.dataset.foto) };
 });
 
 function renderPasosWeb(pasos) {
@@ -2109,6 +2242,8 @@ async function abrirConfigWeb() {
     const t = textosWeb.combinarTextosWeb(ajustesWeb);
     // la primera vez se propone el mismo número que usa la página de pedidos
     if (!ajustesWeb) t.whatsappVisible = ajustesPublicos.whatsappVisible || ajustesPublicos.whatsapp || '';
+    // las fotos elegidas y no guardadas se descartan al volver a entrar
+    fotosNuevasWeb.clear();
     llenarFormConfigWeb(t);
     configWebCambiada = false;
     form.classList.remove('opacity-50', 'pointer-events-none');
@@ -2119,7 +2254,7 @@ window.marcarConfigWebCambiada = function() { configWebCambiada = true; };
 window.agregarCapituloWeb = function() {
     const capitulos = leerCapitulosWeb();
     if (capitulos.length >= textosWeb.LIMITES_WEB.capitulos) return;
-    capitulos.push({ etiqueta: '', titulo: '', texto: '' });
+    capitulos.push({ etiqueta: '', titulo: '', texto: '', foto: null });
     renderCapitulosWeb(capitulos);
     configWebCambiada = true;
     document.querySelector('#cw-capitulos .cw-capitulo:last-child [data-campo="titulo"]').focus();
@@ -2163,7 +2298,7 @@ window.restaurarConfigWeb = function() {
     base.whatsappVisible = campoWeb('whatsapp').value;
     llenarFormConfigWeb(base);
     configWebCambiada = true;
-    mostrarAviso('Se cargaron los textos originales. Tocá Guardar cambios para aplicarlos.', 'ok');
+    mostrarAviso('Se cargaron los textos originales, sin fotos. Tocá Guardar cambios para aplicarlos.', 'ok');
 };
 
 // abre la sección donde está el campo y lo enfoca, para que se vea qué hay que corregir
@@ -2234,17 +2369,46 @@ window.guardarConfigWeb = async function(e) {
     const sinCoincidir = resaltados.find(([s]) => s.resaltado && !(s.titulo ?? s.texto).includes(s.resaltado));
     if (sinCoincidir) { marcarCampoWeb(sinCoincidir[1], `La palabra en color no aparece en ${sinCoincidir[2]}: escribila igual, con mayúsculas y acentos.`); return; }
 
+    if (fotosPreparandoWeb) { mostrarAviso('Esperá a que termine de prepararse la foto.', 'error'); return; }
     if (!numero && !confirm('Sin número de WhatsApp, el formulario de la web no va a poder enviar mensajes. ¿Guardar igual?')) return;
 
     await conBotonBloqueado(e, async () => {
+        const anteriores = idsFotosWeb(ajustesWeb);
+        const subidas = [];
+        let capitulosGuardados;
         try {
+            capitulosGuardados = [];
+            for (const { uid, foto, ...c } of capitulos) {
+                let referencia = null;
+                if (foto?.nueva) {
+                    const nueva = fotosNuevasWeb.get(foto.nueva);
+                    const id = idAzarWeb();
+                    await guardarDoc(documento('webfotos', id), { datos: nueva.datos, ancho: nueva.ancho, alto: nueva.alto, creado: new Date() });
+                    subidas.push(id);
+                    cacheFotosWeb.set(id, nueva.datos);
+                    referencia = { id, ancho: nueva.ancho, alto: nueva.alto };
+                } else if (foto?.id) {
+                    referencia = { id: foto.id, ancho: foto.ancho, alto: foto.alto };
+                }
+                capitulosGuardados.push({ ...c, foto: referencia });
+            }
+            contenido.historia.capitulos = capitulosGuardados;
             await guardarDoc(documento('ajustes', 'web'), { ...contenido, actualizado: new Date() });
-            configWebCambiada = false;
-            mostrarAviso('Guardado. La web ya muestra los textos nuevos.', 'ok');
         } catch (error) {
             console.error(error);
+            // las fotos que se llegaron a subir no quedaron en la web: se borran
+            subidas.forEach(id => borrarDoc(documento('webfotos', id)).catch(err => console.error(err)));
             mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
+            return;
         }
+        // las fotos que ya no usa ningún capítulo se borran de la base
+        const usadas = new Set(capitulosGuardados.map(c => c.foto?.id).filter(Boolean));
+        anteriores.filter(id => !usadas.has(id)).forEach(id => borrarDoc(documento('webfotos', id)).catch(err => console.error(err)));
+        fotosNuevasWeb.clear();
+        // el formulario queda apuntando a las fotos ya subidas, así un segundo guardado no las duplica
+        renderCapitulosWeb(capitulosGuardados);
+        configWebCambiada = false;
+        mostrarAviso('Guardado. La web ya muestra los cambios.', 'ok');
     });
 };
 

@@ -1,8 +1,8 @@
 import { combinarTextosWeb } from './textos-web.js';
 
-// los textos que guarda la cuenta admin desde el sistema (Configuración → Web de Pipón).
-// Se leen sin iniciar sesión: la regla de Firebase solo permite leer este documento.
-const URL_TEXTOS_GUARDADOS = 'https://firestore.googleapis.com/v1/projects/sistema-pipon/databases/(default)/documents/negocio/pipon/ajustes/web?key=AIzaSyBjzZmNyG_NmfNlEc3QusG55YLYIUwXIQY';
+// los textos y fotos que guarda la cuenta admin desde el sistema (Configuración → Web de Pipón).
+// Se leen sin iniciar sesión: las reglas de Firebase solo permiten leer estos documentos.
+const urlDocumento = (ruta) => `https://firestore.googleapis.com/v1/projects/sistema-pipon/databases/(default)/documents/negocio/pipon/${ruta}?key=AIzaSyBjzZmNyG_NmfNlEc3QusG55YLYIUwXIQY`;
 
 const $ = (selector, raiz = document) => raiz.querySelector(selector);
 const $$ = (selector, raiz = document) => [...raiz.querySelectorAll(selector)];
@@ -22,12 +22,12 @@ const desdeFirestore = (v) => {
     return undefined;
 };
 
-// si no hay nada guardado, no hay conexión o tarda demasiado, quedan los textos base
-async function leerTextosGuardados() {
+// devuelve los campos del documento, o null si no existe, no hay conexión o tarda demasiado
+async function leerDocumento(ruta, limiteMs) {
     const corte = new AbortController();
-    const espera = setTimeout(() => corte.abort(), 3500);
+    const espera = setTimeout(() => corte.abort(), limiteMs);
     try {
-        const respuesta = await fetch(URL_TEXTOS_GUARDADOS, { signal: corte.signal, cache: 'no-store' });
+        const respuesta = await fetch(urlDocumento(ruta), { signal: corte.signal, cache: 'no-store' });
         if (!respuesta.ok) return null;
         const doc = await respuesta.json();
         return desdeFirestore({ mapValue: { fields: doc.fields || {} } });
@@ -37,6 +37,9 @@ async function leerTextosGuardados() {
         clearTimeout(espera);
     }
 }
+
+// si no se pueden leer los textos guardados, quedan los textos base
+const leerTextosGuardados = () => leerDocumento('ajustes/web', 3500);
 
 let textos = combinarTextosWeb(await leerTextosGuardados());
 
@@ -87,6 +90,59 @@ const llenarCarril = (carril, tipos) => {
 
 const TEMAS_CAPITULO = ['naranja', 'amarillo', 'marron', 'blanco'];
 
+// ----- Fotos de los capítulos -----
+// el marco ya ocupa el tamaño de la foto antes de que llegue, así la página no salta al cargarla
+const marcoFoto = (capitulo) => {
+    const { id, ancho, alto } = capitulo.foto;
+    const figura = elemento('figure', 'capitulo-foto');
+    figura.dataset.fotoId = id;
+    figura.style.aspectRatio = `${ancho} / ${alto}`;
+    // las fotos verticales no pasan del 62% del alto de la pantalla
+    figura.style.width = `min(100%, ${Math.round(62 * ancho / alto * 100) / 100}vh)`;
+    const marco = elemento('div', 'foto-marco');
+    // el recorte deja ver el borde blanco aunque la foto esté agrandada para moverse adentro
+    const recorte = elemento('div', 'foto-recorte');
+    const img = elemento('img');
+    img.alt = capitulo.titulo;
+    img.decoding = 'async';
+    recorte.append(img);
+    marco.append(recorte);
+    const sticker = elemento('span', 'foto-sticker');
+    sticker.setAttribute('aria-hidden', 'true');
+    sticker.append(elemento('span', 'logo-forma'));
+    figura.append(marco, sticker);
+    return figura;
+};
+
+const FOTO_SEGURA = /^data:image\/(jpeg|webp|png);base64,[A-Za-z0-9+/=]+$/;
+
+async function cargarFoto(figura) {
+    const img = $('img', figura);
+    const datos = (await leerDocumento(`webfotos/${figura.dataset.fotoId}`, 15000))?.datos;
+    // si la foto no está o no se puede cargar, el capítulo queda sin foto
+    const quitar = () => {
+        figura.remove();
+        window.ScrollTrigger?.refresh();
+    };
+    if (typeof datos !== 'string' || !FOTO_SEGURA.test(datos)) { quitar(); return; }
+    img.addEventListener('load', () => figura.classList.add('cargada'), { once: true });
+    img.addEventListener('error', quitar, { once: true });
+    img.src = datos;
+}
+
+// cada foto se pide recién cuando el capítulo se está por ver
+function cargarFotosAlLlegar() {
+    const figuras = $$('.capitulo-foto');
+    if (!('IntersectionObserver' in window)) { figuras.forEach(cargarFoto); return; }
+    const observador = new IntersectionObserver((entradas) => {
+        entradas.filter(e => e.isIntersecting).forEach(e => {
+            observador.unobserve(e.target);
+            cargarFoto(e.target);
+        });
+    }, { rootMargin: '700px 0px' });
+    figuras.forEach(f => observador.observe(f));
+}
+
 function pintarTextos(t) {
     $('#web-bajada').textContent = t.portada.bajada;
     $('#web-bajada').parentElement.hidden = !t.portada.bajada;
@@ -111,6 +167,7 @@ function pintarTextos(t) {
         const cuerpo = elemento('div', 'capitulo-cuerpo');
         if (c.etiqueta) cuerpo.append(elemento('span', 'capitulo-anio', c.etiqueta));
         cuerpo.append(elemento('h3', '', c.titulo), elemento('p', '', c.texto));
+        if (c.foto) cuerpo.append(marcoFoto(c));
         item.append(punto, cuerpo);
         lista.append(item);
     });
@@ -139,6 +196,7 @@ function pintarTextos(t) {
 }
 
 pintarTextos(textos);
+cargarFotosAlLlegar();
 $('#anio').textContent = new Date().getFullYear();
 
 // ----- Cabecera: se vuelve sólida cuando la portada ya quedó cubierta -----
@@ -327,6 +385,14 @@ function iniciarAnimaciones() {
         });
         capitulos.forEach((capitulo, i) => {
             gsap.from($('.capitulo-cuerpo', capitulo), { y: 60, opacity: 0, duration: .9, ease: 'power3.out', scrollTrigger: { trigger: capitulo, start: 'top 85%', once: true } });
+            // la foto entra girada y se acomoda; adentro del marco se mueve un poco con el scroll
+            const figura = $('.capitulo-foto', capitulo);
+            if (figura) {
+                const entradaFoto = { trigger: figura, start: 'top 88%', once: true };
+                gsap.from(figura, { rotate: i % 2 ? 10 : -10, scale: .85, opacity: 0, duration: 1.1, ease: 'back.out(1.4)', scrollTrigger: entradaFoto });
+                gsap.from($('.foto-sticker', figura), { scale: 0, rotate: -120, duration: .7, delay: .45, ease: 'back.out(2)', scrollTrigger: { ...entradaFoto } });
+                gsap.fromTo($('img', figura), { yPercent: -5 }, { yPercent: 5, ease: 'none', scrollTrigger: { trigger: figura, start: 'top bottom', end: 'bottom top', scrub: true } });
+            }
             ScrollTrigger.create({
                 trigger: capitulo,
                 start: 'top 60%',
