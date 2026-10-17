@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipón · Concordia</title>
+    <meta name="description" content="Conocé la historia de Pipón y sumalo a tu drugstore, kiosco o almacén en Concordia, Entre Ríos.">
+    <meta name="theme-color" content="#D45115">
+    <link rel="icon" type="image/png" href="img/favicon.png">
+    <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://firestore.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/sitio.css">
+    <script>
+        // la portada espera a tener los textos guardados; si algo falla se muestra igual a los 4 segundos
+        document.documentElement.classList.add('cargando');
+        setTimeout(() => document.documentElement.classList.remove('cargando'), 4000);
+    </script>
+</head>
+<body>
+
+    <header class="cabecera">
+        <div class="contenedor cabecera-dentro">
+            <a href="#portada" class="marca" aria-label="Pipón, volver al inicio">
+                <span class="logo-forma" aria-hidden="true"></span>
+                <span>Pipón</span>
+            </a>
+            <nav class="menu" aria-label="Apartados">
+                <a href="#conocenos" class="enlace">Conocenos</a>
+                <a href="#tu-negocio" class="enlace">Tu negocio</a>
+                <a href="#quiero" class="boton boton-crema">Quiero Pipón</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <!-- Portada: el logo se achica y se tiñe a medida que bajás -->
+        <section id="portada" class="portada">
+            <div class="portada-escena">
+                <span class="miga m1" aria-hidden="true"></span>
+                <span class="miga m2" aria-hidden="true"></span>
+                <span class="miga m3" aria-hidden="true"></span>
+                <span class="miga m4" aria-hidden="true"></span>
+                <span class="miga m5" aria-hidden="true"></span>
+                <span class="miga m6" aria-hidden="true"></span>
+                <span class="portada-circulo" aria-hidden="true"></span>
+
+                <div class="portada-logo">
+                    <div class="logo-meneo">
+                        <div class="logo-forma" role="img" aria-label="Logo de Pipón"></div>
+                    </div>
+                </div>
+                <h1 class="portada-titulo" aria-label="Pipón">
+                    <span class="letra" aria-hidden="true"><span>P</span></span><span class="letra" aria-hidden="true"><span>i</span></span><span class="letra" aria-hidden="true"><span>p</span></span><span class="letra" aria-hidden="true"><span>ó</span></span><span class="letra" aria-hidden="true"><span>n</span></span>
+                </h1>
+                <p class="portada-bajada"><span id="web-bajada">Rico de verdad, hecho en Concordia.</span></p>
+
+                <div class="portada-hola" aria-hidden="true">
+                    <p class="portada-hola-titulo" id="web-hola">Hola, somos Pipón.</p>
+                    <p class="portada-hola-texto">Esta es nuestra historia <i class="fa-solid fa-arrow-down"></i></p>
+                </div>
+
+                <a href="#conocenos" class="deslizar"><span>Deslizá <i class="fa-solid fa-chevron-down"></i></span></a>
+            </div>
+        </section>
+
+        <!-- Cinta que corre con el scroll -->
+        <div class="cinta" aria-hidden="true">
+            <div class="cuadros"></div>
+            <div class="cinta-pista" id="web-cinta">
+                <span>Hecho en Concordia <i class="fa-solid fa-star"></i> Con mucho amor <i class="fa-solid fa-star"></i> Pipón <i class="fa-solid fa-star"></i></span>
+                <span>Hecho en Concordia <i class="fa-solid fa-star"></i> Con mucho amor <i class="fa-solid fa-star"></i> Pipón <i class="fa-solid fa-star"></i></span>
+                <span>Hecho en Concordia <i class="fa-solid fa-star"></i> Con mucho amor <i class="fa-solid fa-star"></i> Pipón <i class="fa-solid fa-star"></i></span>
+            </div>
+        </div>
+
+        <!-- Conocenos -->
+        <section id="conocenos" class="seccion historia">
+            <div class="contenedor">
+                <p class="etiqueta revelar">Conocenos</p>
+                <h2 class="titulo-grande revelar" id="web-historia-titulo">Nuestra <em>historia</em></h2>
+
+                <div class="historia-grilla">
+                    <div class="medallon-col" aria-hidden="true">
+                        <div class="medallon-pegado">
+                            <div class="medallon" data-tema="naranja">
+                                <div class="logo-forma"></div>
+                            </div>
+                            <p class="medallon-pie">Capítulo <span id="medallon-numero">1</span> de <span id="medallon-total">4</span></p>
+                        </div>
+                    </div>
+
+                    <div class="linea-caja">
+                        <span class="linea-relleno" aria-hidden="true"></span>
+                        <ol class="linea" id="web-capitulos">
+                            <li class="capitulo" data-tema="naranja">
+                                <span class="capitulo-punto" aria-hidden="true"></span>
+                                <div class="capitulo-cuerpo">
+                                    <span class="capitulo-anio">20XX</span>
+                                    <h3>Cómo empezó</h3>
+                                    <p>Pipón nació en una cocina de Concordia, con una receta de familia y muchas ganas de compartirla. Al principio era para los amigos y los vecinos, hasta que empezaron a pedirnos más.</p>
+                                </div>
+                            </li>
+                            <li class="capitulo" data-tema="amarillo">
+                                <span class="capitulo-punto" aria-hidden="true"></span>
+                                <div class="capitulo-cuerpo">
+                                    <span class="capitulo-anio">¿Por qué Pipón?</span>
+                                    <h3>Un nombre con panza llena</h3>
+                                    <p>Pipón es esa sensación de haber comido algo rico y quedar feliz. Eso es lo que buscamos en cada cosa que hacemos, y por eso nuestro muñeco abraza lo que más le gusta.</p>
+                                </div>
+                            </li>
+                            <li class="capitulo" data-tema="marron">
+                                <span class="capitulo-punto" aria-hidden="true"></span>
+                                <div class="capitulo-cuerpo">
+                                    <span class="capitulo-anio">20XX</span>
+                                    <h3>Creciendo de a poco</h3>
+                                    <p>Los primeros kioscos del barrio confiaron en nosotros. Después llegaron los almacenes, los drugstores y los mayoristas, siempre con la misma receta y el mismo cuidado.</p>
+                                </div>
+                            </li>
+                            <li class="capitulo" data-tema="blanco">
+                                <span class="capitulo-punto" aria-hidden="true"></span>
+                                <div class="capitulo-cuerpo">
+                                    <span class="capitulo-anio">Hoy</span>
+                                    <h3>Cada vez más cerca tuyo</h3>
+                                    <p>Hoy Pipón está en negocios de toda la ciudad y queremos seguir sumando puntos. Si tenés un comercio, el próximo podés ser vos.</p>
+                                </div>
+                            </li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Frase que se va pintando palabra por palabra -->
+        <section class="frase">
+            <div class="contenedor">
+                <div class="frase-logo logo-forma" aria-hidden="true"></div>
+                <p class="frase-texto" id="web-frase">Comer rico, compartir y quedar bien <span class="resaltada">pipón.</span></p>
+            </div>
+        </section>
+
+        <!-- Tené Pipón en tu negocio -->
+        <section id="tu-negocio" class="seccion negocio">
+            <div class="contenedor">
+                <p class="etiqueta revelar">Para comercios</p>
+                <h2 class="titulo-grande revelar" id="web-negocio-titulo">¿Querés tener <em>Pipón</em> en tu negocio?</h2>
+                <p class="negocio-intro revelar" id="web-negocio-intro">Si tenés un drugstore, kiosco, almacén o cualquier comercio de Concordia, podés sumar Pipón a tus estantes. Mandanos tus datos por WhatsApp y coordinamos.</p>
+            </div>
+
+            <div class="carriles" aria-hidden="true">
+                <div class="carril" id="web-carril-1">
+                    <span class="chip"><i class="fa-solid fa-store"></i>Drugstores</span>
+                    <span class="chip"><i class="fa-solid fa-shop"></i>Kioscos</span>
+                    <span class="chip"><i class="fa-solid fa-basket-shopping"></i>Almacenes</span>
+                    <span class="chip"><i class="fa-solid fa-cart-shopping"></i>Despensas</span>
+                    <span class="chip"><i class="fa-solid fa-mug-hot"></i>Cafeterías</span>
+                </div>
+                <div class="carril inverso" id="web-carril-2">
+                    <span class="chip"><i class="fa-solid fa-utensils"></i>Buffets</span>
+                    <span class="chip"><i class="fa-solid fa-gas-pump"></i>Estaciones de servicio</span>
+                    <span class="chip"><i class="fa-solid fa-school"></i>Cantinas escolares</span>
+                    <span class="chip"><i class="fa-solid fa-dumbbell"></i>Gimnasios</span>
+                    <span class="chip"><i class="fa-solid fa-boxes-stacked"></i>Mayoristas</span>
+                </div>
+            </div>
+
+            <div class="contenedor negocio-grilla">
+                <ol class="pasos" id="web-pasos">
+                    <li class="paso">
+                        <span class="paso-num">1</span>
+                        <div>
+                            <h3>Completás tus datos</h3>
+                            <p>Nombre del negocio, qué tipo de comercio es y dónde queda.</p>
+                        </div>
+                    </li>
+                    <li class="paso">
+                        <span class="paso-num">2</span>
+                        <div>
+                            <h3>Nos llega por WhatsApp</h3>
+                            <p>Se abre WhatsApp con el mensaje armado. Solo tenés que enviarlo.</p>
+                        </div>
+                    </li>
+                    <li class="paso">
+                        <span class="paso-num">3</span>
+                        <div>
+                            <h3>Coordinamos y listo</h3>
+                            <p>Te respondemos para arreglar todo y Pipón llega a tu negocio.</p>
+                        </div>
+                    </li>
+                </ol>
+
+                <form id="quiero" class="formulario" novalidate>
+                    <h3>Quiero Pipón en mi negocio</h3>
+                    <p class="formulario-bajada">Te lleva menos de un minuto.</p>
+
+                    <div class="campo">
+                        <label for="f-negocio">Nombre del negocio</label>
+                        <input id="f-negocio" name="negocio" type="text" autocomplete="organization" maxlength="80" placeholder="Ej: Kiosco El Puente" required>
+                    </div>
+                    <div class="campo">
+                        <label for="f-tipo">Tipo de negocio</label>
+                        <select id="f-tipo" name="tipo" required>
+                            <option value="">Elegí una opción</option>
+                            <option>Drugstore</option>
+                            <option>Kiosco</option>
+                            <option>Almacén</option>
+                            <option>Despensa</option>
+                            <option>Cafetería</option>
+                            <option>Buffet / cantina</option>
+                            <option>Mayorista</option>
+                            <option>Otro</option>
+                        </select>
+                    </div>
+                    <div class="campo">
+                        <label for="f-nombre">Tu nombre</label>
+                        <input id="f-nombre" name="nombre" type="text" autocomplete="name" maxlength="60" placeholder="Ej: Laura" required>
+                    </div>
+                    <div class="campo">
+                        <label for="f-direccion">Dirección y ciudad</label>
+                        <input id="f-direccion" name="direccion" type="text" autocomplete="street-address" maxlength="120" placeholder="Ej: Pellegrini 800, Concordia" required>
+                    </div>
+                    <div class="campo">
+                        <label for="f-comentario">Comentario <span class="opcional">(opcional)</span></label>
+                        <textarea id="f-comentario" name="comentario" rows="3" maxlength="300" placeholder="Horarios, qué te interesa, lo que quieras contarnos"></textarea>
+                    </div>
+
+                    <p id="form-aviso" class="form-aviso" role="status" aria-live="polite"></p>
+
+                    <button type="submit" class="boton boton-whatsapp"><i class="fa-brands fa-whatsapp"></i>Enviar por WhatsApp</button>
+                    <p class="formulario-nota"><i class="fa-solid fa-lock"></i> No guardamos tus datos: solo se arma el mensaje para que lo envíes vos.</p>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <footer class="pie">
+        <div class="contenedor pie-dentro">
+            <div class="pie-marca">
+                <span class="logo-forma" aria-hidden="true"></span>
+                <div>
+                    <p class="pie-nombre">Pipón</p>
+                    <p id="web-ciudad">Concordia, Entre Ríos</p>
+                </div>
+            </div>
+            <a href="#quiero" class="boton boton-amarillo"><i class="fa-brands fa-whatsapp"></i>Quiero Pipón</a>
+        </div>
+        <div class="contenedor pie-legal">
+            <p>© <span id="anio"></span> Pipón</p>
+            <a href="https://www.psmsaas.com.ar" target="_blank" rel="noopener">Web hecha por PSM</a>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" integrity="sha512-7eHRwcbYkK4d9g/6tD/mhkf++eoTHwpNM9woBxtPUBWm67zeAfFC+HrdoE2GanKeocly/VxeLvIqwvCdk7qScg==" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" integrity="sha512-onMTRKJBKz8M1TnqqDuGBlowlH0ohFzMXYRNebz+yOcc5TQr/zAKsthzhuv0hiyUKEiQEQXEynnXCvNTOk50dg==" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+    <script type="module" src="js/sitio.js"></script>
+</body>
+</html>

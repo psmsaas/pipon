@@ -56,6 +56,7 @@
     <header class="bg-pipon-brown text-white p-4 sticky top-0 z-10 shadow-md">
         <div class="max-w-md mx-auto flex items-center justify-center gap-3 relative">
             <button onclick="cerrarSesion()" class="absolute left-0 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full text-white/40 hover:text-white/90 active:bg-white/10 transition-colors" aria-label="Cerrar sesión" title="Cerrar sesión"><i class="fa-solid fa-right-from-bracket"></i></button>
+            <button onclick="cambiarPestana('config')" class="solo-admin hidden absolute left-9 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full text-white/40 hover:text-white/90 active:bg-white/10 transition-colors items-center justify-center" aria-label="Configuración" title="Configuración"><i class="fa-solid fa-gear"></i></button>
             <div class="bg-white rounded-full w-10 h-10 flex items-center justify-center overflow-hidden border-2 border-white">
                 <img src="img/pipon.jpeg" alt="Logo Pipón" class="w-full h-full object-cover">
             </div>
@@ -362,6 +363,104 @@
             <div id="crm-seguimientos" class="subtab-crm hidden"></div>
             <div id="crm-clientes" class="subtab-crm hidden"></div>
             <div id="crm-resultados" class="subtab-crm hidden"></div>
+        </div>
+
+        <!-- Configuración (solo admin): por ahora, los textos de la web de Pipón -->
+        <div id="content-config" class="tab-content hidden">
+            <div class="flex justify-between items-end mb-4 px-1">
+                <h2 class="text-xl font-bold text-pipon-brown">Configuración</h2>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-3">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="font-black text-gray-800"><i class="fa-solid fa-globe text-pipon-orange mr-1.5"></i>Web de Pipón</p>
+                        <p id="cw-estado" class="text-[11px] text-gray-500 font-medium mt-0.5"></p>
+                    </div>
+                    <a href="sitio/" target="_blank" rel="noopener" class="shrink-0 text-sm font-bold text-white bg-pipon-orange px-4 py-1.5 rounded-full shadow-sm active:scale-95 transition-transform"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>Ver la web</a>
+                </div>
+                <p class="text-xs text-gray-500 font-medium mt-3">Acá cambiás los textos de la web. Al guardar, se actualizan para todos los que la visiten.</p>
+            </div>
+
+            <form id="form-config-web" onsubmit="guardarConfigWeb(event)" oninput="marcarConfigWebCambiada()" class="pb-8">
+                <details class="group bg-white rounded-xl shadow-sm border border-gray-100 mb-3" open>
+                    <summary class="flex items-center justify-between gap-2 p-4 cursor-pointer list-none font-bold text-gray-800"><span><i class="fa-brands fa-whatsapp text-green-600 w-5 mr-1 text-center"></i>WhatsApp de la web</span><i class="fa-solid fa-chevron-down text-gray-300 text-xs transition-transform group-open:rotate-180"></i></summary>
+                    <div class="px-4 pb-4">
+                        <p class="text-[11px] text-gray-500 font-medium mb-3">A este número llegan los mensajes de los negocios que completan "Quiero Pipón en mi negocio".</p>
+                        <input type="tel" id="cw-whatsapp" maxlength="30" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:bg-white transition-all font-bold text-gray-800" placeholder="11 2345 6789 (sin 0 ni 15)">
+                        <div class="grid grid-cols-2 gap-2 mt-2">
+                            <button type="button" onclick="usarWhatsappPedidosWeb()" class="bg-gray-50 text-gray-600 font-bold py-2.5 rounded-xl text-xs active:bg-gray-100">Usar el de pedidos</button>
+                            <button type="button" onclick="probarWhatsappWeb()" class="bg-green-50 text-green-700 font-bold py-2.5 rounded-xl text-xs active:bg-green-100"><i class="fa-brands fa-whatsapp mr-1"></i>Probar número</button>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="group bg-white rounded-xl shadow-sm border border-gray-100 mb-3">
+                    <summary class="flex items-center justify-between gap-2 p-4 cursor-pointer list-none font-bold text-gray-800"><span><i class="fa-solid fa-house text-pipon-orange w-5 mr-1 text-center"></i>Portada</span><i class="fa-solid fa-chevron-down text-gray-300 text-xs transition-transform group-open:rotate-180"></i></summary>
+                    <div class="px-4 pb-4">
+                        <label for="cw-bajada" class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Frase debajo del logo <span class="normal-case tracking-normal font-medium">(opcional)</span></label>
+                        <input type="text" id="cw-bajada" maxlength="80" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-medium text-sm mb-4">
+                        <label for="cw-hola" class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Saludo al bajar</label>
+                        <input type="text" id="cw-hola" maxlength="40" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-medium text-sm">
+                    </div>
+                </details>
+
+                <details class="group bg-white rounded-xl shadow-sm border border-gray-100 mb-3">
+                    <summary class="flex items-center justify-between gap-2 p-4 cursor-pointer list-none font-bold text-gray-800"><span><i class="fa-solid fa-star text-pipon-orange w-5 mr-1 text-center"></i>Cinta que corre</span><i class="fa-solid fa-chevron-down text-gray-300 text-xs transition-transform group-open:rotate-180"></i></summary>
+                    <div class="px-4 pb-4">
+                        <label for="cw-cinta" class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Frases (una por renglón, hasta 6)</label>
+                        <textarea id="cw-cinta" rows="4" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-medium resize-none text-sm"></textarea>
+                    </div>
+                </details>
+
+                <details class="group bg-white rounded-xl shadow-sm border border-gray-100 mb-3">
+                    <summary class="flex items-center justify-between gap-2 p-4 cursor-pointer list-none font-bold text-gray-800"><span><i class="fa-solid fa-book-open text-pipon-orange w-5 mr-1 text-center"></i>Conocenos: la historia</span><i class="fa-solid fa-chevron-down text-gray-300 text-xs transition-transform group-open:rotate-180"></i></summary>
+                    <div class="px-4 pb-4">
+                        <label for="cw-historia-titulo" class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Título</label>
+                        <input type="text" id="cw-historia-titulo" maxlength="80" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-medium text-sm mb-4">
+                        <label for="cw-historia-resaltado" class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Palabra en color <span class="normal-case tracking-normal font-medium">(escrita igual que en el título)</span></label>
+                        <input type="text" id="cw-historia-resaltado" maxlength="40" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-medium text-sm mb-4">
+                        <div id="cw-capitulos" class="flex flex-col gap-3"></div>
+                        <button type="button" id="cw-agregar-capitulo" onclick="agregarCapituloWeb()" class="w-full mt-3 border-2 border-dashed border-gray-200 text-gray-500 font-bold py-2.5 rounded-xl text-sm active:bg-gray-50"><i class="fa-solid fa-plus mr-1"></i>Agregar capítulo</button>
+                    </div>
+                </details>
+
+                <details class="group bg-white rounded-xl shadow-sm border border-gray-100 mb-3">
+                    <summary class="flex items-center justify-between gap-2 p-4 cursor-pointer list-none font-bold text-gray-800"><span><i class="fa-solid fa-quote-left text-pipon-orange w-5 mr-1 text-center"></i>Frase destacada</span><i class="fa-solid fa-chevron-down text-gray-300 text-xs transition-transform group-open:rotate-180"></i></summary>
+                    <div class="px-4 pb-4">
+                        <label for="cw-frase-texto" class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Frase</label>
+                        <textarea id="cw-frase-texto" rows="2" maxlength="80" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-medium resize-none text-sm mb-4"></textarea>
+                        <label for="cw-frase-resaltado" class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Palabra en color <span class="normal-case tracking-normal font-medium">(escrita igual que en la frase)</span></label>
+                        <input type="text" id="cw-frase-resaltado" maxlength="40" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-medium text-sm">
+                    </div>
+                </details>
+
+                <details class="group bg-white rounded-xl shadow-sm border border-gray-100 mb-3">
+                    <summary class="flex items-center justify-between gap-2 p-4 cursor-pointer list-none font-bold text-gray-800"><span><i class="fa-solid fa-store text-pipon-orange w-5 mr-1 text-center"></i>Para comercios</span><i class="fa-solid fa-chevron-down text-gray-300 text-xs transition-transform group-open:rotate-180"></i></summary>
+                    <div class="px-4 pb-4">
+                        <label for="cw-negocio-titulo" class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Título</label>
+                        <input type="text" id="cw-negocio-titulo" maxlength="80" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-medium text-sm mb-4">
+                        <label for="cw-negocio-resaltado" class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Palabra en color <span class="normal-case tracking-normal font-medium">(escrita igual que en el título)</span></label>
+                        <input type="text" id="cw-negocio-resaltado" maxlength="40" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-medium text-sm mb-4">
+                        <label for="cw-negocio-intro" class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Texto</label>
+                        <textarea id="cw-negocio-intro" rows="4" maxlength="400" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-medium resize-none text-sm mb-4"></textarea>
+                        <label for="cw-negocio-tipos" class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Tipos de negocio que pasan (uno por renglón, hasta 16)</label>
+                        <textarea id="cw-negocio-tipos" rows="6" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-medium resize-none text-sm mb-4"></textarea>
+                        <div id="cw-pasos" class="flex flex-col gap-3"></div>
+                    </div>
+                </details>
+
+                <details class="group bg-white rounded-xl shadow-sm border border-gray-100 mb-4">
+                    <summary class="flex items-center justify-between gap-2 p-4 cursor-pointer list-none font-bold text-gray-800"><span><i class="fa-solid fa-location-dot text-pipon-orange w-5 mr-1 text-center"></i>Pie de página</span><i class="fa-solid fa-chevron-down text-gray-300 text-xs transition-transform group-open:rotate-180"></i></summary>
+                    <div class="px-4 pb-4">
+                        <label for="cw-ciudad" class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Ciudad <span class="normal-case tracking-normal font-medium">(opcional)</span></label>
+                        <input type="text" id="cw-ciudad" maxlength="80" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-pipon-orange focus:bg-white transition-all font-medium text-sm">
+                    </div>
+                </details>
+
+                <button type="submit" class="w-full bg-pipon-orange hover:bg-[#b84511] text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-orange-200 active:scale-95 transition-all">Guardar cambios</button>
+                <button type="button" onclick="restaurarConfigWeb()" class="w-full mt-3 text-sm font-bold text-gray-500 py-2.5 rounded-xl active:bg-gray-100"><i class="fa-solid fa-rotate-left mr-1"></i>Volver a los textos originales</button>
+            </form>
         </div>
     </main>
 

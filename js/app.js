@@ -682,6 +682,13 @@ window.cambiarMes = function(cambio) { fechaCalendario.setMonth(fechaCalendario.
 window.seleccionarDiaHistorial = function(fechaStr) { diaSeleccionadoFormat = fechaStr; renderHistorial(); }
 
 window.cambiarPestana = function(pestana) {
+    const enConfig = !document.getElementById('content-config').classList.contains('hidden');
+    // al salir de Configuración con cambios sin guardar, pregunta antes de perderlos
+    if (enConfig && pestana !== 'config' && configWebCambiada) {
+        if (!confirm('Tenés cambios sin guardar en la web. ¿Salir igual?')) return;
+        configWebCambiada = false;
+    }
+
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
     document.getElementById(`content-${pestana}`).classList.remove('hidden');
 
@@ -689,9 +696,12 @@ window.cambiarPestana = function(pestana) {
         btn.classList.remove('text-pipon-orange');
         btn.classList.add('text-gray-400');
     });
+    // Configuración se abre desde el engranaje del encabezado, no tiene botón en la barra
     const activeBtn = document.getElementById(`nav-${pestana}`);
-    activeBtn.classList.remove('text-gray-400');
-    activeBtn.classList.add('text-pipon-orange');
+    if (activeBtn) {
+        activeBtn.classList.remove('text-gray-400');
+        activeBtn.classList.add('text-pipon-orange');
+    }
 
     if (pestana === 'historial' && !diaSeleccionadoFormat) {
         const hoy = new Date();
@@ -710,6 +720,10 @@ window.cambiarPestana = function(pestana) {
     }
     if (pestana === 'crm') {
         renderCrm();
+    }
+    // si ya estaba en Configuración editando, no pisa lo que escribió
+    if (pestana === 'config' && !(enConfig && configWebCambiada)) {
+        abrirConfigWeb();
     }
 };
 
@@ -1998,6 +2012,235 @@ window.guardarWhatsappPipon = async function(e) {
             await guardarDoc(documento('ajustes', 'publico'), { whatsapp: numero, whatsappVisible: visible });
             cerrarModal('modalWhatsappPipon');
             mostrarAviso(numero ? 'Número guardado. Ya aparece en la página de pedidos.' : 'Número borrado. El botón ya no aparece.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
+        }
+    });
+};
+
+// ---------- Configuración: textos de la web de Pipón (solo admin) ----------
+// se guardan en ajustes/web y la web (sitio/) los lee sin iniciar sesión.
+// Los textos base están en sitio/js/textos-web.js y se cargan recién al abrir esta pantalla,
+// así el resto del sistema no depende de los archivos de la web.
+let ajustesWeb = null;
+let configWebCambiada = false;
+let textosWeb = null;
+let cargaTextosWeb = null;
+const PASOS_WEB = 3;
+const campoWeb = (id) => document.getElementById(`cw-${id}`);
+const lineasWeb = (texto) => texto.split('\n').map(l => l.trim()).filter(Boolean);
+const CLASE_CAMPO_WEB = 'w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-pipon-orange transition-all font-medium text-sm';
+
+addEventListener('beforeunload', (e) => { if (configWebCambiada) e.preventDefault(); });
+
+function renderEstadoConfigWeb() {
+    const estado = campoWeb('estado');
+    if (!ajustesWeb) estado.textContent = 'Muestra los textos originales.';
+    else estado.textContent = ajustesWeb.actualizado ? `Último cambio: ${formatearFechaHora(ajustesWeb.actualizado)}` : 'Con textos propios.';
+}
+
+function renderCapitulosWeb(capitulos) {
+    const ultimo = capitulos.length - 1;
+    const boton = 'w-8 h-8 rounded-lg bg-white border border-gray-200 text-xs disabled:opacity-30';
+    document.getElementById('cw-capitulos').innerHTML = capitulos.map((c, i) => `
+        <div class="cw-capitulo bg-gray-50 rounded-xl border border-gray-200 p-3">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-black text-pipon-brown uppercase tracking-widest">Capítulo ${i + 1}</span>
+                <div class="flex gap-1">
+                    <button type="button" onclick="moverCapituloWeb(${i}, -1)" ${i === 0 ? 'disabled' : ''} class="${boton} text-gray-500" aria-label="Subir capítulo ${i + 1}"><i class="fa-solid fa-arrow-up"></i></button>
+                    <button type="button" onclick="moverCapituloWeb(${i}, 1)" ${i === ultimo ? 'disabled' : ''} class="${boton} text-gray-500" aria-label="Bajar capítulo ${i + 1}"><i class="fa-solid fa-arrow-down"></i></button>
+                    <button type="button" onclick="quitarCapituloWeb(${i})" ${ultimo === 0 ? 'disabled' : ''} class="${boton} text-red-500" aria-label="Quitar capítulo ${i + 1}"><i class="fa-solid fa-trash-can"></i></button>
+                </div>
+            </div>
+            <input type="text" data-campo="etiqueta" maxlength="${textosWeb.LIMITES_WEB.corto}" value="${escaparHtml(c.etiqueta)}" placeholder="Año o etiqueta (opcional), ej: 2019" aria-label="Año o etiqueta del capítulo ${i + 1}" class="${CLASE_CAMPO_WEB} mb-2">
+            <input type="text" data-campo="titulo" maxlength="${textosWeb.LIMITES_WEB.titulo}" value="${escaparHtml(c.titulo)}" placeholder="Título" aria-label="Título del capítulo ${i + 1}" class="${CLASE_CAMPO_WEB} mb-2">
+            <textarea data-campo="texto" rows="4" maxlength="${textosWeb.LIMITES_WEB.texto}" placeholder="Texto" aria-label="Texto del capítulo ${i + 1}" class="${CLASE_CAMPO_WEB} resize-none">${escaparHtml(c.texto)}</textarea>
+        </div>`).join('');
+    document.getElementById('cw-agregar-capitulo').classList.toggle('hidden', capitulos.length >= textosWeb.LIMITES_WEB.capitulos);
+}
+
+const leerCapitulosWeb = () => [...document.querySelectorAll('#cw-capitulos .cw-capitulo')].map(el => {
+    const valor = (campo) => el.querySelector(`[data-campo="${campo}"]`).value.trim();
+    return { etiqueta: valor('etiqueta'), titulo: valor('titulo'), texto: valor('texto') };
+});
+
+function renderPasosWeb(pasos) {
+    document.getElementById('cw-pasos').innerHTML = pasos.map((p, i) => `
+        <div class="bg-gray-50 rounded-xl border border-gray-200 p-3">
+            <p class="text-xs font-black text-pipon-brown uppercase tracking-widest mb-2">Paso ${i + 1}</p>
+            <input type="text" id="cw-paso-${i}-titulo" maxlength="${textosWeb.LIMITES_WEB.titulo}" value="${escaparHtml(p.titulo)}" placeholder="Título" aria-label="Título del paso ${i + 1}" class="${CLASE_CAMPO_WEB} mb-2">
+            <textarea id="cw-paso-${i}-texto" rows="2" maxlength="${textosWeb.LIMITES_WEB.texto}" placeholder="Texto" aria-label="Texto del paso ${i + 1}" class="${CLASE_CAMPO_WEB} resize-none">${escaparHtml(p.texto)}</textarea>
+        </div>`).join('');
+}
+
+function llenarFormConfigWeb(t) {
+    campoWeb('whatsapp').value = t.whatsappVisible || '';
+    campoWeb('bajada').value = t.portada.bajada;
+    campoWeb('hola').value = t.portada.hola;
+    campoWeb('cinta').value = t.cinta.join('\n');
+    campoWeb('historia-titulo').value = t.historia.titulo;
+    campoWeb('historia-resaltado').value = t.historia.resaltado;
+    renderCapitulosWeb(t.historia.capitulos);
+    campoWeb('frase-texto').value = t.frase.texto;
+    campoWeb('frase-resaltado').value = t.frase.resaltado;
+    campoWeb('negocio-titulo').value = t.negocio.titulo;
+    campoWeb('negocio-resaltado').value = t.negocio.resaltado;
+    campoWeb('negocio-intro').value = t.negocio.intro;
+    campoWeb('negocio-tipos').value = t.negocio.tipos.join('\n');
+    renderPasosWeb(t.negocio.pasos);
+    campoWeb('ciudad').value = t.pie.ciudad;
+}
+
+async function abrirConfigWeb() {
+    if (!esAdmin) return;
+    renderEstadoConfigWeb();
+    const form = document.getElementById('form-config-web');
+    form.classList.add('opacity-50', 'pointer-events-none');
+    try {
+        cargaTextosWeb ||= import('../sitio/js/textos-web.js');
+        textosWeb = await cargaTextosWeb;
+    } catch (error) {
+        console.error(error);
+        cargaTextosWeb = null;
+        mostrarAviso('No se pudo abrir la configuración de la web. Revisá la conexión.', 'error');
+        return;
+    }
+    const t = textosWeb.combinarTextosWeb(ajustesWeb);
+    // la primera vez se propone el mismo número que usa la página de pedidos
+    if (!ajustesWeb) t.whatsappVisible = ajustesPublicos.whatsappVisible || ajustesPublicos.whatsapp || '';
+    llenarFormConfigWeb(t);
+    configWebCambiada = false;
+    form.classList.remove('opacity-50', 'pointer-events-none');
+}
+
+window.marcarConfigWebCambiada = function() { configWebCambiada = true; };
+
+window.agregarCapituloWeb = function() {
+    const capitulos = leerCapitulosWeb();
+    if (capitulos.length >= textosWeb.LIMITES_WEB.capitulos) return;
+    capitulos.push({ etiqueta: '', titulo: '', texto: '' });
+    renderCapitulosWeb(capitulos);
+    configWebCambiada = true;
+    document.querySelector('#cw-capitulos .cw-capitulo:last-child [data-campo="titulo"]').focus();
+};
+
+window.moverCapituloWeb = function(i, direccion) {
+    const capitulos = leerCapitulosWeb();
+    const destino = i + direccion;
+    if (destino < 0 || destino >= capitulos.length) return;
+    [capitulos[i], capitulos[destino]] = [capitulos[destino], capitulos[i]];
+    renderCapitulosWeb(capitulos);
+    configWebCambiada = true;
+};
+
+window.quitarCapituloWeb = function(i) {
+    const capitulos = leerCapitulosWeb();
+    if (capitulos.length <= 1) return;
+    const c = capitulos[i];
+    if ((c.titulo || c.texto) && !confirm(`¿Quitar el capítulo ${i + 1}${c.titulo ? ` "${c.titulo}"` : ''}?`)) return;
+    capitulos.splice(i, 1);
+    renderCapitulosWeb(capitulos);
+    configWebCambiada = true;
+};
+
+window.usarWhatsappPedidosWeb = function() {
+    const numero = ajustesPublicos.whatsappVisible || ajustesPublicos.whatsapp;
+    if (!numero) { mostrarAviso('Todavía no cargaste el WhatsApp de pedidos.', 'error'); return; }
+    campoWeb('whatsapp').value = numero;
+    configWebCambiada = true;
+};
+
+window.probarWhatsappWeb = function() {
+    const url = linkWhatsApp(campoWeb('whatsapp').value, 'Prueba del número de la web de Pipón');
+    if (!url) { mostrarAviso('Escribí un número primero.', 'error'); return; }
+    window.open(url, '_blank');
+};
+
+window.restaurarConfigWeb = function() {
+    if (!textosWeb) return;
+    const base = structuredClone(textosWeb.TEXTOS_WEB_BASE);
+    base.whatsappVisible = campoWeb('whatsapp').value;
+    llenarFormConfigWeb(base);
+    configWebCambiada = true;
+    mostrarAviso('Se cargaron los textos originales. Tocá Guardar cambios para aplicarlos.', 'ok');
+};
+
+// abre la sección donde está el campo y lo enfoca, para que se vea qué hay que corregir
+const marcarCampoWeb = (campo, mensaje) => {
+    mostrarAviso(mensaje, 'error');
+    campo.closest('details').open = true;
+    campo.focus();
+};
+
+window.guardarConfigWeb = async function(e) {
+    e.preventDefault();
+    if (!esAdmin || !textosWeb) return;
+    const L = textosWeb.LIMITES_WEB;
+    const valor = (id) => campoWeb(id).value.trim();
+
+    const visible = valor('whatsapp');
+    const numero = normalizarTelefono(visible);
+    if (visible && numero.length !== 13) { marcarCampoWeb(campoWeb('whatsapp'), 'Revisá el WhatsApp: con característica y sin 0 ni 15, ej. 345 412 3456.'); return; }
+
+    const capitulos = leerCapitulosWeb();
+    const pasos = Array.from({ length: PASOS_WEB }, (_, i) => ({ titulo: valor(`paso-${i}-titulo`), texto: valor(`paso-${i}-texto`) }));
+    const contenido = {
+        whatsapp: numero,
+        whatsappVisible: numero ? visible : '',
+        portada: { bajada: valor('bajada'), hola: valor('hola') },
+        cinta: lineasWeb(campoWeb('cinta').value),
+        historia: { titulo: valor('historia-titulo'), resaltado: valor('historia-resaltado'), capitulos },
+        frase: { texto: valor('frase-texto'), resaltado: valor('frase-resaltado') },
+        negocio: { titulo: valor('negocio-titulo'), resaltado: valor('negocio-resaltado'), intro: valor('negocio-intro'), tipos: lineasWeb(campoWeb('negocio-tipos').value), pasos },
+        pie: { ciudad: valor('ciudad') }
+    };
+
+    const cajasCapitulos = [...document.querySelectorAll('#cw-capitulos .cw-capitulo')];
+    const obligatorios = [
+        [contenido.portada.hola, campoWeb('hola'), 'el saludo de la portada'],
+        [contenido.cinta.length, campoWeb('cinta'), 'al menos una frase de la cinta'],
+        [contenido.historia.titulo, campoWeb('historia-titulo'), 'el título de la historia'],
+        ...capitulos.flatMap((c, i) => [
+            [c.titulo, cajasCapitulos[i].querySelector('[data-campo="titulo"]'), `el título del capítulo ${i + 1}`],
+            [c.texto, cajasCapitulos[i].querySelector('[data-campo="texto"]'), `el texto del capítulo ${i + 1}`]
+        ]),
+        [contenido.frase.texto, campoWeb('frase-texto'), 'la frase destacada'],
+        [contenido.negocio.titulo, campoWeb('negocio-titulo'), 'el título de "Para comercios"'],
+        [contenido.negocio.intro, campoWeb('negocio-intro'), 'el texto de "Para comercios"'],
+        [contenido.negocio.tipos.length, campoWeb('negocio-tipos'), 'al menos un tipo de negocio'],
+        ...pasos.flatMap((p, i) => [
+            [p.titulo, campoWeb(`paso-${i}-titulo`), `el título del paso ${i + 1}`],
+            [p.texto, campoWeb(`paso-${i}-texto`), `el texto del paso ${i + 1}`]
+        ])
+    ];
+    const falta = obligatorios.find(([v]) => !v);
+    if (falta) { marcarCampoWeb(falta[1], `Falta completar ${falta[2]}.`); return; }
+
+    const listas = [
+        [contenido.cinta, campoWeb('cinta'), L.cinta, 'La cinta', 'frases'],
+        [contenido.negocio.tipos, campoWeb('negocio-tipos'), L.tipos, 'La lista de tipos de negocio', 'renglones']
+    ];
+    for (const [items, campo, maximo, nombre, unidad] of listas) {
+        if (items.length > maximo) { marcarCampoWeb(campo, `${nombre} admite hasta ${maximo} ${unidad}.`); return; }
+        if (items.some(item => item.length > L.corto)) { marcarCampoWeb(campo, `${nombre}: cada renglón puede tener hasta ${L.corto} letras.`); return; }
+    }
+
+    const resaltados = [
+        [contenido.historia, campoWeb('historia-resaltado'), 'el título de la historia'],
+        [contenido.frase, campoWeb('frase-resaltado'), 'la frase destacada'],
+        [contenido.negocio, campoWeb('negocio-resaltado'), 'el título de "Para comercios"']
+    ];
+    const sinCoincidir = resaltados.find(([s]) => s.resaltado && !(s.titulo ?? s.texto).includes(s.resaltado));
+    if (sinCoincidir) { marcarCampoWeb(sinCoincidir[1], `La palabra en color no aparece en ${sinCoincidir[2]}: escribila igual, con mayúsculas y acentos.`); return; }
+
+    if (!numero && !confirm('Sin número de WhatsApp, el formulario de la web no va a poder enviar mensajes. ¿Guardar igual?')) return;
+
+    await conBotonBloqueado(e, async () => {
+        try {
+            await guardarDoc(documento('ajustes', 'web'), { ...contenido, actualizado: new Date() });
+            configWebCambiada = false;
+            mostrarAviso('Guardado. La web ya muestra los textos nuevos.', 'ok');
         } catch (error) {
             console.error(error);
             mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
@@ -4075,6 +4318,8 @@ function cargarDatos() {
             escuchar(coleccion('ajustes'), (snapshot) => {
                 ajustesPublicos = snapshot.docs.find(doc => doc.id === 'publico')?.data() || {};
                 ajustesCrm = snapshot.docs.find(doc => doc.id === 'crm')?.data() || {};
+                ajustesWeb = snapshot.docs.find(doc => doc.id === 'web')?.data() || null;
+                renderEstadoConfigWeb();
                 refrescarTodo();
             }, (error) => console.error(error));
 
