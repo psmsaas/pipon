@@ -199,6 +199,72 @@ pintarTextos(textos);
 cargarFotosAlLlegar();
 $('#anio').textContent = new Date().getFullYear();
 
+// ----- Migas de la portada: nunca encima del dibujo ni de los textos -----
+// Cada pantalla (y cada frase guardada desde Configuración) deja un hueco distinto:
+// si una miga cae sobre algo, se corre al lugar libre más cercano; si no hay lugar, se oculta.
+const escena = $('.portada-escena');
+const SEPARACION_MIGA = 10;
+
+// caja de un elemento dentro de la escena, sin contar las animaciones (transform)
+const cajaEnEscena = (el) => {
+    let x = 0, y = 0;
+    for (let n = el; n && n !== escena; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
+    return { x, y, w: el.offsetWidth, h: el.offsetHeight };
+};
+const seTocan = (a, b, margen) => a.x < b.x + b.w + margen && b.x < a.x + a.w + margen && a.y < b.y + b.h + margen && b.y < a.y + a.h + margen;
+
+function acomodarMigas() {
+    const ancho = escena.clientWidth, alto = escena.clientHeight;
+    if (!ancho || !alto) return;
+    const deslizar = cajaEnEscena($('.deslizar'));
+    deslizar.x -= deslizar.w / 2; // está centrado con translateX(-50%)
+    const ocupado = [
+        { x: 0, y: 0, w: ancho, h: $('.cabecera').offsetHeight },
+        cajaEnEscena($('.portada-logo')),
+        cajaEnEscena($('.portada-titulo')),
+        cajaEnEscena($('.portada-bajada')),
+        deslizar
+    ].filter(c => c.w && c.h);
+    const libre = (caja, otras) => caja.x >= 4 && caja.y >= 4 && caja.x + caja.w <= ancho - 4 && caja.y + caja.h <= alto - 4
+        && !ocupado.some(o => seTocan(caja, o, SEPARACION_MIGA)) && !otras.some(o => seTocan(caja, o, 4));
+
+    // primero todas vuelven a su lugar de diseño
+    const migas = $$('.miga', escena).map(el => {
+        Object.assign(el.style, { left: '', top: '', right: '', bottom: '', visibility: '' });
+        return { el, caja: cajaEnEscena(el) };
+    });
+    const quedan = migas.filter(m => libre(m.caja, []));
+    const colocadas = quedan.map(m => m.caja);
+    migas.filter(m => !quedan.includes(m)).forEach(({ el, caja }) => {
+        // busca el lugar libre más cercano en una grilla que recorre toda la portada
+        const lugares = [];
+        for (let px = 0; px <= 1; px += .04) {
+            for (let py = 0; py <= 1; py += .04) {
+                const x = Math.round(px * (ancho - caja.w)), y = Math.round(py * (alto - caja.h));
+                lugares.push({ x, y, w: caja.w, h: caja.h, d: Math.hypot(x - caja.x, y - caja.y) });
+            }
+        }
+        const lugar = lugares.sort((a, b) => a.d - b.d).find(l => libre(l, colocadas));
+        if (!lugar) { el.style.visibility = 'hidden'; return; }
+        Object.assign(el.style, { left: `${lugar.x}px`, top: `${lugar.y}px`, right: 'auto', bottom: 'auto' });
+        colocadas.push(lugar);
+    });
+}
+
+acomodarMigas();
+document.fonts?.ready.then(acomodarMigas);
+// se vuelve a acomodar cada vez que la portada cambia de tamaño (girar el celular, achicar la ventana,
+// o cuando la animación fija de la portada recalcula su alto después de un resize)
+if (window.ResizeObserver) {
+    let cuadroMigas = 0;
+    new ResizeObserver(() => {
+        cancelAnimationFrame(cuadroMigas);
+        cuadroMigas = requestAnimationFrame(acomodarMigas);
+    }).observe(escena);
+} else {
+    addEventListener('resize', () => setTimeout(acomodarMigas, 400));
+}
+
 // ----- Cabecera: se vuelve sólida cuando la portada ya quedó cubierta -----
 const cabecera = $('.cabecera');
 const cinta = $('.cinta');
@@ -321,6 +387,15 @@ function iniciarAnimaciones() {
     const { gsap, ScrollTrigger } = window;
     gsap.registerPlugin(ScrollTrigger);
     ScrollTrigger.config({ ignoreMobileResize: true });
+    // al recalcular (girar el celular, achicar la ventana) la animación salta arriba para medirse:
+    // con el desplazamiento suave ese salto no es instantáneo y la portada quedaba trabada a medio morder.
+    // Se apaga solo mientras recalcula; los enlaces del menú siguen bajando suave.
+    const html = document.documentElement;
+    ScrollTrigger.addEventListener('refreshInit', () => {
+        html.style.scrollBehavior = 'auto';
+        getComputedStyle(html).scrollBehavior; // aplica el cambio ya, antes de que mida
+    });
+    ScrollTrigger.addEventListener('refresh', () => { html.style.scrollBehavior = ''; });
 
     const palabrasFrase = separarPalabras($('.frase-texto'));
     const mm = gsap.matchMedia();
