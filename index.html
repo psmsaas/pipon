@@ -97,6 +97,8 @@
                 </div>
             </div>
 
+            <div id="resumen-consignacion" class="hidden mb-6"></div>
+
             <div id="alertas-mayorista" class="hidden flex-col gap-3 mb-6"></div>
             <div id="alertas-crm" class="hidden flex-col gap-3 mb-6"></div>
             <div id="alertas-prestamos" class="hidden flex-col gap-3 mb-6"></div>
@@ -897,6 +899,15 @@
                     <button type="submit" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-red-200 active:scale-95 transition-all">Guardar Cambios</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Consignación: dejar la mercadería, rendir y cambiar la fecha (va encima del detalle del pedido) -->
+    <div id="modalConsignacion" class="fixed inset-0 z-[55] hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4"></div>
+            <button type="button" onclick="cerrarModal('modalConsignacion')" class="absolute top-5 right-5 w-8 h-8 bg-gray-100 rounded-full text-gray-500" aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+            <div id="consignacion-contenido"></div>
         </div>
     </div>
 

@@ -16,7 +16,12 @@ if (MODO_PRUEBA) {
     const memoria = {};
     const oyentes = {};
     const cargas = {};
-    const convertirFechas = (datos) => Object.fromEntries(Object.entries(datos).map(([k, v]) => [k, v instanceof Date ? Timestamp.fromDate(v) : v]));
+    // como Firestore: las fechas se guardan como Timestamp también dentro de listas y objetos
+    const aTimestamp = (v) => v instanceof Date ? Timestamp.fromDate(v)
+        : Array.isArray(v) ? v.map(aTimestamp)
+        : v && typeof v === 'object' && v.constructor === Object ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, aTimestamp(x)]))
+        : v;
+    const convertirFechas = (datos) => aTimestamp(datos);
     const asegurar = (refColeccion) => cargas[refColeccion.path] ||= getDocs(refColeccion).then(snap => {
         memoria[refColeccion.path] = new Map(snap.docs.map(d => [d.id, d.data()]));
     });
@@ -145,10 +150,59 @@ async function conBotonBloqueadoClick(boton, tarea) {
     }
 }
 
-// un pedido mayorista entra como ingreso el día que se entrega
-const ventasMayoristasEntregadas = () => pedidosData
-    .filter(p => p.estado === 'entregado' && p.fechaEntrega)
-    .map(p => ({ ...p, monto: p.total, timestamp: p.fechaEntrega, tipo: 'mayorista' }));
+// ----- Mercadería en consignación -----
+// Un pedido dejado en consignación no suma al entregarlo: entra lo vendido en cada rendición, el día
+// que se cobra, al precio y descuento del pedido. Las rendiciones guardan por cada producto (mismo orden
+// que p.items) cuántas se vendieron, devolvieron y perdieron.
+const esConsignacion = (p) => p.estado === 'consignacion' || p.estado === 'rendido';
+// mismo redondeo que calcularTotalesPedido: si se vende todo de una vez da justo el total del pedido
+const montoConDescuento = (p, subtotal) => subtotal - Math.round(subtotal * (Number(p.descuento) || 0) / 100);
+const montoVendido = (p, cantidades) => montoConDescuento(p, (p.items || []).reduce((s, it, i) => s + (Number(cantidades[i]) || 0) * Number(it.precio), 0));
+const vendidasRendicion = (r) => (r.items || []).reduce((s, x) => s + (Number(x?.vendidas) || 0), 0);
+
+function cuentasConsignacion(p) {
+    const filas = (p.items || []).map(it => ({ nombre: it.nombre, precio: Number(it.precio) || 0, dejadas: Number(it.cantidad) || 0, vendidas: 0, devueltas: 0, perdidas: 0 }));
+    (p.rendiciones || []).forEach(r => (r.items || []).forEach((x, i) => {
+        if (!filas[i] || !x) return;
+        filas[i].vendidas += Number(x.vendidas) || 0;
+        filas[i].devueltas += Number(x.devueltas) || 0;
+        filas[i].perdidas += Number(x.perdidas) || 0;
+    }));
+    filas.forEach(f => { f.afuera = Math.max(0, f.dejadas - f.vendidas - f.devueltas - f.perdidas); });
+    const suma = (campo) => filas.reduce((s, f) => s + f[campo], 0);
+    return {
+        filas,
+        dejadas: suma('dejadas'), vendidas: suma('vendidas'), devueltas: suma('devueltas'), perdidas: suma('perdidas'), afuera: suma('afuera'),
+        cobrado: (p.rendiciones || []).reduce((s, r) => s + (Number(r.monto) || 0), 0),
+        valorAfuera: montoVendido(p, filas.map(f => f.afuera)),
+        valorPerdido: montoVendido(p, filas.map(f => f.perdidas))
+    };
+}
+
+// lo que realmente se cobró de un pedido: en consignación, solo lo vendido en las rendiciones
+const montoPedido = (p) => esConsignacion(p) ? cuentasConsignacion(p).cobrado : Number(p.total) || 0;
+const unidadesPedido = (p) => esConsignacion(p) ? cuentasConsignacion(p).vendidas : Number(p.unidades) || 0;
+const itemsCompradosPedido = (p) => !esConsignacion(p) ? (p.items || [])
+    : cuentasConsignacion(p).filas.filter(f => f.vendidas > 0).map(f => ({ nombre: f.nombre, cantidad: f.vendidas, precio: f.precio }));
+
+// un pedido mayorista entra como ingreso el día que se entrega; en consignación, cada rendición cobrada
+const ventasMayoristasEntregadas = () => [
+    ...pedidosData
+        .filter(p => p.estado === 'entregado' && p.fechaEntrega)
+        .map(p => ({ ...p, monto: p.total, timestamp: p.fechaEntrega, tipo: 'mayorista' })),
+    ...pedidosData.filter(esConsignacion).flatMap(p => (p.rendiciones || [])
+        .filter(r => r.fecha && Number(r.monto) > 0)
+        .map(r => ({
+            ...p,
+            monto: Number(r.monto),
+            timestamp: r.fecha,
+            tipo: 'mayorista',
+            consignacion: true,
+            metodo: r.metodo,
+            unidades: vendidasRendicion(r),
+            items: (p.items || []).map((it, i) => ({ ...it, cantidad: Number(r.items?.[i]?.vendidas) || 0 })).filter(it => it.cantidad > 0)
+        })))
+];
 const todosLosIngresos = () => [...ventasData, ...ventasMayoristasEntregadas()];
 
 window.cambiarVistaBalance = function(vista) {
@@ -214,7 +268,7 @@ function renderVentas() {
                 <p class="font-bold text-gray-800 truncate">${escaparHtml(nombrePedido(v))}</p>
                 <div class="flex items-center gap-2 mt-1">
                     <span class="text-xs text-gray-400"><i class="fa-regular fa-clock"></i> ${formatearHora(v.timestamp)}</span>
-                    <span class="text-[10px] bg-violet-100 text-violet-700 font-bold px-2 py-0.5 rounded">Mayorista · ${v.unidades} u.</span>
+                    <span class="text-[10px] bg-violet-100 text-violet-700 font-bold px-2 py-0.5 rounded">${v.consignacion ? 'Consignación' : 'Mayorista'} · ${v.unidades} u.</span>
                     <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">${escaparHtml(v.metodo || '')}</span>
                 </div>
             </div>
@@ -435,7 +489,7 @@ function agruparDatosPorFecha() {
 const filaMovimiento = (item) => {
     const estilos = { venta: ['green', '+', 'fa-arrow-down', `abrirEditarVenta('${item.id}')`], gasto: ['red', '-', 'fa-arrow-up', `abrirEditarGasto('${item.id}')`], mayorista: ['violet', '+', 'fa-boxes-stacked', `verDetallePedido('${item.id}')`] };
     const [color, signo, icono, accion] = estilos[item.tipo];
-    const titulo = item.tipo === 'mayorista' ? `Mayorista · ${nombrePedido(item)}` : (item.descripcion || 'Venta General');
+    const titulo = item.tipo === 'mayorista' ? `${item.consignacion ? 'Consignación' : 'Mayorista'} · ${nombrePedido(item)}` : (item.descripcion || 'Venta General');
     return `
     <div class="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
         <div class="flex items-center gap-2 overflow-hidden">
@@ -815,6 +869,7 @@ window.cerrarModal = function(modalId) {
     if(modalId === 'modalContacto') document.getElementById('form-contacto').reset();
     if(modalId === 'modalPedidoDetalle') pedidoDetalleAbierto = null;
     if(modalId === 'modalHistorialContacto') historialContactoAbierto = null;
+    if(modalId === 'modalConsignacion') consignacionEnEdicion = null;
     if(modalId === 'modalPrestamo') document.getElementById('form-prestamo').reset();
     if(modalId === 'modalPrestamoDetalle') prestamoAbierto = null;
     if(modalId === 'modalCuota') {
@@ -829,7 +884,7 @@ window.seleccionarMetodo = function(tipo, metodo, elementoBtn) {
     botones.forEach(btn => {
         btn.className = `metodo-btn-${tipo} border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-xl transition-all`;
     });
-    if (tipo === 'venta') {
+    if (tipo === 'venta' || tipo === 'rendicion') {
         elementoBtn.className = `metodo-btn-${tipo} border-2 border-green-500 bg-green-50 text-green-700 font-bold py-3 rounded-xl transition-all`;
     } else {
         elementoBtn.className = `metodo-btn-${tipo} border-2 border-red-500 bg-red-50 text-red-700 font-bold py-3 rounded-xl transition-all`;
@@ -1239,6 +1294,8 @@ const ESTADOS_PEDIDO = {
     preparacion: { texto: 'En preparación', clases: 'bg-blue-100 text-blue-700',   icono: 'fa-fire-burner' },
     listo:       { texto: 'Listo',          clases: 'bg-green-100 text-green-700', icono: 'fa-circle-check' },
     entregado:   { texto: 'Entregado',      clases: 'bg-gray-100 text-gray-600',   icono: 'fa-handshake' },
+    consignacion: { texto: 'En consignación', clases: 'bg-amber-100 text-amber-700', icono: 'fa-handshake-angle' },
+    rendido:     { texto: 'Consignación rendida', clases: 'bg-teal-100 text-teal-700', icono: 'fa-handshake' },
     cancelado:   { texto: 'Cancelado',      clases: 'bg-red-100 text-red-600',     icono: 'fa-ban' }
 };
 const ESTADOS_ACTIVOS = ['pendiente', 'preparacion', 'listo'];
@@ -1337,7 +1394,7 @@ function renderMayorista() {
     const alertas = mayoristasData.filter(m => estadisticasContacto(m).alerta).length;
 
     const subtabs = [
-        { id: 'pedidos', texto: 'Pedidos', icono: 'fa-clipboard-list', badge: activos.length, color: 'bg-violet-600' },
+        { id: 'pedidos', texto: 'Pedidos', icono: 'fa-clipboard-list', badge: activos.length + rendicionesParaHoy().length, color: 'bg-violet-600' },
         { id: 'historial', texto: 'Historial', icono: 'fa-clock-rotate-left', badge: 0 },
         { id: 'contactos', texto: 'Contactos', icono: 'fa-address-book', badge: alertas, color: 'bg-red-500' }
     ];
@@ -1357,8 +1414,9 @@ function renderMayorista() {
 
 function renderPedidosMayorista(activos) {
     const cont = document.getElementById('mayorista-pedidos');
+    const consignaciones = htmlConsignacionesAbiertas();
     if (!activos.length) {
-        cont.innerHTML = `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm"><i class="fa-solid fa-clipboard-check text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium">No hay pedidos por realizar.</p></div>`;
+        cont.innerHTML = consignaciones + `<div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm"><i class="fa-solid fa-clipboard-check text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium">No hay pedidos por realizar.</p></div>`;
         return;
     }
     const orden = { pendiente: 0, preparacion: 1, listo: 2 };
@@ -1370,7 +1428,7 @@ function renderPedidosMayorista(activos) {
     }));
     const filas = Object.entries(aPreparar).sort((a, b) => b[1] - a[1]);
 
-    let html = '';
+    let html = consignaciones;
     if (filas.length) {
         html += `
             <div class="bg-white rounded-2xl p-4 shadow-sm border border-violet-100 mb-4 relative overflow-hidden">
@@ -1411,8 +1469,8 @@ function renderHistorialMayorista() {
     const lista = Object.values(grupos).map(g => ({
         ...g,
         ultima: g.pedidos.reduce((max, p) => Math.max(max, aFecha(p.timestamp)?.getTime() || 0), 0),
-        unidades: g.pedidos.reduce((s, p) => s + (Number(p.unidades) || 0), 0),
-        total: g.pedidos.reduce((s, p) => s + (Number(p.total) || 0), 0)
+        unidades: g.pedidos.reduce((s, p) => s + unidadesPedido(p), 0),
+        total: g.pedidos.reduce((s, p) => s + montoPedido(p), 0)
     })).sort((a, b) => b.ultima - a.ultima);
 
     if (!lista.length) {
@@ -1491,7 +1549,8 @@ function renderAlertasInicio() {
     const cont = document.getElementById('alertas-mayorista');
     const nuevos = pedidosData.filter(p => p.estado === 'pendiente').length;
     const inactivos = mayoristasData.filter(m => estadisticasContacto(m).alerta);
-    const totalAvisos = nuevos + inactivos.length;
+    const rendiciones = rendicionesParaHoy();
+    const totalAvisos = nuevos + inactivos.length + rendiciones.length;
 
     const badge = document.getElementById('badge-mayorista');
     badge.innerText = totalAvisos;
@@ -1510,6 +1569,15 @@ function renderAlertasInicio() {
         html += `<button onclick="irAMayorista('contactos')" class="w-full text-left bg-red-500 text-white rounded-2xl p-4 flex items-center gap-3 shadow-md active:scale-95 transition-all">
             <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><i class="fa-solid fa-bell"></i></div>
             <div class="flex-1 min-w-0"><p class="font-bold">${plural(inactivos.length, 'mayorista sin comprar', 'mayoristas sin comprar')}</p><p class="text-xs text-white/80 truncate">${escaparHtml(inactivos.map(m => m.nombre).join(', '))}</p></div>
+            <i class="fa-solid fa-chevron-right text-white/70"></i>
+        </button>`;
+    }
+    // consignaciones con la rendición para hoy o atrasada
+    if (rendiciones.length) {
+        const una = rendiciones.length === 1 ? rendiciones[0] : null;
+        html += `<button onclick="${una ? `verDetallePedido('${una.id}')` : `irAMayorista('pedidos')`}" class="w-full text-left bg-amber-500 text-white rounded-2xl p-4 flex items-center gap-3 shadow-md active:scale-95 transition-all">
+            <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><i class="fa-solid fa-handshake-angle"></i></div>
+            <div class="flex-1 min-w-0"><p class="font-bold truncate">${una ? `Rendición de ${escaparHtml(nombrePedido(una))}` : `${rendiciones.length} rendiciones de consignación`}</p><p class="text-xs text-white/90 truncate">${una ? `${textoRendicion(una)} · ${plural(cuentasConsignacion(una).afuera, 'unidad afuera', 'unidades afuera')}` : escaparHtml(rendiciones.map(nombrePedido).join(', '))}</p></div>
             <i class="fa-solid fa-chevron-right text-white/70"></i>
         </button>`;
     }
@@ -1728,7 +1796,11 @@ function renderDetallePedido() {
         ['Pedido recibido', p.timestamp],
         ['En preparación', p.fechaPreparacion],
         ['Listo', p.fechaListo],
-        [`Entregado y cobrado${p.metodo ? ' · ' + p.metodo : ''}`, p.fechaEntrega]
+        ...(esConsignacion(p)
+            ? [['Dejado en consignación', p.fechaConsignacion],
+               ...(p.rendiciones || []).map((r, i) => [`Rendición ${i + 1}: ${vendidasRendicion(r)} vendidas · ${formatearDinero(Number(r.monto) || 0)}${Number(r.monto) > 0 && r.metodo ? ' · ' + r.metodo : ''}`, r.fecha]),
+               ...(p.estado === 'rendido' ? [['Consignación rendida', p.fechaRendido]] : [])]
+            : [[`Entregado y cobrado${p.metodo ? ' · ' + p.metodo : ''}`, p.fechaEntrega]])
     ];
     if (p.estado === 'cancelado') pasos.push(['Cancelado', p.fechaCancelado]);
 
@@ -1754,7 +1826,10 @@ function renderDetallePedido() {
                 <button onclick="entregarPedido('${p.id}', 'Efectivo')" class="bg-green-500 text-white font-bold py-3.5 rounded-xl active:scale-95 transition-all"><i class="fa-solid fa-money-bill-wave mr-1.5"></i>Efectivo</button>
                 <button onclick="entregarPedido('${p.id}', 'Transferencia')" class="bg-green-500 text-white font-bold py-3.5 rounded-xl active:scale-95 transition-all"><i class="fa-solid fa-building-columns mr-1.5"></i>Transfer.</button>
             </div>
+            <button onclick="abrirDejarConsignacion('${p.id}')" class="w-full bg-amber-50 border border-amber-300 text-amber-700 font-bold py-3 rounded-xl text-sm active:bg-amber-100"><i class="fa-solid fa-handshake-angle mr-2"></i>Dejar en consignación (se cobra lo que venda)</button>
             <div class="grid grid-cols-2 gap-2">${btnSecundario(`enviarMensajePedido('${p.id}', 'listo')`, 'fa-rotate-right', 'Reenviar "listo"')}${btnSecundario(`cancelarPedido('${p.id}')`, 'fa-ban', 'Cancelar', 'text-red-500')}</div>`;
+    } else if (esConsignacion(p)) {
+        acciones = accionesConsignacion(p);
     }
 
     cont.innerHTML = `
@@ -1783,9 +1858,11 @@ function renderDetallePedido() {
                 <div class="flex justify-between text-gray-500"><span>Unidades</span><span class="font-bold">${p.unidades}</span></div>
                 <div class="flex justify-between text-gray-500"><span>Subtotal</span><span class="font-bold">${formatearDinero(p.subtotal)}</span></div>
                 ${p.descuento ? `<div class="flex justify-between text-violet-600"><span>Descuento ${p.descuento}%</span><span class="font-bold">-${formatearDinero(p.montoDescuento)}</span></div>` : ''}
-                <div class="flex justify-between items-center mt-1"><span class="font-bold text-gray-800">Total</span><span class="text-2xl font-black text-violet-700">${formatearDinero(p.total)}</span></div>
+                <div class="flex justify-between items-center mt-1"><span class="font-bold text-gray-800">${esConsignacion(p) ? 'Total dejado' : 'Total'}</span><span class="text-2xl font-black text-violet-700">${formatearDinero(p.total)}</span></div>
             </div>
         </div>
+
+        ${esConsignacion(p) ? panelConsignacion(p) : ''}
 
         ${p.notas ? `<div class="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-4 text-sm text-amber-900"><i class="fa-regular fa-note-sticky mr-1.5"></i>${escaparHtml(p.notas)}</div>` : ''}
 
@@ -1892,9 +1969,9 @@ function renderHistorialContacto() {
     }
 
     const porProducto = {};
-    pedidos.forEach(p => (p.items || []).forEach(it => { porProducto[it.nombre] = (porProducto[it.nombre] || 0) + Number(it.cantidad); }));
-    const unidades = pedidos.reduce((s, p) => s + (Number(p.unidades) || 0), 0);
-    const total = pedidos.reduce((s, p) => s + (Number(p.total) || 0), 0);
+    pedidos.forEach(p => itemsCompradosPedido(p).forEach(it => { porProducto[it.nombre] = (porProducto[it.nombre] || 0) + Number(it.cantidad); }));
+    const unidades = pedidos.reduce((s, p) => s + unidadesPedido(p), 0);
+    const total = pedidos.reduce((s, p) => s + montoPedido(p), 0);
 
     cont.innerHTML = `
         <p class="font-black text-gray-800 text-lg mb-3">${escaparHtml(nombre)}</p>
@@ -1912,7 +1989,7 @@ function renderHistorialContacto() {
                 <button onclick="verDetallePedido('${p.id}')" class="w-full text-left bg-white rounded-xl p-3 border border-gray-100 shadow-sm active:bg-gray-50">
                     <div class="flex justify-between items-center mb-1.5">
                         <span class="text-sm font-bold text-gray-800"><i class="fa-regular fa-calendar text-violet-500 mr-1"></i>${formatearFecha(p.timestamp)}</span>
-                        <span class="font-black text-violet-700">${formatearDinero(p.total)}</span>
+                        <span class="font-black text-violet-700">${formatearDinero(montoPedido(p))}</span>
                     </div>
                     <div class="flex justify-between items-end gap-2">
                         <div class="text-xs text-gray-500 leading-relaxed">${(p.items || []).map(it => `${it.cantidad} × ${escaparHtml(it.nombre)}`).join('<br>')}</div>
@@ -1995,6 +2072,378 @@ window.copiarLinkPedido = async function(id = null) {
     } catch {
         prompt('Copiá el link de pedidos:', link);
     }
+};
+
+// ---------- Mercadería en consignación (admin y empleado) ----------
+// Al entregar un pedido "listo" se puede dejar en consignación: no suma ingreso. En cada rendición se
+// cargan por producto las vendidas (se cobran), devueltas y perdidas (solo dato). Cuando no queda nada
+// afuera el pedido pasa a "rendido". La próxima rendición se avisa en Inicio el día que toca.
+const PLAZO_RENDICION_DIAS = 3;
+let consignacionEnEdicion = null;
+
+const fechaEnDias = (dias) => fechaAInput(sumarDias(dias));
+const consignacionesAbiertas = () => pedidosData.filter(p => p.estado === 'consignacion');
+const diasRendicion = (p) => p.proximaRendicion ? diasEntre(new Date(), inputAFecha(p.proximaRendicion)) : null;
+const rendicionesParaHoy = () => consignacionesAbiertas().filter(p => diasRendicion(p) !== null && diasRendicion(p) <= 0)
+    .sort((a, b) => diasRendicion(a) - diasRendicion(b));
+const textoRendicion = (p) => {
+    const d = diasRendicion(p);
+    if (d === null) return 'Sin fecha de rendición';
+    return d < 0 ? `Rendición atrasada ${plural(-d, 'día', 'días')}` : d === 0 ? 'Rendir hoy' : d === 1 ? 'Rendir mañana' : `Rendir en ${d} días`;
+};
+const chipRendicion = (p) => {
+    const d = diasRendicion(p);
+    const clases = d === null ? 'bg-gray-100 text-gray-500' : d < 0 ? 'bg-red-100 text-red-700' : d === 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600';
+    return `<span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${clases}"><i class="fa-regular fa-calendar mr-1"></i>${textoRendicion(p)}</span>`;
+};
+
+// sección arriba de los pedidos en Mayorista
+function htmlConsignacionesAbiertas() {
+    const abiertas = consignacionesAbiertas().sort((a, b) => (a.proximaRendicion || '9').localeCompare(b.proximaRendicion || '9'));
+    if (!abiertas.length) return '';
+    const valor = abiertas.reduce((s, p) => s + cuentasConsignacion(p).valorAfuera, 0);
+    return `
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-amber-200 mb-4 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>
+            <div class="flex justify-between items-center gap-2 mb-3">
+                <h3 class="font-bold text-gray-800 text-sm flex items-center gap-2"><i class="fa-solid fa-handshake-angle text-amber-500"></i> En consignación</h3>
+                <span class="text-[11px] font-black text-amber-700">${formatearDinero(valor)} afuera</span>
+            </div>
+            <div class="flex flex-col gap-2">${abiertas.map(p => {
+                const c = cuentasConsignacion(p);
+                return `
+                <button onclick="verDetallePedido('${p.id}')" class="w-full text-left bg-amber-50/60 rounded-xl p-3 border border-amber-100 active:bg-amber-100 transition-colors">
+                    <div class="flex justify-between items-start gap-2">
+                        <p class="font-bold text-gray-800 truncate min-w-0">${escaparHtml(nombrePedido(p))}</p>
+                        ${chipRendicion(p)}
+                    </div>
+                    <p class="text-[11px] text-gray-500 font-medium mt-1">${plural(c.afuera, 'unidad afuera', 'unidades afuera')} · ${formatearDinero(c.valorAfuera)} · dejado ${haceDias(p.fechaConsignacion)}${c.cobrado ? ` · cobrado ${formatearDinero(c.cobrado)}` : ''}</p>
+                </button>`;
+            }).join('')}</div>
+        </div>`;
+}
+
+// dato en Inicio: lo que está afuera no suma al balance hasta que se rinde
+function renderResumenConsignacion() {
+    const cont = document.getElementById('resumen-consignacion');
+    const abiertas = consignacionesAbiertas();
+    if (!abiertas.length) { cont.innerHTML = ''; cont.classList.add('hidden'); return; }
+    const cuentas = abiertas.map(cuentasConsignacion);
+    const valor = cuentas.reduce((s, c) => s + c.valorAfuera, 0);
+    const unidades = cuentas.reduce((s, c) => s + c.afuera, 0);
+    cont.innerHTML = `
+        <button onclick="irAMayorista('pedidos')" class="w-full text-left bg-white rounded-2xl shadow-sm p-4 border border-amber-200 flex items-center gap-3 active:bg-amber-50 transition-colors">
+            <div class="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><i class="fa-solid fa-handshake-angle text-sm"></i></div>
+            <div class="flex-1 min-w-0">
+                <p class="text-xs font-bold text-gray-500 uppercase">Mercadería en consignación</p>
+                <p class="text-[11px] text-gray-400 font-medium truncate">${plural(unidades, 'unidad', 'unidades')} en ${plural(abiertas.length, 'negocio', 'negocios')} · no suma al balance</p>
+            </div>
+            <p class="text-lg font-black text-amber-600 shrink-0">${formatearDinero(valor)}</p>
+        </button>`;
+    cont.classList.remove('hidden');
+}
+
+// ----- Detalle del pedido -----
+function panelConsignacion(p) {
+    const c = cuentasConsignacion(p);
+    const celda = (n, color = 'text-gray-700') => `<td class="py-1.5 text-center font-bold ${n ? color : 'text-gray-300'}">${n}</td>`;
+    return `
+        <div class="rounded-xl border border-amber-200 bg-amber-50/50 p-3 mb-4">
+            <div class="flex justify-between items-center gap-2 mb-2">
+                <p class="text-[10px] font-black text-amber-700 uppercase tracking-widest"><i class="fa-solid fa-handshake-angle mr-1"></i>Consignación</p>
+                ${p.estado === 'consignacion' ? chipRendicion(p) : ''}
+            </div>
+            <div class="overflow-x-auto -mx-1">
+                <table class="w-full text-xs">
+                    <thead><tr class="text-[9px] uppercase text-gray-400 tracking-wider">
+                        <th class="text-left font-bold py-1 px-1">Producto</th><th class="font-bold px-0.5" title="Dejadas">Dej.</th><th class="font-bold px-0.5 text-green-600" title="Vendidas">Vend.</th><th class="font-bold px-0.5 text-blue-600" title="Devueltas">Dev.</th><th class="font-bold px-0.5 text-red-500" title="Perdidas">Perd.</th><th class="font-bold px-0.5 text-amber-700" title="Siguen afuera">Afuera</th>
+                    </tr></thead>
+                    <tbody>${c.filas.map(f => `<tr class="border-t border-amber-100">
+                        <td class="py-1.5 px-1 text-gray-700 font-medium break-words">${escaparHtml(f.nombre)}</td>
+                        ${celda(f.dejadas)}${celda(f.vendidas, 'text-green-600')}${celda(f.devueltas, 'text-blue-600')}${celda(f.perdidas, 'text-red-500')}${celda(f.afuera, 'text-amber-700')}
+                    </tr>`).join('')}</tbody>
+                </table>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-3">
+                <div class="bg-white rounded-lg p-2 border border-amber-100"><p class="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Cobrado</p><p class="font-black text-green-600 text-sm">${formatearDinero(c.cobrado)}</p></div>
+                <div class="bg-white rounded-lg p-2 border border-amber-100"><p class="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Sigue afuera</p><p class="font-black text-amber-700 text-sm">${formatearDinero(c.valorAfuera)} <span class="text-[10px] text-gray-400">· ${c.afuera} u.</span></p></div>
+            </div>
+            ${c.perdidas ? `<p class="text-[11px] text-red-600 font-bold mt-2"><i class="fa-solid fa-circle-exclamation mr-1"></i>Se perdieron ${plural(c.perdidas, 'unidad', 'unidades')} (${formatearDinero(c.valorPerdido)}). Queda como dato, no resta del balance.</p>` : ''}
+        </div>`;
+}
+
+function accionesConsignacion(p) {
+    const boton = (onclick, icono, texto, color = 'text-gray-600') =>
+        `<button onclick="${onclick}" class="w-full bg-gray-50 border border-gray-100 ${color} font-bold py-3 rounded-xl text-sm active:bg-gray-100"><i class="${icono} mr-2"></i>${texto}</button>`;
+    const tieneRendiciones = (p.rendiciones || []).length > 0;
+    const deshacer = esAdmin && tieneRendiciones ? boton(`deshacerUltimaRendicion('${p.id}')`, 'fa-solid fa-rotate-left', 'Deshacer la última rendición', 'text-red-500') : '';
+    const resumen = boton(`enviarResumenConsignacion('${p.id}')`, 'fa-brands fa-whatsapp', 'Mandar resumen por WhatsApp', 'text-green-600');
+    if (p.estado === 'rendido') return `${resumen}${deshacer}`;
+    return `
+        <button onclick="abrirRendicion('${p.id}')" class="w-full bg-amber-500 text-white font-black py-4 rounded-2xl shadow-lg shadow-amber-200 active:scale-95 transition-all"><i class="fa-solid fa-scale-balanced mr-2"></i>Rendir</button>
+        ${resumen}
+        ${boton(`abrirCambiarRendicion('${p.id}')`, 'fa-regular fa-calendar', p.proximaRendicion ? `Próxima rendición: ${fechaCorta(p.proximaRendicion)} · Cambiar` : 'Poner fecha de rendición')}
+        ${tieneRendiciones ? deshacer : boton(`volverAListo('${p.id}')`, 'fa-solid fa-rotate-left', 'No la dejé: volver a "listo"', 'text-red-500')}`;
+}
+
+// ----- Ventana de consignación: dejar, rendir y cambiar la fecha -----
+const campoFechaRendicion = (valor) => `
+    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Próxima rendición</label>
+    <input type="date" id="consig-proxima" value="${valor || ''}" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-amber-500 focus:bg-white transition-all font-medium">
+    <p class="text-[11px] text-gray-400 font-medium mt-1.5"><i class="fa-regular fa-bell mr-1"></i>Ese día te avisa en Inicio. Dejalo vacío si no querés aviso.</p>`;
+
+function abrirVentanaConsignacion(modo, p, html) {
+    consignacionEnEdicion = { id: p.id, modo };
+    document.getElementById('consignacion-contenido').innerHTML = html;
+    abrirModal('modalConsignacion');
+}
+
+window.abrirDejarConsignacion = function(id) {
+    const p = pedidosData.find(x => x.id === id);
+    if (!p || p.estado !== 'listo') return;
+    abrirVentanaConsignacion('dejar', p, `
+        <h2 class="text-2xl font-black text-amber-600 mb-1">Dejar en consignación</h2>
+        <p class="text-sm font-bold text-gray-500 mb-4">${escaparHtml(nombrePedido(p))} · ${plural(Number(p.unidades) || 0, 'unidad', 'unidades')} · ${formatearDinero(p.total)}</p>
+        <form onsubmit="guardarConsignacion(event)">
+            <div class="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-5 text-xs text-amber-900 font-medium leading-relaxed">
+                <i class="fa-solid fa-circle-info mr-1"></i>No suma al balance ahora. Cuando rindas, lo vendido se cobra a estos precios (con su descuento) y entra ese día.
+            </div>
+            <div class="mb-6">${campoFechaRendicion(fechaEnDias(PLAZO_RENDICION_DIAS))}</div>
+            <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-amber-200 active:scale-95 transition-all">Dejar en consignación</button>
+        </form>`);
+};
+
+window.abrirCambiarRendicion = function(id) {
+    const p = pedidosData.find(x => x.id === id);
+    if (!p || p.estado !== 'consignacion') return;
+    abrirVentanaConsignacion('fecha', p, `
+        <h2 class="text-2xl font-black text-amber-600 mb-1">Fecha de rendición</h2>
+        <p class="text-sm font-bold text-gray-500 mb-4">${escaparHtml(nombrePedido(p))}</p>
+        <form onsubmit="guardarConsignacion(event)">
+            <div class="mb-6">${campoFechaRendicion(p.proximaRendicion || fechaEnDias(PLAZO_RENDICION_DIAS))}</div>
+            <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-amber-200 active:scale-95 transition-all">Guardar</button>
+        </form>`);
+};
+
+window.abrirRendicion = function(id) {
+    const p = pedidosData.find(x => x.id === id);
+    if (!p || p.estado !== 'consignacion') return;
+    const c = cuentasConsignacion(p);
+    const campo = (i, tipo, texto, color) => `
+        <div class="min-w-0">
+            <label class="block text-[9px] font-bold uppercase tracking-wider mb-1 ${color}">${texto}</label>
+            <input type="number" min="0" max="${c.filas[i].afuera}" step="1" inputmode="numeric" data-i="${i}" data-tipo="${tipo}" placeholder="0" class="rend-campo w-full bg-white border border-gray-200 rounded-lg px-2 py-2 outline-none focus:border-amber-500 font-bold text-center">
+        </div>`;
+    abrirVentanaConsignacion('rendir', p, `
+        <h2 class="text-2xl font-black text-amber-600 mb-1">Rendir</h2>
+        <p class="text-sm font-bold text-gray-500 mb-4">${escaparHtml(nombrePedido(p))} · dejado el ${formatearFecha(p.fechaConsignacion)} · ${plural(c.afuera, 'unidad afuera', 'unidades afuera')}</p>
+        <form onsubmit="guardarRendicion(event)" oninput="actualizarResumenRendicion()">
+            <div class="grid grid-cols-2 gap-2 mb-3">
+                <button type="button" onclick="completarRendicion('vendidas')" class="bg-green-50 border border-green-200 text-green-700 font-bold py-2 rounded-xl text-xs active:bg-green-100"><i class="fa-solid fa-check-double mr-1"></i>Vendió todo</button>
+                <button type="button" onclick="completarRendicion('devueltas')" class="bg-blue-50 border border-blue-200 text-blue-700 font-bold py-2 rounded-xl text-xs active:bg-blue-100"><i class="fa-solid fa-rotate-left mr-1"></i>Devolvió todo</button>
+            </div>
+            <div class="flex flex-col gap-2 mb-4">${c.filas.map((f, i) => f.afuera ? `
+                <div class="rend-fila rounded-xl border border-gray-200 bg-gray-50 p-3" data-i="${i}">
+                    <div class="flex justify-between items-center gap-2 mb-2">
+                        <p class="text-sm font-bold text-gray-800 break-words min-w-0">${escaparHtml(f.nombre)}</p>
+                        <span class="text-[11px] font-black text-amber-700 shrink-0">quedan ${f.afuera}</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">${campo(i, 'vendidas', 'Vendidas', 'text-green-600')}${campo(i, 'devueltas', 'Devueltas', 'text-blue-600')}${campo(i, 'perdidas', 'Perdidas', 'text-red-500')}</div>
+                </div>` : '').join('')}</div>
+
+            <p id="rend-resumen" class="text-sm font-bold text-gray-700 bg-amber-50 border border-amber-100 rounded-xl p-3 mb-4"></p>
+
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Fecha de la rendición</label>
+                <input type="date" id="rend-fecha" value="${fechaAInput(new Date())}" max="${fechaAInput(new Date())}" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-amber-500 focus:bg-white transition-all font-medium" required>
+            </div>
+
+            <div id="rend-campo-metodo" class="mb-4">
+                <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Cobrado con</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <button type="button" onclick="seleccionarMetodo('rendicion', 'Efectivo', this)" class="metodo-btn-rendicion border-2 border-green-500 bg-green-50 text-green-700 font-bold py-3 rounded-xl transition-all"><i class="fa-solid fa-money-bill-wave mr-2"></i>Efectivo</button>
+                    <button type="button" onclick="seleccionarMetodo('rendicion', 'Transferencia', this)" class="metodo-btn-rendicion border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-xl transition-all"><i class="fa-solid fa-building-columns mr-2"></i>Transfer.</button>
+                </div>
+                <input type="hidden" id="rendicion-metodo" value="Efectivo">
+            </div>
+
+            <div id="rend-campo-proxima" class="mb-6">${campoFechaRendicion(fechaEnDias(PLAZO_RENDICION_DIAS))}</div>
+
+            <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-amber-200 active:scale-95 transition-all">Guardar rendición</button>
+        </form>`);
+    actualizarResumenRendicion();
+};
+
+// lee lo cargado en "Rendir": cantidades por producto (mismo orden que p.items) y si alguna se pasa de lo que queda
+function leerRendicion(p) {
+    const c = cuentasConsignacion(p);
+    const cant = { vendidas: c.filas.map(() => 0), devueltas: c.filas.map(() => 0), perdidas: c.filas.map(() => 0) };
+    let invalido = false;
+    document.querySelectorAll('#consignacion-contenido .rend-campo').forEach(el => {
+        const n = el.value === '' ? 0 : Number(el.value);
+        if (!Number.isInteger(n) || n < 0) invalido = true;
+        cant[el.dataset.tipo][Number(el.dataset.i)] = Number.isInteger(n) && n > 0 ? n : 0;
+    });
+    const pasadas = c.filas.map((f, i) => cant.vendidas[i] + cant.devueltas[i] + cant.perdidas[i] > f.afuera);
+    const suma = (lista) => lista.reduce((s, n) => s + n, 0);
+    const movidas = suma(cant.vendidas) + suma(cant.devueltas) + suma(cant.perdidas);
+    return { c, cant, pasadas, invalido, movidas, quedan: c.afuera - movidas, monto: montoVendido(p, cant.vendidas), vendidas: suma(cant.vendidas) };
+}
+
+window.actualizarResumenRendicion = function() {
+    const p = pedidosData.find(x => x.id === consignacionEnEdicion?.id);
+    if (!p) return;
+    const r = leerRendicion(p);
+    document.querySelectorAll('#consignacion-contenido .rend-fila').forEach(fila => {
+        const pasada = r.pasadas[Number(fila.dataset.i)];
+        fila.classList.toggle('border-red-400', pasada);
+        fila.classList.toggle('bg-red-50', pasada);
+    });
+    const el = document.getElementById('rend-resumen');
+    if (r.invalido) el.innerHTML = '<span class="text-red-600">Usá números enteros, sin negativos.</span>';
+    else if (r.pasadas.some(Boolean)) el.innerHTML = '<span class="text-red-600">En algún producto cargaste más de lo que queda afuera.</span>';
+    else if (!r.movidas) el.innerText = 'Cargá cuántas vendió, devolvió o se perdieron.';
+    else el.innerHTML = `Cobrás <span class="text-green-600 font-black">${formatearDinero(r.monto)}</span> por ${plural(r.vendidas, 'unidad vendida', 'unidades vendidas')}. `
+        + (r.quedan > 0 ? `Quedan <span class="text-amber-700 font-black">${plural(r.quedan, 'unidad', 'unidades')}</span> afuera.` : 'No queda nada afuera: la consignación se cierra.');
+    document.getElementById('rend-campo-metodo').classList.toggle('hidden', !(r.monto > 0));
+    document.getElementById('rend-campo-proxima').classList.toggle('hidden', r.quedan <= 0 && r.movidas > 0);
+};
+
+// "Vendió todo" / "Devolvió todo": completa con lo que falta en cada producto
+window.completarRendicion = function(tipo) {
+    const p = pedidosData.find(x => x.id === consignacionEnEdicion?.id);
+    if (!p) return;
+    const c = cuentasConsignacion(p);
+    document.querySelectorAll('#consignacion-contenido .rend-campo').forEach(el => {
+        el.value = el.dataset.tipo === tipo ? (c.filas[Number(el.dataset.i)].afuera || '') : '';
+    });
+    actualizarResumenRendicion();
+};
+
+window.guardarConsignacion = async function(e) {
+    e.preventDefault();
+    if (!consignacionEnEdicion) return;
+    await conBotonBloqueado(e, async () => {
+        const { id, modo } = consignacionEnEdicion;
+        const p = pedidosData.find(x => x.id === id);
+        const proxima = document.getElementById('consig-proxima').value || null;
+        try {
+            if (modo === 'dejar') {
+                if (!p || p.estado !== 'listo') { mostrarAviso('El pedido ya no está listo para entregar.', 'error'); return; }
+                await actualizarDoc(documento('pedidos', id), { estado: 'consignacion', fechaConsignacion: new Date(), proximaRendicion: proxima, rendiciones: [] });
+                cerrarModal('modalConsignacion');
+                mostrarAviso('Quedó en consignación. No suma al balance hasta que rindas.', 'ok');
+            } else {
+                if (!p || p.estado !== 'consignacion') { mostrarAviso('Esa consignación ya no está abierta.', 'error'); return; }
+                await actualizarDoc(documento('pedidos', id), { proximaRendicion: proxima });
+                cerrarModal('modalConsignacion');
+                mostrarAviso(proxima ? 'Fecha de rendición guardada.' : 'Sin fecha de rendición: no te va a avisar.', 'ok');
+            }
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
+        }
+    });
+};
+
+window.guardarRendicion = async function(e) {
+    e.preventDefault();
+    if (consignacionEnEdicion?.modo !== 'rendir') return;
+    await conBotonBloqueado(e, async () => {
+        const p = pedidosData.find(x => x.id === consignacionEnEdicion.id);
+        if (!p || p.estado !== 'consignacion') { mostrarAviso('Esa consignación ya no está abierta.', 'error'); return; }
+        const r = leerRendicion(p);
+        const fecha = document.getElementById('rend-fecha').value;
+        if (r.invalido) { mostrarAviso('Usá números enteros, sin negativos.', 'error'); return; }
+        if (r.pasadas.some(Boolean)) { mostrarAviso('En algún producto cargaste más de lo que queda afuera.', 'error'); return; }
+        if (!r.movidas) { mostrarAviso('Cargá cuántas vendió, devolvió o se perdieron.', 'error'); return; }
+        if (!fecha || fecha > fechaAInput(new Date())) { mostrarAviso('Elegí la fecha de la rendición (no puede ser futura).', 'error'); return; }
+
+        const nueva = {
+            fecha: fechaElegida(fecha),
+            items: (p.items || []).map((_, i) => ({ vendidas: r.cant.vendidas[i], devueltas: r.cant.devueltas[i], perdidas: r.cant.perdidas[i] })),
+            monto: r.monto,
+            metodo: r.monto > 0 ? document.getElementById('rendicion-metodo').value : null,
+            unidades: r.vendidas
+        };
+        const cerrada = r.quedan <= 0;
+        try {
+            await actualizarDoc(documento('pedidos', p.id), {
+                rendiciones: [...(p.rendiciones || []), nueva],
+                estado: cerrada ? 'rendido' : 'consignacion',
+                proximaRendicion: cerrada ? null : (document.getElementById('consig-proxima').value || null),
+                fechaRendido: cerrada ? new Date() : null
+            });
+            cerrarModal('modalConsignacion');
+            mostrarAviso(r.monto > 0 ? `Rendición guardada. Entraron ${formatearDinero(r.monto)} al balance.` : 'Rendición guardada.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
+        }
+    });
+};
+
+window.volverAListo = async function(id) {
+    const p = pedidosData.find(x => x.id === id);
+    if (!p || p.estado !== 'consignacion' || (p.rendiciones || []).length) return;
+    if (!confirm('¿Volver el pedido a "listo"? Queda como si no lo hubieras dejado en consignación.')) return;
+    try {
+        await actualizarDoc(documento('pedidos', id), { estado: 'listo', fechaConsignacion: null, proximaRendicion: null, rendiciones: [] });
+        mostrarAviso('El pedido volvió a "listo".', 'ok');
+    } catch (error) {
+        console.error(error);
+        mostrarAviso('No se pudo actualizar. Probá de nuevo.', 'error');
+    }
+};
+
+// solo el admin: saca la última rendición (y lo que se había cobrado en ella)
+window.deshacerUltimaRendicion = async function(id) {
+    const p = pedidosData.find(x => x.id === id);
+    const rendiciones = p?.rendiciones || [];
+    if (!esAdmin || !esConsignacion(p) || !rendiciones.length) return;
+    const ultima = rendiciones[rendiciones.length - 1];
+    if (!confirm(`¿Deshacer la rendición del ${formatearFecha(ultima.fecha)}?${Number(ultima.monto) > 0 ? `\nSe saca del balance lo cobrado: ${formatearDinero(Number(ultima.monto))}.` : ''}\nEsas unidades vuelven a figurar afuera.`)) return;
+    try {
+        await actualizarDoc(documento('pedidos', id), {
+            rendiciones: rendiciones.slice(0, -1),
+            estado: 'consignacion',
+            proximaRendicion: p.proximaRendicion || fechaAInput(new Date()),
+            fechaRendido: null
+        });
+        mostrarAviso('Rendición deshecha.', 'ok');
+    } catch (error) {
+        console.error(error);
+        mostrarAviso('No se pudo deshacer. Probá de nuevo.', 'error');
+    }
+};
+
+const mensajeConsignacion = (p) => {
+    const c = cuentasConsignacion(p);
+    const lineas = [
+        `¡Hola ${nombrePedido(p)}! 🥪 Te pasamos el resumen de la mercadería en consignación de Pipón:`,
+        '',
+        `• Dejamos: ${c.dejadas} u. (${formatearFecha(p.fechaConsignacion)})`,
+        `• Vendiste: ${c.vendidas} u. · ${formatearDinero(c.cobrado)}`
+    ];
+    if (c.devueltas) lineas.push(`• Devolviste: ${c.devueltas} u.`);
+    if (c.perdidas) lineas.push(`• Se perdieron: ${c.perdidas} u.`);
+    lineas.push('');
+    if (c.afuera) {
+        lineas.push('Quedan en tu negocio:', ...c.filas.filter(f => f.afuera).map(f => `• ${f.afuera} x ${f.nombre}`));
+        if (p.proximaRendicion) lineas.push('', `Próxima rendición: ${fechaCorta(p.proximaRendicion)}`);
+    } else {
+        lineas.push('Ya no queda mercadería nuestra en tu negocio.');
+    }
+    lineas.push('', '¡Gracias por elegir Pipón!');
+    return lineas.join('\n');
+};
+
+window.enviarResumenConsignacion = function(id) {
+    const p = pedidosData.find(x => x.id === id);
+    if (!p) return;
+    const url = linkWhatsApp(telefonoPedido(p), mensajeConsignacion(p));
+    if (!url) { mostrarAviso('El contacto no tiene WhatsApp cargado.', 'error'); return; }
+    window.open(url, '_blank');
 };
 
 // ---------- Préstamos y cuotas (solo admin) ----------
@@ -3868,7 +4317,7 @@ const filaPedidoProspecto = (p) => {
         <button onclick="abrirFichaProspecto('${p.id}')" class="w-full text-left">
             <div class="flex justify-between items-start gap-2">
                 <p class="font-bold text-gray-800 truncate min-w-0">${escaparHtml(p.nombre)}</p>
-                <span class="text-[11px] font-black shrink-0 text-green-700">${formatearDinero(Number(ultimo.total) || 0)}</span>
+                <span class="text-[11px] font-black shrink-0 text-green-700">${formatearDinero(montoPedido(ultimo))}</span>
             </div>
             <p class="text-xs text-gray-500 font-medium mt-0.5">${pedidos.length === 1 ? 'Hizo un pedido' : `Hizo ${pedidos.length} pedidos`} · el último el ${formatearFecha(ultimo.timestamp)}</p>
         </button>
@@ -4087,7 +4536,7 @@ function renderFichaProspecto() {
     const pedidos = pedidosDeProspecto(p);
     const avisoPedido = pedidos.length ? `<div class="rounded-xl border border-green-200 bg-green-50 p-3 mb-4 text-green-800">
             <p class="text-[10px] uppercase font-black tracking-widest opacity-70"><i class="fa-solid fa-cart-shopping mr-1"></i>${pedidos.length === 1 ? 'Hizo un pedido' : `Hizo ${pedidos.length} pedidos`}</p>
-            <p class="font-black">${formatearFecha(pedidos[0].timestamp)} · ${formatearDinero(Number(pedidos[0].total) || 0)}</p>
+            <p class="font-black">${formatearFecha(pedidos[0].timestamp)} · ${formatearDinero(montoPedido(pedidos[0]))}</p>
             <p class="text-xs font-medium mt-0.5">Llegó con su mismo WhatsApp. Pasalo a cliente para que quede vinculado.</p>
         </div>` : '';
     const avisoPrimerPedido = sinPrimerPedido(p) ? `<div class="rounded-xl border border-violet-200 bg-violet-50 p-3 mb-4 text-violet-800 text-sm font-medium"><i class="fa-solid fa-hourglass-half mr-1"></i>Es cliente hace ${plural(diasEntre(aFecha(p.fechaConversion), new Date()), 'día', 'días')} y todavía no hizo su primer pedido.</div>` : '';
@@ -4891,7 +5340,7 @@ function renderResultadosCrm() {
     const idsClientesCrm = new Set(delCrm.filter(p => p.etapa === 'cliente' && p.mayoristaId).map(p => p.mayoristaId));
     const pedidosPeriodo = pedidosData.filter(x => x.estado !== 'cancelado' && enPeriodo(x.timestamp, rango));
     const pedidosCrm = pedidosPeriodo.filter(x => idsClientesCrm.has(contactoDePedido(x)?.id));
-    const suma = (lista) => lista.reduce((s, x) => s + (Number(x.total) || 0), 0);
+    const suma = (lista) => lista.reduce((s, x) => s + montoPedido(x), 0);
     const montoCrm = suma(pedidosCrm);
     const montoMayorista = suma(pedidosPeriodo);
     const ranking = new Map();
@@ -4899,7 +5348,7 @@ function renderResultadosCrm() {
         const id = contactoDePedido(x).id;
         const r = ranking.get(id) || { nombre: nombrePedido(x), pedidos: 0, monto: 0 };
         r.pedidos++;
-        r.monto += Number(x.total) || 0;
+        r.monto += montoPedido(x);
         ranking.set(id, r);
     });
     const top = [...ranking.values()].sort((a, b) => b.monto - a.monto).slice(0, 5);
@@ -4944,6 +5393,7 @@ function refrescarTodo() {
     renderSubPestanasGastos();
     renderAlertasPrestamos();
     if (prestamoAbierto) renderDetallePrestamo();
+    renderResumenConsignacion();
 }
 
 const usuarioAEmail = (usuario) => {
