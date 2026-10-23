@@ -99,6 +99,7 @@
 
             <div id="alertas-mayorista" class="hidden flex-col gap-3 mb-6"></div>
             <div id="alertas-crm" class="hidden flex-col gap-3 mb-6"></div>
+            <div id="alertas-prestamos" class="hidden flex-col gap-3 mb-6"></div>
 
             <h3 class="font-bold text-pipon-brown mb-3 px-1">Resumen rápido</h3>
             <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 text-center">
@@ -118,13 +119,22 @@
         </div>
 
         <div id="content-gastos" class="tab-content hidden">
-            <div class="flex justify-between items-end mb-4 px-1">
-                <h2 class="text-xl font-bold text-pipon-brown">Gastos de Hoy</h2>
-                <span class="text-sm font-bold text-red-600 bg-red-100 px-3 py-1 rounded-full" id="total-gastos-hoy-badge">Total: $0</span>
+            <!-- solapas: los préstamos y cuotas los ve solo el admin -->
+            <div class="solo-admin hidden mb-4">
+                <div id="subtabs-gastos" class="grid grid-cols-2 gap-1 bg-white p-1 rounded-2xl shadow-sm border border-gray-100 w-full"></div>
             </div>
-            <div id="lista-gastos" class="flex flex-col gap-3 pb-8">
-                <p class="text-center text-gray-500 mt-10">Cargando gastos...</p>
+
+            <div id="gastos-hoy">
+                <div class="flex justify-between items-end mb-4 px-1">
+                    <h2 class="text-xl font-bold text-pipon-brown">Gastos de Hoy</h2>
+                    <span class="text-sm font-bold text-red-600 bg-red-100 px-3 py-1 rounded-full" id="total-gastos-hoy-badge">Total: $0</span>
+                </div>
+                <div id="lista-gastos" class="flex flex-col gap-3 pb-8">
+                    <p class="text-center text-gray-500 mt-10">Cargando gastos...</p>
+                </div>
             </div>
+
+            <div id="gastos-prestamos" class="hidden"></div>
         </div>
 
         <div id="content-proveedores" class="tab-content hidden">
@@ -471,7 +481,7 @@
             <button onclick="cambiarPestana('mayorista')" id="nav-mayorista" class="nav-btn relative flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-boxes-stacked text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Mayorista</span><span id="badge-mayorista" class="hidden absolute top-0 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black items-center justify-center"></span></button>
             <button onclick="cambiarPestana('crm')" id="nav-crm" class="nav-btn solo-admin hidden relative flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-briefcase text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">CRM</span><span id="badge-crm" class="hidden absolute top-0 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black items-center justify-center"></span></button>
             <button onclick="cambiarPestana('catalogo')" id="nav-catalogo" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-book-open text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Catálogo</span></button>
-            <button onclick="cambiarPestana('gastos')" id="nav-gastos" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-receipt text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Gastos</span></button>
+            <button onclick="cambiarPestana('gastos')" id="nav-gastos" class="nav-btn relative flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-receipt text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Gastos</span><span id="badge-gastos" class="hidden absolute top-0 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black items-center justify-center"></span></button>
             <button onclick="cambiarPestana('proveedores')" id="nav-proveedores" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-address-book text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Agenda</span></button>
             <button onclick="cambiarPestana('historial')" id="nav-historial" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-calendar-days text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Historial</span></button>
             <button onclick="cambiarPestana('balances')" id="nav-balances" class="nav-btn flex flex-col items-center justify-center py-2 text-gray-400 transition-colors rounded-xl"><i class="fa-solid fa-chart-line text-lg mb-1"></i><span class="text-[8.5px] font-bold tracking-tight">Balances</span></button>
@@ -886,6 +896,129 @@
                     <button type="button" onclick="confirmarEliminarTransaccion('gasto')" class="solo-admin hidden w-14 bg-red-50 text-red-500 rounded-2xl items-center justify-center text-lg active:bg-red-100 transition-colors" aria-label="Eliminar gasto"><i class="fa-solid fa-trash"></i></button>
                     <button type="submit" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-red-200 active:scale-95 transition-all">Guardar Cambios</button>
                 </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Préstamos y cuotas (solo admin) -->
+    <div id="modalPrestamo" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="titulo-modal-prestamo" class="text-2xl font-black text-amber-600">Nuevo préstamo</h2>
+                <button type="button" onclick="cerrarModal('modalPrestamo')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="form-prestamo" onsubmit="guardarPrestamo(event)" oninput="renderVistaPreviaPrestamo()">
+                <input type="hidden" id="prestamo-id">
+
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿Qué es?</label>
+                    <select id="prestamo-tipo" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-amber-500 focus:bg-white transition-all font-bold text-gray-700 appearance-none"></select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Nombre</label>
+                    <input type="text" id="prestamo-nombre" maxlength="60" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-amber-500 focus:bg-white transition-all font-medium" placeholder="Ej: Préstamo Banco Nación, Heladera en cuotas" required>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">¿A quién se le paga? <span class="normal-case font-semibold tracking-normal">(opcional)</span></label>
+                    <input type="text" id="prestamo-acreedor" maxlength="60" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-amber-500 focus:bg-white transition-all font-medium" placeholder="Ej: Banco Nación, Tarjeta Naranja">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="min-w-0">
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Fecha</label>
+                        <input type="date" id="prestamo-fecha" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-amber-500 focus:bg-white transition-all font-medium" required>
+                    </div>
+                    <div class="min-w-0">
+                        <label id="label-prestamo-monto" class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Monto recibido</label>
+                        <input type="number" id="prestamo-monto" min="0" step="0.01" inputmode="decimal" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-amber-500 focus:bg-white transition-all font-medium" placeholder="Opcional">
+                    </div>
+                </div>
+
+                <!-- el calendario de cuotas se arma al crear; después cada cuota se edita desde el detalle -->
+                <div id="prestamo-campos-cuotas" class="bg-amber-50/60 border border-amber-100 rounded-2xl p-4 mb-4">
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div class="min-w-0">
+                            <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Cuotas</label>
+                            <input type="number" id="prestamo-cuotas" min="1" max="120" step="1" inputmode="numeric" class="w-full bg-white border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-amber-500 transition-all font-medium" placeholder="Ej: 12">
+                        </div>
+                        <div class="min-w-0">
+                            <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Valor cuota</label>
+                            <input type="number" id="prestamo-monto-cuota" min="1" step="0.01" inputmode="decimal" class="w-full bg-white border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-amber-500 transition-all font-medium" placeholder="$">
+                        </div>
+                    </div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Vence la primera cuota</label>
+                    <input type="date" id="prestamo-primer-vencimiento" class="w-full bg-white border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-amber-500 transition-all font-medium">
+                    <p id="prestamo-vista-previa" class="text-xs font-bold text-amber-800 mt-3"></p>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Avisarme antes de cada vencimiento</label>
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="prestamo-aviso" min="0" max="60" step="1" inputmode="numeric" class="w-24 bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-amber-500 focus:bg-white transition-all font-bold text-center" required>
+                        <span class="text-sm font-bold text-gray-500">días antes</span>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Notas <span class="normal-case font-semibold tracking-normal">(opcional)</span></label>
+                    <textarea id="prestamo-notas" rows="2" maxlength="500" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-amber-500 focus:bg-white transition-all font-medium" placeholder="Ej: tasa, débito automático, número de cuenta"></textarea>
+                </div>
+
+                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-amber-200 active:scale-95 transition-all">Guardar</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalPrestamoDetalle" class="fixed inset-0 z-50 hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-5">
+                <h2 class="text-2xl font-black text-amber-600">Detalle</h2>
+                <button onclick="cerrarModal('modalPrestamoDetalle')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="prestamo-detalle-contenido"></div>
+        </div>
+    </div>
+
+    <!-- pagar o editar una cuota: va encima del detalle -->
+    <div id="modalCuota" class="fixed inset-0 z-[55] hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm">
+        <div class="bg-white w-full rounded-t-3xl p-5 pb-8 modal-enter shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-5">
+                <h2 id="titulo-modal-cuota" class="text-2xl font-black text-amber-600">Cuota</h2>
+                <button type="button" onclick="cerrarModal('modalCuota')" class="w-8 h-8 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-cuota" onsubmit="guardarCuota(event)">
+                <p id="cuota-subtitulo" class="text-sm font-bold text-gray-500 mb-5"></p>
+
+                <div class="mb-5 text-center">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Monto</label>
+                    <div class="flex justify-center items-center gap-1 text-4xl font-black text-gray-800">
+                        <span class="text-2xl text-gray-400">$</span>
+                        <input type="number" id="cuota-monto" class="w-56 max-w-[80%] bg-transparent outline-none text-center p-0 border-b-2 border-dashed border-gray-300 focus:border-amber-500 transition-colors" required min="1" step="0.01" inputmode="decimal">
+                    </div>
+                </div>
+
+                <div class="mb-5">
+                    <label id="label-cuota-fecha" class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Fecha</label>
+                    <input type="date" id="cuota-fecha" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-amber-500 focus:bg-white transition-all font-medium" required>
+                </div>
+
+                <div id="cuota-campo-metodo" class="mb-6">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Pagado con</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button type="button" onclick="seleccionarMetodo('cuota', 'Efectivo', this)" class="metodo-btn-cuota border-2 border-red-500 bg-red-50 text-red-700 font-bold py-3 rounded-xl transition-all"><i class="fa-solid fa-money-bill-wave mr-2"></i>Caja/Efectivo</button>
+                        <button type="button" onclick="seleccionarMetodo('cuota', 'Transferencia', this)" class="metodo-btn-cuota border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-xl transition-all"><i class="fa-solid fa-building-columns mr-2"></i>Cuenta/Transf.</button>
+                    </div>
+                    <input type="hidden" id="cuota-metodo" value="Efectivo">
+                    <p class="text-[11px] text-gray-400 font-medium mt-3"><i class="fa-solid fa-circle-info mr-1"></i>Se registra como gasto de ese día.</p>
+                </div>
+
+                <button id="cuota-boton" type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-amber-200 active:scale-95 transition-all">Guardar</button>
             </form>
         </div>
     </div>

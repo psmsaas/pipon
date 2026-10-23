@@ -113,7 +113,8 @@ const esMesPasado = (timestamp) => {
 };
 
 // los gastos se asocian al proveedor por nombre; si no tiene o el proveedor ya no existe, queda "sin especificar"
-const esHuerfano = (g) => !g.proveedor || !proveedoresData.some(p => p.nombre === g.proveedor);
+// los pagos de cuotas de préstamos no tienen proveedor y no cuentan como "falta asignar"
+const esHuerfano = (g) => !g.prestamoId && (!g.proveedor || !proveedoresData.some(p => p.nombre === g.proveedor));
 
 // bloquea el botón mientras se guarda, así un doble toque no duplica el registro
 async function conBotonBloqueado(e, tarea) {
@@ -267,7 +268,9 @@ function renderGastos() {
     `).join('');
 }
 
-const chipProveedor = (g) => `<span class="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold whitespace-nowrap"><i class="fa-solid fa-truck"></i> ${escaparHtml(esHuerfano(g) ? 'Sin especificar' : g.proveedor)}</span>`;
+const chipProveedor = (g) => g.prestamoId
+    ? `<span class="text-[9px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-bold whitespace-nowrap"><i class="fa-solid fa-hand-holding-dollar"></i> Cuota</span>`
+    : `<span class="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold whitespace-nowrap"><i class="fa-solid fa-truck"></i> ${escaparHtml(esHuerfano(g) ? 'Sin especificar' : g.proveedor)}</span>`;
 
 function renderProveedores() {
     const listEl = document.getElementById('lista-proveedores');
@@ -648,7 +651,7 @@ function actualizarDetalleBalances() {
 
     const estadisticasProv = {};
     gastosMes.forEach(g => {
-        const nombre = esHuerfano(g) ? 'Sin especificar' : g.proveedor;
+        const nombre = g.prestamoId ? 'Préstamos y cuotas' : esHuerfano(g) ? 'Sin especificar' : g.proveedor;
         const stat = estadisticasProv[nombre] ||= { cantidad: 0, gastado: 0 };
         stat.cantidad += 1;
         stat.gastado += Number(g.monto);
@@ -663,10 +666,11 @@ function actualizarDetalleBalances() {
     } else {
         listProvEl.innerHTML = rankingGastos.map(prov => {
             const sinEspecificar = prov.nombre === 'Sin especificar';
+            const cuotas = prov.nombre === 'Préstamos y cuotas';
             return `
             <div class="flex justify-between items-center bg-gray-50 rounded-xl p-3 border border-gray-100">
                 <div class="flex items-center gap-3">
-                    <span class="w-6 h-6 rounded-full ${sinEspecificar ? 'bg-gray-200 text-gray-500' : 'bg-blue-50 text-blue-500'} flex items-center justify-center shrink-0"><i class="fa-solid ${sinEspecificar ? 'fa-tag' : 'fa-truck'} text-[9px]"></i></span>
+                    <span class="w-6 h-6 rounded-full ${sinEspecificar ? 'bg-gray-200 text-gray-500' : cuotas ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-500'} flex items-center justify-center shrink-0"><i class="fa-solid ${sinEspecificar ? 'fa-tag' : cuotas ? 'fa-hand-holding-dollar' : 'fa-truck'} text-[9px]"></i></span>
                     <div>
                         <p class="font-bold text-gray-800 text-sm leading-tight">${escaparHtml(prov.nombre)}</p>
                         <p class="text-[11px] text-gray-500 font-medium">${plural(prov.cantidad, 'movimiento', 'movimientos')}</p>
@@ -717,6 +721,9 @@ window.cambiarPestana = function(pestana) {
     }
     if (pestana === 'proveedores') {
         renderProveedores();
+    }
+    if (pestana === 'gastos') {
+        renderSubPestanasGastos();
     }
     if (pestana === 'crm') {
         renderCrm();
@@ -808,6 +815,12 @@ window.cerrarModal = function(modalId) {
     if(modalId === 'modalContacto') document.getElementById('form-contacto').reset();
     if(modalId === 'modalPedidoDetalle') pedidoDetalleAbierto = null;
     if(modalId === 'modalHistorialContacto') historialContactoAbierto = null;
+    if(modalId === 'modalPrestamo') document.getElementById('form-prestamo').reset();
+    if(modalId === 'modalPrestamoDetalle') prestamoAbierto = null;
+    if(modalId === 'modalCuota') {
+        document.getElementById('form-cuota').reset();
+        cuotaEnEdicion = null;
+    }
 };
 
 window.seleccionarMetodo = function(tipo, metodo, elementoBtn) {
@@ -1983,6 +1996,599 @@ window.copiarLinkPedido = async function(id = null) {
         prompt('Copiá el link de pedidos:', link);
     }
 };
+
+// ---------- Préstamos y cuotas (solo admin) ----------
+// Una cuota figura pagada mientras exista su gasto (prestamoId + número de cuota): pagar es una sola
+// escritura, y si ese gasto va a la papelera la cuota vuelve a quedar pendiente sola.
+// Las fechas de las cuotas se guardan como texto 'AAAA-MM-DD' para que el huso horario no las corra.
+const TIPOS_PRESTAMO = {
+    prestamo:  { texto: 'Préstamo',                   icono: 'fa-hand-holding-dollar', monto: 'Monto recibido' },
+    compra:    { texto: 'Compra en cuotas',           icono: 'fa-cart-shopping',       monto: 'Precio total' },
+    proveedor: { texto: 'Pago en cuotas a proveedor', icono: 'fa-truck',               monto: 'Monto total' },
+    otro:      { texto: 'Otro',                       icono: 'fa-file-invoice-dollar', monto: 'Monto total' }
+};
+const AVISO_PRESTAMO_DIAS = 7;
+const MAX_CUOTAS = 120;
+let prestamosData = [];
+let estadoPrestamos = 'cargando';
+let subPestanaGastos = 'hoy';
+let prestamoAbierto = null;
+let cuotaEnEdicion = null;
+
+const tipoPrestamo = (p) => TIPOS_PRESTAMO[p.tipo] || TIPOS_PRESTAMO.otro;
+// suma meses manteniendo el día; si ese mes no lo tiene (un 31 en noviembre) cae el último día del mes
+const sumarMeses = (valor, meses) => {
+    const [anio, mes, dia] = valor.split('-').map(Number);
+    const ultimoDia = new Date(anio, mes + meses, 0).getDate();
+    return fechaAInput(new Date(anio, mes - 1 + meses, Math.min(dia, ultimoDia), 12));
+};
+const diaSiguiente = (valor) => {
+    const d = inputAFecha(valor);
+    d.setDate(d.getDate() + 1);
+    return fechaAInput(d);
+};
+const armarCuotas = (cantidad, monto, primerVencimiento) =>
+    Array.from({ length: cantidad }, (_, i) => ({ numero: i + 1, vence: sumarMeses(primerVencimiento, i), monto }));
+const pagosDeCuota = (p, numero) => gastosData.filter(g => g.prestamoId === p.id && Number(g.cuota) === numero);
+const avisoDe = (p) => p.avisoDias === null || p.avisoDias === undefined || p.avisoDias === '' || !Number.isFinite(Number(p.avisoDias))
+    ? AVISO_PRESTAMO_DIAS : Number(p.avisoDias);
+
+function estadoPrestamo(p) {
+    const hoy = new Date();
+    const aviso = avisoDe(p);
+    const cuotas = [...(p.cuotas || [])].sort((a, b) => a.numero - b.numero).map(c => {
+        const pagos = pagosDeCuota(p, c.numero);
+        const dias = diasEntre(hoy, inputAFecha(c.vence));
+        const estado = pagos.length ? 'pagada' : dias < 0 ? 'vencida' : dias <= aviso ? 'proxima' : 'futura';
+        return { ...c, monto: Number(c.monto) || 0, pagos, pagado: pagos.reduce((s, g) => s + Number(g.monto), 0), dias, estado };
+    });
+    const pendientes = cuotas.filter(c => c.estado !== 'pagada').sort((a, b) => a.vence.localeCompare(b.vence));
+    const pagado = cuotas.reduce((s, c) => s + c.pagado, 0);
+    const saldo = pendientes.reduce((s, c) => s + c.monto, 0);
+    return {
+        cuotas, aviso, pagado, saldo,
+        total: pagado + saldo,
+        pagadas: cuotas.length - pendientes.length,
+        proxima: pendientes[0] || null,
+        avisos: pendientes.filter(c => c.estado === 'vencida' || c.estado === 'proxima'),
+        terminado: cuotas.length > 0 && !pendientes.length
+    };
+}
+
+const avisosPrestamos = () => prestamosData
+    .flatMap(p => {
+        const est = estadoPrestamo(p);
+        return est.avisos.map(c => ({ p, c, de: est.cuotas.length }));
+    })
+    .sort((a, b) => a.c.dias - b.c.dias);
+
+const textoVencimiento = (c) => c.dias < 0 ? `Venció hace ${plural(-c.dias, 'día', 'días')}`
+    : c.dias === 0 ? 'Vence hoy' : c.dias === 1 ? 'Vence mañana' : `Vence en ${c.dias} días`;
+const fechaCorta = (valor) => inputAFecha(valor).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+const COLORES_CUOTA = {
+    vencida: 'bg-red-100 text-red-700',
+    proxima: 'bg-amber-100 text-amber-700',
+    futura:  'bg-gray-100 text-gray-500',
+    pagada:  'bg-green-100 text-green-700'
+};
+const chipCuota = (c) => `<span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${COLORES_CUOTA[c.estado]}">${c.estado === 'pagada' ? '<i class="fa-solid fa-check mr-1"></i>Pagada' : textoVencimiento(c)}</span>`;
+
+window.cambiarSubPestanaGastos = function(sub) {
+    subPestanaGastos = sub;
+    renderSubPestanasGastos();
+};
+
+function renderSubPestanasGastos() {
+    const sub = esAdmin ? subPestanaGastos : 'hoy';
+    document.getElementById('gastos-hoy').classList.toggle('hidden', sub !== 'hoy');
+    document.getElementById('gastos-prestamos').classList.toggle('hidden', sub !== 'prestamos');
+    if (!esAdmin) return;
+
+    const avisos = avisosPrestamos().length;
+    const subtabs = [
+        { id: 'hoy', texto: 'Gastos', icono: 'fa-receipt', badge: 0 },
+        { id: 'prestamos', texto: 'Préstamos y cuotas', icono: 'fa-hand-holding-dollar', badge: avisos }
+    ];
+    document.getElementById('subtabs-gastos').innerHTML = subtabs.map(s => {
+        const activa = sub === s.id;
+        const badge = s.badge ? `<span class="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] flex items-center justify-center ${activa ? 'bg-white text-amber-700' : 'bg-red-500 text-white'}">${s.badge}</span>` : '';
+        return `<button onclick="cambiarSubPestanaGastos('${s.id}')" class="py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${activa ? 'bg-amber-500 text-white shadow-sm' : 'text-gray-500'}"><i class="fa-solid ${s.icono}"></i>${s.texto}${badge}</button>`;
+    }).join('');
+    if (sub === 'prestamos') renderPrestamos();
+}
+
+const tarjetaPrestamo = (p) => {
+    const est = estadoPrestamo(p);
+    const tipo = tipoPrestamo(p);
+    const avance = est.cuotas.length ? Math.round(est.pagadas / est.cuotas.length * 100) : 0;
+    const borde = est.terminado ? 'border-gray-100' : est.proxima?.estado === 'vencida' ? 'border-red-300' : est.proxima?.estado === 'proxima' ? 'border-amber-300' : 'border-gray-100';
+    return `
+        <button onclick="verPrestamo('${p.id}')" class="w-full text-left bg-white rounded-2xl p-4 shadow-sm border ${borde} active:bg-gray-50 transition-colors">
+            <div class="flex justify-between items-start gap-3">
+                <div class="min-w-0">
+                    <p class="font-bold text-gray-800 truncate">${escaparHtml(p.nombre)}</p>
+                    <p class="text-[11px] text-gray-400 font-medium truncate"><i class="fa-solid ${tipo.icono} mr-1"></i>${tipo.texto}${p.acreedor ? ' · ' + escaparHtml(p.acreedor) : ''}</p>
+                </div>
+                ${est.terminado ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap"><i class="fa-solid fa-flag-checkered mr-1"></i>Terminado</span>' : est.proxima ? chipCuota(est.proxima) : ''}
+            </div>
+            <div class="mt-3">
+                <div class="flex justify-between text-[11px] font-bold text-gray-500 mb-1"><span>${est.pagadas} de ${plural(est.cuotas.length, 'cuota pagada', 'cuotas pagadas')}</span><span>${avance}%</span></div>
+                <div class="h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-amber-500 rounded-full" style="width: ${avance}%"></div></div>
+            </div>
+            ${est.terminado ? '' : `
+            <div class="grid grid-cols-2 gap-2 mt-3">
+                <div class="bg-gray-50 rounded-lg p-2">
+                    <p class="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Falta pagar</p>
+                    <p class="font-black text-gray-800 text-sm">${formatearDinero(est.saldo)}</p>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-2">
+                    <p class="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Próxima cuota</p>
+                    <p class="font-black text-gray-800 text-sm">${est.proxima ? `${formatearDinero(est.proxima.monto)} <span class="text-[10px] text-gray-400">· ${formatearDiaMes(inputAFecha(est.proxima.vence))}</span>` : '—'}</p>
+                </div>
+            </div>`}
+        </button>`;
+};
+
+function renderPrestamos() {
+    const cont = document.getElementById('gastos-prestamos');
+    const encabezado = `
+        <div class="flex justify-between items-center mb-4 px-1">
+            <h2 class="text-xl font-bold text-pipon-brown">Préstamos y cuotas</h2>
+            <button onclick="abrirPrestamo()" class="text-sm font-bold text-amber-700 bg-amber-100 px-4 py-1.5 rounded-full flex items-center gap-1 active:bg-amber-200 transition-colors shadow-sm"><i class="fa-solid fa-plus"></i> Nuevo</button>
+        </div>`;
+
+    if (estadoPrestamos === 'error') {
+        cont.innerHTML = encabezado + `<div class="text-center py-8 px-4 bg-red-50 rounded-2xl border border-red-200"><i class="fa-solid fa-triangle-exclamation text-3xl text-red-300 mb-3 block"></i><p class="text-red-700 font-bold text-sm">No se pudieron cargar los préstamos.</p><p class="text-red-600 text-xs mt-1">Revisá la conexión y que la regla de Firebase con "prestamos" esté publicada.</p></div>`;
+        return;
+    }
+    if (estadoPrestamos === 'cargando') {
+        cont.innerHTML = encabezado + `<p class="text-center text-gray-500 mt-10">Cargando préstamos...</p>`;
+        return;
+    }
+    if (!prestamosData.length) {
+        cont.innerHTML = encabezado + `<div class="text-center py-10 px-4 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm"><i class="fa-solid fa-hand-holding-dollar text-4xl text-gray-200 mb-3 block"></i><p class="text-gray-500 font-medium">No hay préstamos ni compras en cuotas.</p><p class="text-xs text-gray-400 mt-1">Cargá uno y te avisamos antes de cada vencimiento.</p></div>`;
+        return;
+    }
+
+    const lista = prestamosData.map(p => ({ p, est: estadoPrestamo(p) }));
+    const activos = lista.filter(x => !x.est.terminado)
+        .sort((a, b) => (a.est.proxima?.vence || '9').localeCompare(b.est.proxima?.vence || '9'));
+    const terminados = lista.filter(x => x.est.terminado).sort((a, b) => a.p.nombre.localeCompare(b.p.nombre));
+
+    const mes = fechaAInput(new Date()).slice(0, 7);
+    const cuotasPendientes = activos.flatMap(x => x.est.cuotas.filter(c => c.estado !== 'pagada'));
+    const saldoTotal = activos.reduce((s, x) => s + x.est.saldo, 0);
+    const esteMes = cuotasPendientes.filter(c => c.vence.slice(0, 7) === mes).reduce((s, c) => s + c.monto, 0);
+    const vencidas = cuotasPendientes.filter(c => c.estado === 'vencida');
+
+    let html = encabezado;
+    if (activos.length) {
+        html += `
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-amber-100 mb-4 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <p class="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Falta pagar (total)</p>
+                    <p class="font-black text-gray-800 text-lg">${formatearDinero(saldoTotal)}</p>
+                </div>
+                <div>
+                    <p class="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Vence este mes</p>
+                    <p class="font-black text-amber-600 text-lg">${formatearDinero(esteMes)}</p>
+                </div>
+            </div>
+            ${vencidas.length ? `<p class="mt-3 text-xs font-bold text-red-600 bg-red-50 rounded-lg px-3 py-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i>${plural(vencidas.length, 'cuota vencida', 'cuotas vencidas')} sin pagar: ${formatearDinero(vencidas.reduce((s, c) => s + c.monto, 0))}</p>` : ''}
+        </div>
+        <div class="flex flex-col gap-3">${activos.map(x => tarjetaPrestamo(x.p)).join('')}</div>`;
+    } else {
+        html += `<div class="text-center py-6 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm"><p class="text-gray-500 font-medium text-sm"><i class="fa-solid fa-circle-check text-green-500 mr-1"></i>No hay cuotas pendientes.</p></div>`;
+    }
+    if (terminados.length) {
+        html += `
+        <details class="mt-5 group">
+            <summary class="cursor-pointer list-none text-xs font-bold text-gray-400 uppercase tracking-widest px-1 flex items-center gap-2"><i class="fa-solid fa-chevron-right transition-transform group-open:rotate-90"></i>Terminados (${terminados.length})</summary>
+            <div class="flex flex-col gap-3 mt-3">${terminados.map(x => tarjetaPrestamo(x.p)).join('')}</div>
+        </details>`;
+    }
+    cont.innerHTML = html + '<div class="h-8"></div>';
+}
+
+// ----- Alta y edición -----
+window.abrirPrestamo = function(id = null) {
+    const p = id ? prestamosData.find(x => x.id === id) : null;
+    document.getElementById('titulo-modal-prestamo').innerText = p ? 'Editar' : 'Préstamo o cuotas';
+    document.getElementById('prestamo-id').value = p?.id || '';
+    document.getElementById('prestamo-tipo').innerHTML = Object.entries(TIPOS_PRESTAMO).map(([valor, t]) => `<option value="${valor}">${t.texto}</option>`).join('');
+    document.getElementById('prestamo-tipo').value = p?.tipo && TIPOS_PRESTAMO[p.tipo] ? p.tipo : 'prestamo';
+    document.getElementById('prestamo-nombre').value = p?.nombre || '';
+    document.getElementById('prestamo-acreedor').value = p?.acreedor || '';
+    document.getElementById('prestamo-fecha').value = p?.fecha || fechaAInput(new Date());
+    document.getElementById('prestamo-monto').value = p?.montoRecibido || '';
+    document.getElementById('prestamo-aviso').value = p ? avisoDe(p) : AVISO_PRESTAMO_DIAS;
+    document.getElementById('prestamo-notas').value = p?.notas || '';
+    // las cuotas se arman solo al crear; después se editan una por una desde el detalle
+    document.getElementById('prestamo-campos-cuotas').classList.toggle('hidden', !!p);
+    if (!p) {
+        document.getElementById('prestamo-cuotas').value = '';
+        document.getElementById('prestamo-monto-cuota').value = '';
+        document.getElementById('prestamo-primer-vencimiento').value = sumarMeses(fechaAInput(new Date()), 1);
+    }
+    renderVistaPreviaPrestamo();
+    if (p) cerrarModal('modalPrestamoDetalle');
+    setTimeout(() => abrirModal('modalPrestamo'), p ? 300 : 0);
+};
+
+const leerCuotasForm = () => ({
+    cantidad: Number(document.getElementById('prestamo-cuotas').value),
+    monto: Number(document.getElementById('prestamo-monto-cuota').value),
+    primerVencimiento: document.getElementById('prestamo-primer-vencimiento').value
+});
+
+window.renderVistaPreviaPrestamo = function() {
+    const tipo = TIPOS_PRESTAMO[document.getElementById('prestamo-tipo').value] || TIPOS_PRESTAMO.prestamo;
+    document.getElementById('label-prestamo-monto').innerText = tipo.monto;
+    const el = document.getElementById('prestamo-vista-previa');
+    const { cantidad, monto, primerVencimiento } = leerCuotasForm();
+    if (!(Number.isInteger(cantidad) && cantidad >= 1 && cantidad <= MAX_CUOTAS) || !(monto > 0) || !primerVencimiento) {
+        el.innerText = 'Completá cuotas, monto y primer vencimiento para ver el resumen.';
+        return;
+    }
+    const total = cantidad * monto;
+    const recibido = Number(document.getElementById('prestamo-monto').value);
+    const ultima = sumarMeses(primerVencimiento, cantidad - 1);
+    el.innerText = `${plural(cantidad, 'cuota', 'cuotas')} de ${formatearDinero(monto)}`
+        + (cantidad > 1 ? ` · del ${fechaCorta(primerVencimiento)} al ${fechaCorta(ultima)}` : ` · vence el ${fechaCorta(primerVencimiento)}`)
+        + ` · Total ${formatearDinero(total)}`
+        + (recibido > 0 && total > recibido ? ` (${formatearDinero(total - recibido)} de diferencia)` : '');
+};
+
+window.guardarPrestamo = async function(e) {
+    e.preventDefault();
+    if (!esAdmin) return;
+    await conBotonBloqueado(e, async () => {
+        const id = document.getElementById('prestamo-id').value;
+        const aviso = parseInt(document.getElementById('prestamo-aviso').value, 10);
+        const recibido = Number(document.getElementById('prestamo-monto').value);
+        const datos = {
+            tipo: document.getElementById('prestamo-tipo').value,
+            nombre: document.getElementById('prestamo-nombre').value.trim(),
+            acreedor: document.getElementById('prestamo-acreedor').value.trim(),
+            fecha: document.getElementById('prestamo-fecha').value,
+            montoRecibido: recibido > 0 ? recibido : null,
+            avisoDias: Number.isInteger(aviso) && aviso >= 0 ? Math.min(aviso, 60) : AVISO_PRESTAMO_DIAS,
+            notas: document.getElementById('prestamo-notas').value.trim()
+        };
+        if (!datos.nombre) { mostrarAviso('Poné un nombre.', 'error'); return; }
+        if (!datos.fecha) { mostrarAviso('Elegí la fecha.', 'error'); return; }
+
+        try {
+            if (id) {
+                await actualizarDoc(documento('prestamos', id), datos);
+                cerrarModal('modalPrestamo');
+                mostrarAviso('Cambios guardados.', 'ok');
+                setTimeout(() => verPrestamo(id), 300);
+                return;
+            }
+            const { cantidad, monto, primerVencimiento } = leerCuotasForm();
+            if (!Number.isInteger(cantidad) || cantidad < 1 || cantidad > MAX_CUOTAS) { mostrarAviso(`La cantidad de cuotas tiene que ser entre 1 y ${MAX_CUOTAS}.`, 'error'); return; }
+            if (!(monto > 0)) { mostrarAviso('Poné el monto de cada cuota.', 'error'); return; }
+            if (!primerVencimiento) { mostrarAviso('Elegí cuándo vence la primera cuota.', 'error'); return; }
+            await crearDoc(coleccion('prestamos'), { ...datos, cuotas: armarCuotas(cantidad, monto, primerVencimiento), creado: new Date() });
+            cerrarModal('modalPrestamo');
+            subPestanaGastos = 'prestamos';
+            renderSubPestanasGastos();
+            mostrarAviso('Guardado. Te avisamos antes de cada vencimiento.', 'ok');
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
+        }
+    });
+};
+
+window.eliminarPrestamo = async function(id) {
+    const p = prestamosData.find(x => x.id === id);
+    if (!esAdmin || !p) return;
+    const pagos = gastosData.filter(g => g.prestamoId === id).length;
+    if (!confirm(`¿Eliminar "${p.nombre}"?${pagos ? `\nLos ${plural(pagos, 'pago ya registrado', 'pagos ya registrados')} quedan en Gastos.` : ''}`)) return;
+    try {
+        await borrarDoc(documento('prestamos', id));
+        cerrarModal('modalPrestamoDetalle');
+        mostrarAviso('Eliminado.', 'ok');
+    } catch (error) {
+        console.error(error);
+        mostrarAviso('No se pudo eliminar. Probá de nuevo.', 'error');
+    }
+};
+
+// ----- Detalle -----
+window.verPrestamo = function(id) {
+    prestamoAbierto = id;
+    renderDetallePrestamo();
+    abrirModal('modalPrestamoDetalle');
+};
+
+// desde el aviso de Inicio: va a Gastos > Préstamos y abre el detalle
+window.irAPrestamo = function(id = null) {
+    subPestanaGastos = 'prestamos';
+    cambiarPestana('gastos');
+    if (id) verPrestamo(id);
+};
+
+const datoPrestamo = (titulo, valor, color = 'text-gray-800') => `
+    <div class="bg-amber-50/60 rounded-xl p-2.5 border border-amber-100">
+        <p class="text-[9px] uppercase font-bold text-gray-400 tracking-wider">${titulo}</p>
+        <p class="font-black ${color} text-sm">${valor}</p>
+    </div>`;
+
+function renderDetallePrestamo() {
+    const cont = document.getElementById('prestamo-detalle-contenido');
+    const p = prestamosData.find(x => x.id === prestamoAbierto);
+    if (!p) { cont.innerHTML = `<p class="text-center text-gray-400 py-8">No se encontró.</p>`; return; }
+    const est = estadoPrestamo(p);
+    const tipo = tipoPrestamo(p);
+    const total = est.cuotas.length;
+    const ultima = est.cuotas[total - 1];
+
+    const filaCuota = (c) => {
+        const pago = c.pagos[0];
+        const acciones = c.estado === 'pagada'
+            ? `<button onclick="deshacerPagoCuota('${p.id}', ${c.numero})" class="text-[11px] font-bold text-gray-400 px-2 py-1.5 rounded-lg active:bg-gray-100">Deshacer</button>`
+            : `<button onclick="abrirEditarCuota('${p.id}', ${c.numero})" class="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center active:bg-gray-200" aria-label="Editar cuota ${c.numero}"><i class="fa-solid fa-pen text-[10px]"></i></button>
+               <a href="${linkCalendarioCuota(p, c, total)}" target="_blank" rel="noopener" class="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center active:bg-gray-200" aria-label="Agregar la cuota ${c.numero} a Google Calendar"><i class="fa-regular fa-calendar-plus text-xs"></i></a>
+               <button onclick="abrirPagarCuota('${p.id}', ${c.numero})" class="h-8 px-3 rounded-lg bg-amber-500 text-white text-xs font-black active:scale-95 transition-all">Pagar</button>`;
+        return `
+            <div class="rounded-xl p-3 border ${c.estado === 'vencida' ? 'border-red-200 bg-red-50/50' : c.estado === 'proxima' ? 'border-amber-200 bg-amber-50/50' : 'border-gray-100 bg-white'}">
+                <div class="flex justify-between items-center gap-2">
+                    <div class="min-w-0">
+                        <p class="text-sm font-bold text-gray-800">Cuota ${c.numero}/${total} <span class="font-black ${c.estado === 'pagada' ? 'text-green-600' : 'text-gray-800'}">· ${formatearDinero(c.estado === 'pagada' ? c.pagado : c.monto)}</span></p>
+                        <p class="text-[11px] text-gray-500 font-medium mt-0.5">${c.estado === 'pagada'
+                            ? `Pagada el ${formatearFecha(pago.timestamp)}${pago.metodo ? ' · ' + escaparHtml(pago.metodo) : ''}${c.pagos.length > 1 ? ` · <span class="text-red-500 font-bold">${c.pagos.length} pagos cargados</span>` : ''}`
+                            : `Vence ${fechaCorta(c.vence)}`}</p>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">${acciones}</div>
+                </div>
+                ${c.estado === 'pagada' ? '' : `<div class="mt-2">${chipCuota(c)}</div>`}
+            </div>`;
+    };
+
+    cont.innerHTML = `
+        <div class="flex justify-between items-start gap-3 mb-4">
+            <div class="min-w-0">
+                <p class="text-xl font-black text-gray-800 break-words">${escaparHtml(p.nombre)}</p>
+                <p class="text-xs text-gray-400 font-medium mt-0.5"><i class="fa-solid ${tipo.icono} mr-1"></i>${tipo.texto}${p.acreedor ? ' · ' + escaparHtml(p.acreedor) : ''}</p>
+                ${p.fecha ? `<p class="text-xs text-gray-400 font-medium mt-0.5"><i class="fa-regular fa-calendar mr-1"></i>${fechaCorta(p.fecha)}</p>` : ''}
+            </div>
+            <button onclick="abrirPrestamo('${p.id}')" class="w-9 h-9 bg-gray-100 text-gray-500 rounded-full flex items-center justify-center shrink-0 active:bg-gray-200" aria-label="Editar"><i class="fa-solid fa-pen text-xs"></i></button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 mb-3">
+            ${datoPrestamo('Pagado', `${formatearDinero(est.pagado)} <span class="text-[10px] text-gray-400">· ${est.pagadas}/${total}</span>`, 'text-green-600')}
+            ${datoPrestamo('Falta pagar', formatearDinero(est.saldo), est.saldo ? 'text-red-600' : 'text-gray-800')}
+            ${p.montoRecibido ? datoPrestamo(tipo.monto, formatearDinero(p.montoRecibido)) : ''}
+            ${datoPrestamo('Total en cuotas', `${formatearDinero(est.total)}${p.montoRecibido && est.total > p.montoRecibido ? ` <span class="text-[10px] text-gray-400">· +${formatearDinero(est.total - p.montoRecibido)}</span>` : ''}`)}
+        </div>
+        <p class="text-[11px] text-gray-500 font-medium mb-4 px-1"><i class="fa-regular fa-bell mr-1"></i>${est.aviso ? `Avisa ${plural(est.aviso, 'día', 'días')} antes de cada vencimiento` : 'Avisa el mismo día del vencimiento'}</p>
+
+        ${p.notas ? `<div class="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-4 text-sm text-amber-900 whitespace-pre-line break-words"><i class="fa-regular fa-note-sticky mr-1.5"></i>${escaparHtml(p.notas)}</div>` : ''}
+
+        ${est.terminado ? '' : `<button onclick="descargarCalendarioPrestamo('${p.id}')" class="w-full mb-4 bg-white border border-amber-200 text-amber-700 font-bold py-2.5 rounded-xl text-sm active:bg-amber-50"><i class="fa-regular fa-calendar-plus mr-1.5"></i>Agregar las cuotas pendientes al calendario del celular</button>`}
+
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Cuotas</p>
+        <div class="flex flex-col gap-2 mb-4">${est.cuotas.map(filaCuota).join('')}</div>
+
+        <div class="grid grid-cols-2 gap-2 mb-2">
+            <button onclick="agregarCuota('${p.id}')" class="bg-gray-50 border border-gray-100 text-gray-600 font-bold py-3 rounded-xl text-sm active:bg-gray-100"><i class="fa-solid fa-plus mr-1.5"></i>Agregar cuota</button>
+            <button onclick="quitarUltimaCuota('${p.id}')" ${!ultima || ultima.estado === 'pagada' || total <= 1 ? 'disabled' : ''} class="bg-gray-50 border border-gray-100 text-gray-600 font-bold py-3 rounded-xl text-sm active:bg-gray-100 disabled:opacity-40"><i class="fa-solid fa-minus mr-1.5"></i>Quitar la última</button>
+        </div>
+        <button onclick="eliminarPrestamo('${p.id}')" class="w-full text-xs font-bold text-red-400 py-2"><i class="fa-solid fa-trash mr-1"></i>Eliminar</button>`;
+}
+
+// ----- Cuotas: pagar, editar, agregar y quitar -----
+const buscarCuota = (prestamoId, numero) => {
+    const p = prestamosData.find(x => x.id === prestamoId);
+    const c = p && estadoPrestamo(p).cuotas.find(x => x.numero === numero);
+    return p && c ? { p, c, total: (p.cuotas || []).length } : null;
+};
+
+function prepararModalCuota(modo, { p, c, total }) {
+    cuotaEnEdicion = { prestamoId: p.id, numero: c.numero, modo };
+    const pagar = modo === 'pagar';
+    document.getElementById('titulo-modal-cuota').innerText = pagar ? 'Pagar cuota' : 'Editar cuota';
+    document.getElementById('cuota-subtitulo').innerText = `Cuota ${c.numero}/${total} · ${p.nombre}${pagar ? ` · vence ${fechaCorta(c.vence)}` : ''}`;
+    document.getElementById('cuota-monto').value = c.monto || '';
+    document.getElementById('label-cuota-fecha').innerText = pagar ? 'Fecha de pago' : 'Vence';
+    const fecha = document.getElementById('cuota-fecha');
+    fecha.value = pagar ? fechaAInput(new Date()) : c.vence;
+    // no se puede pagar con fecha futura; un vencimiento sí puede ser cualquier día
+    if (pagar) fecha.max = fechaAInput(new Date()); else fecha.removeAttribute('max');
+    document.getElementById('cuota-campo-metodo').classList.toggle('hidden', !pagar);
+    document.getElementById('cuota-metodo').value = 'Efectivo';
+    const botones = document.querySelectorAll('.metodo-btn-cuota');
+    seleccionarMetodo('cuota', 'Efectivo', botones[0]);
+    document.getElementById('cuota-boton').innerText = pagar ? 'Registrar pago' : 'Guardar';
+    abrirModal('modalCuota');
+}
+
+window.abrirPagarCuota = function(prestamoId, numero) {
+    const cuota = buscarCuota(prestamoId, numero);
+    if (!cuota) return;
+    if (cuota.c.estado === 'pagada') { mostrarAviso('Esa cuota ya está pagada.', 'error'); return; }
+    prepararModalCuota('pagar', cuota);
+};
+
+window.abrirEditarCuota = function(prestamoId, numero) {
+    const cuota = buscarCuota(prestamoId, numero);
+    if (cuota) prepararModalCuota('editar', cuota);
+};
+
+window.guardarCuota = async function(e) {
+    e.preventDefault();
+    if (!esAdmin || !cuotaEnEdicion) return;
+    await conBotonBloqueado(e, async () => {
+        const { prestamoId, numero, modo } = cuotaEnEdicion;
+        const cuota = buscarCuota(prestamoId, numero);
+        if (!cuota) { mostrarAviso('No se encontró la cuota.', 'error'); return; }
+        const { p, c, total } = cuota;
+        const monto = Number(document.getElementById('cuota-monto').value);
+        const fecha = document.getElementById('cuota-fecha').value;
+        if (!(monto > 0)) { mostrarAviso('Poné un monto.', 'error'); return; }
+        if (!fecha) { mostrarAviso('Elegí la fecha.', 'error'); return; }
+
+        try {
+            if (modo === 'pagar') {
+                if (c.estado === 'pagada') { mostrarAviso('Esa cuota ya está pagada.', 'error'); return; }
+                if (fecha > fechaAInput(new Date())) { mostrarAviso('La fecha de pago no puede ser futura.', 'error'); return; }
+                await crearDoc(coleccion('gastos'), {
+                    monto,
+                    descripcion: `Cuota ${numero}/${total} · ${p.nombre}`,
+                    metodo: document.getElementById('cuota-metodo').value,
+                    timestamp: fechaElegida(fecha),
+                    prestamoId: p.id,
+                    cuota: numero
+                });
+                cerrarModal('modalCuota');
+                mostrarAviso('Cuota pagada. Ya figura en los gastos.', 'ok');
+            } else {
+                const cuotas = (p.cuotas || []).map(x => x.numero === numero ? { ...x, monto, vence: fecha } : x);
+                await actualizarDoc(documento('prestamos', p.id), { cuotas });
+                cerrarModal('modalCuota');
+                mostrarAviso('Cuota actualizada.', 'ok');
+            }
+        } catch (error) {
+            console.error(error);
+            mostrarAviso('No se pudo guardar. Probá de nuevo.', 'error');
+        }
+    });
+};
+
+// el pago va a la papelera de gastos (se puede restaurar desde el Historial) y la cuota vuelve a quedar pendiente
+window.deshacerPagoCuota = async function(prestamoId, numero) {
+    const cuota = buscarCuota(prestamoId, numero);
+    if (!esAdmin || !cuota || !cuota.c.pagos.length) return;
+    if (!confirm(`¿Deshacer el pago de la cuota ${numero}?\nEl gasto de ${formatearDinero(cuota.c.pagado)} va a la papelera y la cuota vuelve a quedar pendiente.`)) return;
+    try {
+        await Promise.all(cuota.c.pagos.map(g => actualizarDoc(documento('gastos', g.id), { eliminado: true })));
+        mostrarAviso('Pago deshecho. La cuota quedó pendiente.', 'ok');
+    } catch (error) {
+        console.error(error);
+        mostrarAviso('No se pudo deshacer. Probá de nuevo.', 'error');
+    }
+};
+
+window.agregarCuota = async function(prestamoId) {
+    const p = prestamosData.find(x => x.id === prestamoId);
+    if (!esAdmin || !p) return;
+    const cuotas = [...(p.cuotas || [])].sort((a, b) => a.numero - b.numero);
+    if (cuotas.length >= MAX_CUOTAS) { mostrarAviso(`Hasta ${MAX_CUOTAS} cuotas.`, 'error'); return; }
+    const ultima = cuotas[cuotas.length - 1];
+    // el mes siguiente a la última, con el día de la primera cuota: si el plan es los 31, después de un 28 de febrero vuelve al 31
+    const diaDelPlan = cuotas[0]?.vence.slice(8);
+    const nueva = ultima
+        ? { numero: ultima.numero + 1, vence: sumarMeses(`${ultima.vence.slice(0, 8)}${diaDelPlan}`, 1), monto: Number(ultima.monto) || 0 }
+        : { numero: 1, vence: sumarMeses(fechaAInput(new Date()), 1), monto: 0 };
+    try {
+        await actualizarDoc(documento('prestamos', p.id), { cuotas: [...cuotas, nueva] });
+        mostrarAviso(`Cuota ${nueva.numero} agregada. Revisá la fecha y el monto.`, 'ok');
+    } catch (error) {
+        console.error(error);
+        mostrarAviso('No se pudo agregar. Probá de nuevo.', 'error');
+    }
+};
+
+window.quitarUltimaCuota = async function(prestamoId) {
+    const p = prestamosData.find(x => x.id === prestamoId);
+    if (!esAdmin || !p) return;
+    const est = estadoPrestamo(p);
+    const ultima = est.cuotas[est.cuotas.length - 1];
+    if (!ultima || est.cuotas.length <= 1) return;
+    if (ultima.estado === 'pagada') { mostrarAviso('La última cuota ya está pagada.', 'error'); return; }
+    if (!confirm(`¿Quitar la cuota ${ultima.numero} (${formatearDinero(ultima.monto)}, vence ${fechaCorta(ultima.vence)})?`)) return;
+    try {
+        await actualizarDoc(documento('prestamos', p.id), { cuotas: (p.cuotas || []).filter(c => c.numero !== ultima.numero) });
+        mostrarAviso('Cuota quitada.', 'ok');
+    } catch (error) {
+        console.error(error);
+        mostrarAviso('No se pudo quitar. Probá de nuevo.', 'error');
+    }
+};
+
+// ----- Calendario: Google Calendar por cuota o archivo .ics con todas las pendientes -----
+const tituloCuotaCalendario = (p, c, total) => `Vence cuota ${c.numero}/${total} · ${p.nombre}`;
+const detalleCuotaCalendario = (p, c) => [`Monto: ${formatearDinero(c.monto)}`, p.acreedor ? `A pagar a: ${p.acreedor}` : '', 'Cargado en Control Pipón'].filter(Boolean).join('\n');
+const linkCalendarioCuota = (p, c, total) => 'https://calendar.google.com/calendar/render?action=TEMPLATE'
+    + `&text=${encodeURIComponent(tituloCuotaCalendario(p, c, total))}`
+    + `&dates=${c.vence.replaceAll('-', '')}/${diaSiguiente(c.vence).replaceAll('-', '')}`
+    + `&details=${encodeURIComponent(detalleCuotaCalendario(p, c))}`;
+
+const textoIcs = (texto) => String(texto).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+// las líneas largas del .ics se parten en renglones de hasta 50 caracteres (los siguientes empiezan con espacio)
+const plegarIcs = (linea) => linea.length <= 50 ? linea : linea.match(/.{1,50}/gu).join('\r\n ');
+
+window.descargarCalendarioPrestamo = function(prestamoId) {
+    const p = prestamosData.find(x => x.id === prestamoId);
+    if (!p) return;
+    const est = estadoPrestamo(p);
+    const total = est.cuotas.length;
+    const pendientes = est.cuotas.filter(c => c.estado !== 'pagada');
+    if (!pendientes.length) { mostrarAviso('No quedan cuotas por pagar.', 'error'); return; }
+
+    const sello = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const alarma = (disparo, titulo) => ['BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${textoIcs(titulo)}`, `TRIGGER:${disparo}`, 'END:VALARM'];
+    const eventos = pendientes.flatMap(c => {
+        const titulo = tituloCuotaCalendario(p, c, total);
+        return [
+            'BEGIN:VEVENT',
+            `UID:pipon-${p.id}-cuota-${c.numero}@sistema-pipon`,
+            `DTSTAMP:${sello}`,
+            `DTSTART;VALUE=DATE:${c.vence.replaceAll('-', '')}`,
+            `DTEND;VALUE=DATE:${diaSiguiente(c.vence).replaceAll('-', '')}`,
+            `SUMMARY:${textoIcs(titulo)}`,
+            `DESCRIPTION:${textoIcs(detalleCuotaCalendario(p, c))}`,
+            // a las 9 de la mañana, N días antes y el mismo día del vencimiento
+            ...(est.aviso > 0 ? alarma(`-PT${est.aviso * 24 - 9}H`, titulo) : []),
+            ...alarma('PT9H', titulo),
+            'END:VEVENT'
+        ];
+    });
+    const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Pipon//Control Pipon//ES', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', ...eventos, 'END:VCALENDAR']
+        .map(plegarIcs).join('\r\n') + '\r\n';
+
+    const archivo = `cuotas-${normalizarTexto(p.nombre).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'pipon'}.ics`;
+    const enlace = document.createElement('a');
+    enlace.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+    enlace.download = archivo;
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    setTimeout(() => URL.revokeObjectURL(enlace.href), 2000);
+    mostrarAviso('Abrí el archivo descargado para sumar las cuotas a tu calendario.', 'ok');
+};
+
+// ----- Avisos en Inicio y en el botón de Gastos -----
+function renderAlertasPrestamos() {
+    const cont = document.getElementById('alertas-prestamos');
+    const badge = document.getElementById('badge-gastos');
+    const avisos = esAdmin && estadoPrestamos === 'listo' ? avisosPrestamos() : [];
+
+    badge.innerText = avisos.length;
+    badge.classList.toggle('hidden', !avisos.length);
+    badge.classList.toggle('flex', !!avisos.length);
+
+    const visibles = avisos.slice(0, 3);
+    let html = visibles.map(({ p, c, de }) => {
+        const vencida = c.estado === 'vencida';
+        return `<button onclick="irAPrestamo('${p.id}')" class="w-full text-left ${vencida ? 'bg-red-500' : 'bg-amber-500'} text-white rounded-2xl p-4 flex items-center gap-3 shadow-md active:scale-95 transition-all">
+            <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><i class="fa-solid ${vencida ? 'fa-triangle-exclamation' : 'fa-calendar-day'}"></i></div>
+            <div class="flex-1 min-w-0"><p class="font-bold truncate">Cuota ${c.numero}/${de} · ${escaparHtml(p.nombre)}</p><p class="text-xs text-white/90">${textoVencimiento(c)} · ${formatearDinero(c.monto)}</p></div>
+            <i class="fa-solid fa-chevron-right text-white/70"></i>
+        </button>`;
+    }).join('');
+    if (avisos.length > visibles.length) {
+        html += `<button onclick="irAPrestamo()" class="w-full text-center text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl py-2.5">Ver las ${avisos.length} cuotas por vencer</button>`;
+    }
+    cont.innerHTML = html;
+    cont.classList.toggle('hidden', !html);
+    cont.classList.toggle('flex', !!html);
+}
 
 // ---------- WhatsApp de Pipón (solo admin) ----------
 // la página de pedidos lo lee de ajustes/publico para mostrar el botón "Avisar por WhatsApp"
@@ -4335,6 +4941,9 @@ function refrescarTodo() {
     renderCrm();
     renderAlertaCrm();
     if (prospectoAbierto) renderFichaProspecto();
+    renderSubPestanasGastos();
+    renderAlertasPrestamos();
+    if (prestamoAbierto) renderDetallePrestamo();
 }
 
 const usuarioAEmail = (usuario) => {
@@ -4496,6 +5105,23 @@ function cargarDatos() {
                 estadoCrm = 'error';
                 renderCrm();
             });
+
+            escuchar(coleccion('prestamos'), (snapshot) => {
+                prestamosData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                estadoPrestamos = 'listo';
+                refrescarTodo();
+            }, (error) => {
+                console.error(error);
+                estadoPrestamos = 'error';
+                renderSubPestanasGastos();
+            });
+
+            // los avisos de vencimiento dependen del día: si el sistema queda abierto, se recalculan cada tanto
+            setInterval(() => {
+                renderAlertasPrestamos();
+                renderSubPestanasGastos();
+                if (prestamoAbierto) renderDetallePrestamo();
+            }, 15 * 60 * 1000);
         }
     } catch (error) {
         console.error("Error inicializando Firebase:", error);
